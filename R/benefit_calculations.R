@@ -2,6 +2,10 @@
 #' AIME Calculation
 
 aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating the AIME of a specific worker
+  #How earnings are indexed is described in Section 700.3 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
+  #AIME Computation is described in Section 701 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
 
   dataset <- worker %>% left_join(assumptions %>% select(year, awi, taxmax, qc_rec),
                                   by = "year")
@@ -12,7 +16,7 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   # Calculate indexed earnings
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
-      awi_age60 = awi[age == 60],
+      awi_age60 = awi[which(age == 60)],
       index_factor = pmax(awi_age60 / awi, 1),
       capped_earn = pmin(earnings, taxmax),
       indexed_earn = capped_earn * index_factor) %>%
@@ -63,11 +67,11 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
-      bp1_age62 = bp1[age == 62],
-      bp2_age62 = bp2[age == 62],
-      fact1_age62 = fact1[age == 62],
-      fact2_age62 = fact2[age == 62],
-      fact3_age62 = fact3[age == 62],
+      bp1_age62 = bp1[which(age == 62)],
+      bp2_age62 = bp2[which(age == 62)],
+      fact1_age62 = fact1[which(age == 62)],
+      fact2_age62 = fact2[which(age == 62)],
+      fact3_age62 = fact3[which(age == 62)],
       basic_pia = floor(case_when(
         aime > bp2_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (bp2_age62 - bp1_age62)) + (fact3_age62 * (aime - bp2_age62)),
         aime > bp1_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (aime - bp1_age62)),
@@ -96,7 +100,7 @@ cola <- function (worker, assumptions, debugg = FALSE) {
                                   by = "year")
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
-    cpi_age62 = cpi_w[age == 62],
+    cpi_age62 = cpi_w[which(age == 62)],
     cpi_index_factor = pmax(cpi_w / cpi_age62, 1),
     cola_pia = floor(basic_pia * cpi_index_factor)
   ) %>% ungroup()
@@ -144,10 +148,10 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
     group_by(id) %>% arrange(id, age) %>%
     mutate(
       yr_62 = year - age + 62,
-      rf1_ind = rf1[year == yr_62],
-      rf2_ind = rf2[year == yr_62],
-      drc_ind = drc[year == yr_62],
-      nra_ind = nra[year == yr_62],
+      rf1_ind = rf1[which(year == yr_62)],
+      rf2_ind = rf2[which(year == yr_62)],
+      drc_ind = drc[which(year == yr_62)],
+      nra_ind = nra[which(year == yr_62)],
       act_factor = rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind),
       wrk_ben = case_when(
         age >= claim_age ~ floor(cola_pia * act_factor),
