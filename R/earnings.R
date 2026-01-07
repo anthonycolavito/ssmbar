@@ -23,7 +23,7 @@
 
 earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
                                custom_avg_earnings=NULL,
-                               spouse=FALSE) {
+                               spouse=FALSE, debugg = FALSE) {
 
   first_yr <- birth_yr + 21 #First earnings year
   last_yr <- birth_yr + 119 #Last possible year alive (used for benefit amounts)
@@ -43,15 +43,13 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
   #Initial dataframe that merges in necessary assumptions with the worker's trait variables.
 
 
-  if (worker_type != "custom") {
+  if (type != "custom") {
   #Base condition -- when a worker is one of the Trustees' scaled workers.
 
-    worker <- worker %>% left_join(sef %>% filter(worker == type) %>% select(age, factor),
+    worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
-        earnings = case_when(
-          age < age_stop ~ awi * factor, #Creates earnings at each age
-          TRUE ~ 0)
+        earnings =  awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), #Creates earnings at each age
       )
 
   } # End of type conditional
@@ -60,14 +58,30 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
   #The average earnings levels for these workers are equal the specified amounts in inflation-adjusted terms.
   #This section needs to be modified to make these workers more realistic based on the Trustees' scaled earnings factors.
 
+    worker <- worker %>% left_join(factors %>% filter(.data$worker == "raw") %>% select(age, factor),
+                                   by = "age") %>%
+      mutate(
+      pi_age65 = gdp_pi[which(age==65)],
+      index = pi_age65 / gdp_pi,
+      nom_earn = factor * awi,
+      real_earn = nom_earn * index)
+
+    real_earn <- worker$real_earn
+    avg_real_earn <- sum(sort(real_earn, decreasing = TRUE)[1:35]) / 35
+    scalar <- custom_avg_earnings / avg_real_earn
+
     worker <- worker %>% mutate(
-      earnings = case_when(
-        age < age_stop ~ custom_avg_earnings * gdp_pi / pi_age65,
-        TRUE ~ 0)
+      adj_real_earn = real_earn * scalar,
+      earnings = adj_real_earn * gdp_pi / pi_age65
     )
   }
 
-  worker <- worker %>% select(id, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
+  if (debugg) {
+    worker <- worker
+  }
+  else{
+    worker <- worker %>% select(id, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
+  }
 
   return(worker)
 
