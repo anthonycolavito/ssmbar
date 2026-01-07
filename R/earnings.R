@@ -10,7 +10,6 @@
 #' @param factors Data frame for the Trustees' scaled earnings factors.
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions.
 #' @param custom_avg_earnings Numeric value for the real average earnings for the worker, if type="custom" is selected.
-#' @param spouse Boolean value for whether the worker has a spouse -- not currently in use.
 #'
 #' @return worker Data frame with the earnings of the worker.
 #' @examples
@@ -23,7 +22,7 @@
 
 earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
                                custom_avg_earnings=NULL,
-                               spouse=FALSE, debugg = FALSE) {
+                               debugg = FALSE) {
 
   first_yr <- birth_yr + 21 #First earnings year
   last_yr <- birth_yr + 119 #Last possible year alive (used for benefit amounts)
