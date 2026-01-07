@@ -54,24 +54,28 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
   } # End of type conditional
   else {
   #Condition for when a worker is specified as custom.
-  #The average earnings levels for these workers are equal the specified amounts in inflation-adjusted terms.
-  #This section needs to be modified to make these workers more realistic based on the Trustees' scaled earnings factors.
+  #Earnings are generated using the raw scaled earnings factors provided by the trustee in five (5) steps
+  #1. The raw scaled earnings factors are multiplied by the AWI at each age to produce earnings by age in nominal dollars
+  #2. These earnings are inflated/deflated to be in terms of today's dollars.
+  #3. The average of the highest 35 years of real earnings is taken (following the Trustees' method for determining other scaled worker factors)
+  #4. The ratio of the user-specified average earnings to the average resulting from the raw factors is found.
+  #5. The real earnings at each age are multiplied by this ratio and then converted back into nominal dollars.
 
     worker <- worker %>% left_join(factors %>% filter(.data$worker == "raw") %>% select(age, factor),
                                    by = "age") %>%
       mutate(
-      pi_curr = gdp_pi[which(year==as.numeric(format(Sys.Date(), "%Y")))],
-      index = pi_curr / gdp_pi,
-      nom_earn = factor * awi,
-      real_earn = nom_earn * index)
+      pi_curr = gdp_pi[which(year==as.numeric(format(Sys.Date(), "%Y")))], #Price index for the current year
+      index = pi_curr / gdp_pi, #Indexing factors to convert nominal earnings into real earnings
+      nom_earn = factor * awi, #Nominal earnings used the raw scaled earnings factor and the yearly AWI
+      real_earn = nom_earn * index) #Real earnings
 
-    real_earn <- worker$real_earn
-    avg_real_earn <- sum(sort(real_earn, decreasing = TRUE)[1:35]) / 35
-    scalar <- custom_avg_earnings / avg_real_earn
+    real_earn <- worker$real_earn #Vector of the worke's real earnings
+    avg_real_earn <- sum(sort(real_earn, decreasing = TRUE)[1:35]) / 35 #Average of the highest 35 real earnings
+    scalar <- custom_avg_earnings / avg_real_earn #Ratio of the specified average to the average found
 
     worker <- worker %>% mutate(
-      adj_real_earn = real_earn * scalar,
-      earnings = adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1))
+      adj_real_earn = real_earn * scalar, #Adjusted real earnings using the scalar previously calculated
+      earnings = adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)) #Final nominal earnings
     )
   }
 
