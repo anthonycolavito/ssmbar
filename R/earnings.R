@@ -9,7 +9,6 @@
 #' @param age_elig Numeric value for the age in which the worker becomes eligible for benefits.
 #' @param factors Data frame for the Trustees' scaled earnings factors.
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions.
-#' @param zero_yrs Numeric value for the number of zero-earning years held by the worker.
 #' @param custom_avg_earnings Numeric value for the real average earnings for the worker, if type="custom" is selected.
 #' @param spouse Boolean value for whether the worker has a spouse -- not currently in use.
 #'
@@ -22,8 +21,8 @@
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else first row_number group_modify
 #' @export
 
-earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions, zero_yrs=0,
-                               custom_avg_earnings=NULL, age_stop=65,
+earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
+                               custom_avg_earnings=NULL,
                                spouse=FALSE) {
 
   first_yr <- birth_yr + 21 #First earnings year
@@ -34,7 +33,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
   worker_type <- if_else(type == "custom", paste0("custom",custom_avg_earnings), type) #Used for constructing a worker's ID
 
-  id <- paste0(worker_type, "-", birth_yr, "-", age_claim, "-", zero_yrs)
+  id <- paste0(worker_type, "-", birth_yr, "-", age_claim)
 
   claim_age <- age_claim #Age a worker claims benefits.
   elig_age <- age_elig #Age a worker is eligible for benefits.
@@ -51,7 +50,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
         earnings = case_when(
-          age < age_stop ~ awi * factor * if_else(row_number() <= zero_yrs, 0, 1), #Creates earnings at each age
+          age < age_stop ~ awi * factor, #Creates earnings at each age
           TRUE ~ 0)
       )
 
@@ -63,7 +62,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
     worker <- worker %>% mutate(
       earnings = case_when(
-        age < age_stop ~ custom_avg_earnings * gdp_pi / pi_age65 * if_else(row_number() <= zero_yrs, 0, 1),
+        age < age_stop ~ custom_avg_earnings * gdp_pi / pi_age65,
         TRUE ~ 0)
     )
   }
