@@ -104,21 +104,24 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
       spouse_pia = case_when(
         year >= s_yr_claim ~ pmax((0.5 * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE),
         TRUE ~ 0),
-      full_pia = sum(basic_pia, spouse_pia, na.rm=TRUE)
+      full_pia = pmax(basic_pia,0,na.rm=TRUE) + pmax(spouse_pia,0,na.rm=TRUE)
     )
+
+        if (debugg) {
+          worker <- worker %>% left_join(dataset %>% select(year, s_pia, spouse_pia, full_pia),
+                                         by="year")
+        }
+        else {
+          worker <- worker %>% left_join(dataset %>% select(year, spouse_pia, full_pia),
+                                         by="year")
+        }
   }
   else {
     dataset <- worker %>% mutate(
       spouse_pia = 0,
-      full_pia = sum(basic_pia, spouse_pia, na.rm=TRUE)
+      full_pia = pmax(basic_pia,0,na.rm=TRUE) + pmax(spouse_pia,0,na.rm=TRUE)
     )
-  }
 
-  if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(year, s_pia, spouse_pia, full_pia),
-                                   by="year")
-  }
-  else {
     worker <- worker %>% left_join(dataset %>% select(year, spouse_pia, full_pia),
                                    by="year")
   }
