@@ -49,7 +49,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
     worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
-        earnings =  awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), #Creates earnings at each age
+        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)),0, na.rm = TRUE), #Creates earnings at each age
       )
 
   } # End of type conditional
@@ -76,7 +76,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
     worker <- worker %>% mutate(
       adj_real_earn = real_earn * scalar, #Adjusted real earnings using the scalar previously calculated
-      earnings = adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)) #Final nominal earnings
+      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)),0, na.rm = TRUE) #Final nominal earnings
     )
   }
 

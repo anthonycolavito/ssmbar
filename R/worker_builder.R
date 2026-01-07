@@ -1,4 +1,11 @@
-retired_worker <- function(dataset, assumptions, debugg=FALSE) {
+retired_worker <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
+                           custom_avg_earnings=NULL,
+                           spouse = "none",
+                           debugg = FALSE) {
+
+  worker <- earnings_generator(birth_yr = birth_yr, type = type, age_claim = age_claim,
+                               factors = factors, assumptions = assumptions, debugg = debugg)
+
 
   worker <- dataset %>% group_by(id) %>% #Creates new age rows if they are missing in the data
     mutate(birth_yr = first(year - age)) %>%
@@ -12,7 +19,12 @@ retired_worker <- function(dataset, assumptions, debugg=FALSE) {
     ungroup()
 
   worker <- worker %>% aime(assumptions, debugg = debugg) %>% pia(assumptions, debugg = debugg) %>%
-    cola(assumptions, debugg = debugg) %>% worker_benefit(assumptions, debugg = debugg)
+    cola(assumptions, debugg = debugg)
+
+  if (spouse != "none") {
+    spouse <- earnings_generator(birth_yr = birth_yr, type = spouse, age_claim = age_claim,
+                                 factors = factors, assumptions = assumptions, debugg = debugg)
+  }
 
   return(worker)
 
