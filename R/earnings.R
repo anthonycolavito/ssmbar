@@ -61,8 +61,8 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
     worker <- worker %>% left_join(factors %>% filter(.data$worker == "raw") %>% select(age, factor),
                                    by = "age") %>%
       mutate(
-      pi_age65 = gdp_pi[which(age==65)],
-      index = pi_age65 / gdp_pi,
+      pi_age64 = gdp_pi[which(age==64)],
+      index = pi_age64 / gdp_pi,
       nom_earn = factor * awi,
       real_earn = nom_earn * index)
 
@@ -72,7 +72,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
     worker <- worker %>% mutate(
       adj_real_earn = real_earn * scalar,
-      earnings = adj_real_earn * gdp_pi / pi_age65
+      earnings = adj_real_earn * gdp_pi / pi_age64
     )
   }
 
