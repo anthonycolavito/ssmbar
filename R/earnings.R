@@ -71,7 +71,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
     worker <- worker %>% mutate(
       adj_real_earn = real_earn * scalar,
-      earnings = adj_real_earn * gdp_pi / pi_curr
+      earnings = adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1))
     )
   }
 
