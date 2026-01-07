@@ -10,6 +10,7 @@
 #' @param factors Data frame for the Trustees' scaled earnings factors.
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions.
 #' @param custom_avg_earnings Numeric value for the real average earnings for the worker, if type="custom" is selected.
+#' @param debugg Boolean variable used to output additional variables for debugging.
 #'
 #' @return worker Data frame with the earnings of the worker.
 #' @examples
