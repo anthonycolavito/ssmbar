@@ -93,6 +93,40 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
 }
 
+# Spousal Benefit
+spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
+
+  if(!is.null(spouse)) {
+  dataset <- worker %>% left_join(spouse %>% select(year, age, basic_pia, claim_age) %>% rename(s_pia = basic_pia, s_claim_age = claim_age, s_age = age),
+                                  by="year") %>%
+    mutate(
+      s_yr_claim = year[s_age == s_claim_age],
+      spouse_pia = case_when(
+        year >= s_yr_claim ~ pmax((0.5 * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE),
+        TRUE ~ 0),
+      full_pia = sum(basic_pia, spouse_pia, na.rm=TRUE)
+    )
+  }
+  else {
+    dataset <- worker %>% mutate(
+      spouse_pia = 0,
+      full_pia = sum(basic_pia, spouse_pia, na.rm=TRUE)
+    )
+  }
+
+  if (debugg) {
+    worker <- worker %>% left_join(dataset %>% select(year, s_pia, spouse_pia, full_pia),
+                                   by="year")
+  }
+  else {
+    worker <- worker %>% left_join(dataset %>% select(year, spouse_pia, full_pia),
+                                   by="year")
+  }
+
+  return(worker)
+
+}
+
 #COLA Calculation
 cola <- function (worker, assumptions, debugg = FALSE) {
 
@@ -117,8 +151,6 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   return(worker)
 
 }
-
-# Spousal Benefit
 
 
 #RFs and DRCs

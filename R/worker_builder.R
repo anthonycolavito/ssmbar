@@ -1,6 +1,6 @@
 retired_worker <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
                            custom_avg_earnings=NULL,
-                           spouse = "none",
+                           spouse = "none", spouse_type = "medium",
                            debugg = FALSE) {
 
   worker <- earnings_generator(birth_yr = birth_yr, type = type, age_claim = age_claim,
