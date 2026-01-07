@@ -61,7 +61,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
     worker <- worker %>% left_join(factors %>% filter(.data$worker == "raw") %>% select(age, factor),
                                    by = "age") %>%
       mutate(
-      pi_curr = gdp_pi[which(year==2025)],
+      pi_curr = gdp_pi[which(year==as.numeric(format(Sys.Date(), "%Y")))],
       index = pi_curr / gdp_pi,
       nom_earn = factor * awi,
       real_earn = nom_earn * index)
