@@ -7,6 +7,8 @@
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
+#' @return worker Dataframe with a worker's AIME by year and age
+#'
 #' @export
 aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating the AIME of a specific worker
   #How earnings are indexed is described in Section 700.3 of the Social Security Handbook
@@ -74,6 +76,8 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
+#' @return worker dataframe with a worker's retired worker PIA by age
+#'
 #' @export
 pia <- function(worker, assumptions, debugg = FALSE) {
   #PIA calculation is described in Section 706 of the Social Security Handbook
@@ -119,6 +123,8 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
+#' @return worker Dataframe with a worker's spousal PIA by age
+#'
 #' @export
 spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
   #The spousal insurance benefit is described in Section 320 of the Social Security Handbook
@@ -163,6 +169,8 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
+#' @return worker Dataframe with a worker's COLA-adjusted retired worker and spousal PIA by age
+#'
 #' @export
 cola <- function (worker, assumptions, debugg = FALSE) {
 
@@ -200,6 +208,8 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 #' @param rf2 Numeric value that represents the incremental reduction in benefits for the additional months past 36 that in which benefits are claimed early.
 #' @param drc Numeric value that represents the incremental increase in benefits for the months claimed past the NRA, based on the worker's birth cohort.
 #'
+#' @return act_factor numeric value used for adjusting a worker's PIA to compute their monthly benefit
+#'
 #' @export
 rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
   #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
@@ -234,6 +244,8 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
 #' @param worker Dataframe with a worker's COLA-adjusted retired worker PIA by age
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with a workjer's retired worker benefit by age
 #'
 #' @export
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
@@ -279,6 +291,8 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #' @param spouse Dataframe or null value with a worker's spouse's ages and claiming age
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with a worker's spousal benefit by age
 #'
 #' @export
 spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
@@ -337,6 +351,8 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
 #'
 #' @param worker Dataframe with a worker's retired worker and spousal benefit by age
 #' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with a worker's final monthly benefit by age
 #'
 #' @export
 final_benefit <- function(worker, debugg = FALSE) {
