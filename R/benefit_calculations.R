@@ -212,7 +212,7 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
                                    by = c("id","age") )
   }
   else {
-    worker <- worker %>% left_join(dataset %>% select(id, age, full_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, wrk_ben),
                                    by = c("id","age") )
   }
 
