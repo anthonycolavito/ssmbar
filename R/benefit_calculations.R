@@ -34,7 +34,7 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       comp_period <- .x$comp_period
 
       for (i in seq_len(n)) {
-        if (qc_eligible[i]) {
+        if (!is.na(qc_eligible[i]) && qc_eligible[i]) {
           years_to_use <- min(i, comp_period[i])
           top_earnings_sum <- sum(sort(indexed_earnings[1:i], decreasing = TRUE)[1:years_to_use])
           aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12))
