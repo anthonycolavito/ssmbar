@@ -186,6 +186,12 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
 # Monthly Worker Benefit
 
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
+  #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
+  #Delayed retirement credits are described in Section 720
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
+
 
   dataset <- worker %>% left_join(assumptions %>% select(year, rf1, rf2, drc, nra, s_rf1, s_rf2), by="year") %>%
     group_by(id) %>% arrange(id, age) %>%
@@ -216,6 +222,9 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
 #Monthly Spousal Benefit
 spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
+  #How benefits are reduced is described in Sections 723 and 724 of the Social Security Handbook
+  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
+  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
 
   if(!is.null(spouse)) {
 
