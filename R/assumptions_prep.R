@@ -76,6 +76,10 @@ prep_assumptions <- function(dataset) {
 
   }
 
+  #Spousal reduction factors
+  assume$s_rf1 <- 25 / 36 / 100
+  assume$s_rf2 <- assume$rf2
+
   return(assume)
 
 }
