@@ -101,13 +101,10 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
   # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
 
   if(!is.null(spouse)) {
-  dataset <- worker %>% left_join(spouse %>% select(year, age, basic_pia, claim_age) %>% rename(s_pia = basic_pia, s_claim_age = claim_age, s_age = age),
+  dataset <- worker %>% left_join(spouse %>% select(year, basic_pia) %>% rename(s_pia = basic_pia),
                                   by="year") %>%
     mutate(
-      s_yr_claim = year[s_age == s_claim_age],
-      spouse_pia = case_when(
-        year >= s_yr_claim ~ pmax((0.5 * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE),
-        TRUE ~ 0)
+      spouse_pia =  pmax((0.5 * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE)
     )
 
         if (debugg) {
