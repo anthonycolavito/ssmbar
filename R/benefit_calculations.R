@@ -287,7 +287,7 @@ final_benefit <- function(worker, debugg = FALSE) {
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, final_ben),
-                                   by=c("id","age")) %>% select(id, year, age, final_ben)
+                                   by=c("id","age")) %>% select(id, year, age, earnings, final_ben)
   }
 
   return(worker)
