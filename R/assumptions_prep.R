@@ -77,7 +77,7 @@ prep_assumptions <- function(dataset) {
   }
 
   #Spousal PIA share
-  s_pia_share <- 0.5
+  assume$s_pia_share <- 0.5
 
   #Spousal reduction factors
   assume$s_rf1 <- 25 / 36 / 100
