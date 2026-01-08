@@ -108,12 +108,12 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
     )
 
         if (debugg) {
-          worker <- worker %>% left_join(dataset %>% select(year, s_pia, spouse_pia),
-                                         by="year")
+          worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, spouse_pia),
+                                         by=c("id","year"))
         }
         else {
-          worker <- worker %>% left_join(dataset %>% select(year, spouse_pia),
-                                         by="year")
+          worker <- worker %>% left_join(dataset %>% select(id, year, spouse_pia),
+                                         by=c("id","year"))
         }
   }
   else {
@@ -121,8 +121,8 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
       spouse_pia = 0
     )
 
-    worker <- worker %>% left_join(dataset %>% select(year, spouse_pia),
-                                   by="year")
+    worker <- worker %>% left_join(dataset %>% select(id, year, spouse_pia),
+                                   by=c("id","year"))
   }
 
   return(worker)
@@ -279,8 +279,8 @@ final_benefit <- function(worker) {
       final_ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben, 0, na.rm = TRUE)
     )
 
-  worker <- worker %>% left_join(dataset %>% select(age, final_ben),
-                                 by="age")
+  worker <- worker %>% left_join(dataset %>% select(id, age, final_ben),
+                                 by=c("id","age"))
 
   return(worker)
 
