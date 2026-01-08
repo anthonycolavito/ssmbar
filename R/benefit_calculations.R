@@ -271,4 +271,18 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
 
 }
 
+# Final Monthly Benefit
+final_benefit <- function(worker) {
+
+  dataset <- worker %>%
+    mutate(
+      final_ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben, 0, na.rm = TRUE)
+    )
+
+  worker <- worker %>% left_join(dataset %>% select(age, final_ben),
+                                 by="age")
+
+  return(worker)
+
+}
 
