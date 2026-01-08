@@ -103,12 +103,14 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
   if(!is.null(spouse)) {
   dataset <- worker %>% left_join(spouse %>% select(year, basic_pia) %>% rename(s_pia = basic_pia),
                                   by="year") %>%
+    left_join(assumptions %>% select(year, s_pia_share), by="year") %>%
     mutate(
-      spouse_pia =  pmax((0.5 * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE)
+      s_pia_share_ind = s_pia_share[which(age == elig_age)],
+      spouse_pia =  pmax((s_pia_share_ind * s_pia) - pmax(basic_pia,0,na.rm=TRUE), 0, na.rm = TRUE)
     )
 
         if (debugg) {
-          worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, spouse_pia),
+          worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, s_pia_share_ind, spouse_pia),
                                          by=c("id","year"))
         }
         else {
