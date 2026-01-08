@@ -278,16 +278,16 @@ final_benefit <- function(worker, debugg = FALSE) {
 
   dataset <- worker %>%
     mutate(
-      final_ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben, 0, na.rm = TRUE)
+      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben, 0, na.rm = TRUE)
     )
 
   if(debugg) {
-  worker <- worker %>% left_join(dataset %>% select(id, age, final_ben),
+  worker <- worker %>% left_join(dataset %>% select(id, age, ben),
                                  by=c("id","age"))
   }
   else {
-    worker <- worker %>% left_join(dataset %>% select(id, age, final_ben),
-                                   by=c("id","age")) %>% select(id, year, age, earnings, final_ben)
+    worker <- worker %>% left_join(dataset %>% select(id, age, ben),
+                                   by=c("id","age")) %>% select(id, year, age, earnings, ben)
   }
 
   return(worker)
