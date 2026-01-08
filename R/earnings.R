@@ -80,10 +80,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
     )
   }
 
-  if (debugg) {
-    worker <- worker
-  }
-  else{
+  if (!debugg) {}
     worker <- worker %>% select(id, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
   }
 
