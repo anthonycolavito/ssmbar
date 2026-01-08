@@ -169,13 +169,13 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
   dist_from_nra <- (claim_age - nra) * 12
 
   #Calculate reduction factors
-  rf_amt <- ifelse(dist_from_nra >= 0, 0, #If claiming at or above NRA, no RFs
-                   ifelse(dist_from_nra <= -36, (-36*rf1) + (max(-24,(dist_from_nra + 36))*rf2), #If claiming more than three years before NRA. Can't claim before 62
+  rf_amt <- if_else(dist_from_nra >= 0, 0, #If claiming at or above NRA, no RFs
+                   if_else(dist_from_nra <= -36, (-36*rf1) + (pmax(-24,(dist_from_nra + 36))*rf2), #If claiming more than three years before NRA. Can't claim before 62
                           dist_from_nra * rf1)) #If claiming less than three years before NRA
 
   #Calculate DRCs
-  drc_amt <- ifelse(dist_from_nra <= 0, 0, #If claiming at or below NRA
-                    min(36*drc, dist_from_nra * drc)) #If claiming above NRA. DRCs are capped at 70
+  drc_amt <- if_else(dist_from_nra <= 0, 0, #If claiming at or below NRA
+                    pmin(36*drc, dist_from_nra * drc)) #If claiming above NRA. DRCs are capped at 70
 
   act_factor <- 1 + rf_amt + drc_amt
 
