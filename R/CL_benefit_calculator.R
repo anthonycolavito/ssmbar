@@ -166,39 +166,24 @@ calculate_benefits <- function(birth_yr,
     worker <- worker %>%
       spousal_pia(spouse = spouse, assumptions, debugg)
 
-    spouse <- spouse %>%
-      spousal_pia(spouse = worker, assumptions, debugg)
-
     # Step 4: Apply COLA adjustments
     worker <- worker %>%
-      cola(assumptions, debugg)
-
-    spouse <- spouse %>%
       cola(assumptions, debugg)
 
     # Step 5: Calculate retired worker benefits
     worker <- worker %>%
       worker_benefit(assumptions, debugg)
 
-    spouse <- spouse %>%
-      worker_benefit(assumptions, debugg)
-
     # Step 6: Calculate spousal benefits
     worker <- worker %>%
       spouse_benefit(spouse = spouse, assumptions, debugg)
-
-    spouse <- spouse %>%
-      spouse_benefit(spouse = worker, assumptions, debugg)
 
     # Step 7: Calculate final benefits
     worker <- worker %>%
       final_benefit(debugg)
 
-    spouse <- spouse %>%
-      final_benefit(debugg)
-
-    # Return as a list
-    return(list(worker = worker, spouse = spouse))
+    # Return
+    return(worker)
 
   }
 
