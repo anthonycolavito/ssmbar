@@ -6,7 +6,6 @@ retired_worker <- function(birth_yr=1960, type="medium", age_claim, age_elig=62,
   worker <- earnings_generator(birth_yr = birth_yr, type = type, age_claim = age_claim,
                                factors = factors, assumptions = assumptions, debugg = debugg)
 
-
   worker <- dataset %>% group_by(id) %>% #Creates new age rows if they are missing in the data
     mutate(birth_yr = first(year - age)) %>%
     complete(age = 15:119, fill = list(earnings = 0)) %>%
@@ -18,8 +17,21 @@ retired_worker <- function(birth_yr=1960, type="medium", age_claim, age_elig=62,
     select(-birth_yr) %>%
     ungroup()
 
-  worker <- worker %>% aime(assumptions, debugg = debugg) %>% pia(assumptions, debugg = debugg) %>%
-    cola(assumptions, debugg = debugg)
+
+  if (spouse == "none") {
+    no_spouse <- NULL
+    worker <- worker %>% aime(assumptions, debugg = debugg) %>% pia(assumptions, debugg = debugg) %>%
+      spousal_pia(spouse = no_spouse, assumptions, debugg = debugg) %>% cola(assumptions, debugg = debugg) %>%
+      worker_benefit(assumptions, debugg = debugg)
+  }
+  else {
+    spouse <- earnings_generator(birth_yr = birth_yr, type = spouse_type, age_claim = age_claim,
+                                 factors = factors, assumptions = assumptions, debugg = debugg)
+  }
+
+
+
+
 
   if (spouse != "none") {
     spouse <- earnings_generator(birth_yr = birth_yr, type = spouse, age_claim = age_claim,

@@ -61,6 +61,8 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 
 #PIA Calculation
 pia <- function(worker, assumptions, debugg = FALSE) {
+  #PIA calculation is described in Section 706 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0706.html
 
   dataset <- worker %>% left_join(assumptions %>% select(year, bp1, bp2, fact1, fact2, fact3),
                                   by="year")
@@ -95,6 +97,8 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
 # Spousal Benefit
 spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
+  #The spousal insurance benefit is described in Section 320 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
 
   if(!is.null(spouse)) {
   dataset <- worker %>% left_join(spouse %>% select(year, age, basic_pia, claim_age) %>% rename(s_pia = basic_pia, s_claim_age = claim_age, s_age = age),
@@ -157,6 +161,11 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 
 #RFs and DRCs
 rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
+  #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
+  #Delayed retirement credits are described in Section 720
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
 
   # Program Parameters -- these will all need to be made flexible to permit policy changes at some point
 
