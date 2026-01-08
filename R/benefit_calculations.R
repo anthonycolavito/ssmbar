@@ -190,7 +190,7 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
 
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, rf1, rf2, drc, nra), by="year") %>%
+  dataset <- worker %>% left_join(assumptions %>% select(year, rf1, rf2, drc, nra, s_rf1, s_rf2), by="year") %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
       yr_62 = year - age + 62,
@@ -198,18 +198,26 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
       rf2_ind = rf2[year == yr_62],
       drc_ind = drc[year == yr_62],
       nra_ind = nra[year == yr_62],
+      s_rf1_ind = s_rf1[year == yr_62],
+      s_rf2_ind = s_rf2[year == yr_62],
       act_factor = rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind),
+      s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
       wrk_ben = case_when(
-        age >= claim_age ~ floor(cola_pia * act_factor),
+        age >= claim_age ~ floor(cola_basic_pia * act_factor),
         TRUE ~ 0
-      )) %>% select(-claim_age) %>% ungroup()
+      ),
+      spouse_ben = case_when(
+        age >= claim_age ~ floor(cola_spouse_pia * s_act_factor),
+        TRUE ~ 0
+      ),
+      full_ben = wrk_ben + spouse_ben) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind,  act_factor, wrk_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind,  act_factor, wrk_ben, spouse_ben, full_ben),
                                    by = c("id","age") )
   }
   else {
-    worker <- worker %>% left_join(dataset %>% select(id, age, wrk_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, full_ben),
                                    by = c("id","age") )
   }
 
