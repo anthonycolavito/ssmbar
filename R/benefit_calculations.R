@@ -213,7 +213,7 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
       full_ben = wrk_ben + spouse_ben) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind,  act_factor, wrk_ben, spouse_ben, full_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor, s_rf1_ind, s_rf2_ind, s_act_factor, wrk_ben, spouse_ben, full_ben),
                                    by = c("id","age") )
   }
   else {
