@@ -1,6 +1,13 @@
 
 #' AIME Calculation
-
+#'
+#' Function that computes a worker's Average Indexed Monthly Earnings by age
+#'
+#' @param worker Dataframe with a worker's earnings by year and age
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating the AIME of a specific worker
   #How earnings are indexed is described in Section 700.3 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
@@ -59,7 +66,15 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 
 }
 
-#PIA Calculation
+#' PIA Calculation
+#'
+#' Function that computes a worker's Primary Insurance Amount by age
+#'
+#' @param worker Dataframe with a worker's earnings and AIME by year and age
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 pia <- function(worker, assumptions, debugg = FALSE) {
   #PIA calculation is described in Section 706 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0706.html
@@ -95,7 +110,16 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
 }
 
-# Spousal Benefit
+#' Spousal PIA Calculation
+#'
+#' Function for computing a worker's PIA based on their spouse's earnings record
+#'
+#' @param worker Dataframe with a worker's earnings and PIA by year and age
+#' @param spouse Dataframe or null value with a spouse's PIA by the worker's age and year
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
   #The spousal insurance benefit is described in Section 320 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
@@ -131,7 +155,15 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, debugg=FALSE) {
 
 }
 
-#COLA Calculation
+#' COLA Calculation
+#'
+#' Function that computes a worker's COLA-adjusted PIA
+#'
+#' @param worker Dataframe with a worker's unadjusted PIA -- both retired worker and spousal -- by age
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 cola <- function (worker, assumptions, debugg = FALSE) {
 
   dataset <- worker %>% left_join(assumptions %>% select(year, cpi_w),
@@ -158,7 +190,17 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 }
 
 
-#RFs and DRCs
+#' Early Retirement Reduction Factor and Delayed Retirement Credit Calculation
+#'
+#' Function that computes a worker's actuarial adjustment to their benefits based on their claiming age.
+#'
+#' @param claim_age Numeric value that represents the age at which a worker first claims benefits
+#' @param nra Numeric value that represents a worker's Normal Retirement Age
+#' @param rf1 Numeric value that represents the incremental reduction in benefits for the first 36 months prior to the NRA based on the worker's birth cohort.
+#' @param rf2 Numeric value that represents the incremental reduction in benefits for the additional months past 36 that in which benefits are claimed early.
+#' @param drc Numeric value that represents the incremental increase in benefits for the months claimed past the NRA, based on the worker's birth cohort.
+#'
+#' @export
 rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
   #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
@@ -185,8 +227,15 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
 
 }
 
-# Monthly Worker Benefit
-
+#' Retired Worker Benefit Calculation
+#'
+#' Function that calculates a worker's retirement benefit based on their own earnings record
+#'
+#' @param worker Dataframe with a worker's COLA-adjusted retired worker PIA by age
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
   #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
@@ -222,7 +271,16 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
 }
 
-#Monthly Spousal Benefit
+#' Spousal Benefit Calculation
+#'
+#' Function that calculates a worker's spousal benefit based on their spouse's earnings record
+#'
+#' @param worker Dataframe with a worker's COLA-adjusted spousal PIA by age
+#' @param spouse Dataframe or null value with a worker's spouse's ages and claiming age
+#' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
   #How benefits are reduced is described in Sections 723 and 724 of the Social Security Handbook
   #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
@@ -273,7 +331,14 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
 
 }
 
-# Final Monthly Benefit
+#' Final Benefit Calculation
+#'
+#' Function that calculates a worker's retirement benefit based on their own earnings record
+#'
+#' @param worker Dataframe with a worker's retired worker and spousal benefit by age
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @export
 final_benefit <- function(worker, debugg = FALSE) {
 
   dataset <- worker %>%
