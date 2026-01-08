@@ -18,8 +18,7 @@
 #' @param spouse_custom_avg_earnings Numeric value for spouse's real average earnings if spouse_type = "custom". Default is NULL.
 #' @param debugg Boolean value that outputs additional variables if set to TRUE. Default is FALSE.
 #'
-#' @return If no spouse is specified, returns a data frame with the worker's earnings and benefits by age.
-#'   If a spouse is specified, returns a list containing two data frames: one for the worker and one for the spouse.
+#' @return Returns a data frame with the worker's earnings and benefits by age
 #'
 #' @examples
 #' \dontrun{
