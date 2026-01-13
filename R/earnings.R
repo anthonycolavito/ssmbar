@@ -4,6 +4,7 @@
 #' Function that generates the lifetime earnings for a specified worker
 #'
 #' @param birth_yr Numeric value representing the birth year of the worker.
+#' @param sex Character value specifying the sex of the worker: "male", "female", or "all" (gender-neutral).
 #' @param type Character value specifying the earnings level of the worker.
 #' @param age_claim Numeric value for the age in which the worker claims benefits.
 #' @param age_elig Numeric value for the age in which the worker becomes eligible for benefits.
@@ -15,15 +16,21 @@
 #' @return worker Data frame with the earnings of the worker.
 #' @examples
 #' \dontrun{
-#' med_worker <- earnings_generator(birth_yr=1960, type="medium", age_claim = 67, factors=sef, assumptions=tr2025)
+#' med_worker <- earnings_generator(birth_yr=1960, sex="male", type="medium", age_claim = 67, factors=sef, assumptions=tr2025)
 #' }
 #'
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else first row_number group_modify
 #' @export
 
-earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig=62, factors, assumptions,
+earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim, age_elig=62, factors, assumptions,
                                custom_avg_earnings=NULL,
                                debugg = FALSE) {
+
+  # Validate sex parameter
+  valid_sex <- c("male", "female", "all")
+  if (!sex %in% valid_sex) {
+    stop(paste("sex must be one of:", paste(valid_sex, collapse = ", ")))
+  }
 
   first_yr <- birth_yr + 21 #First earnings year
   last_yr <- birth_yr + 119 #Last possible year alive (used for benefit amounts)
@@ -33,13 +40,15 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
 
   worker_type <- if_else(type == "custom", paste0("custom",custom_avg_earnings), type) #Used for constructing a worker's ID
 
-  id <- paste0(worker_type, "-", birth_yr, "-", age_claim)
+  # ID format: type-sex-birthyr-claimage (e.g., "medium-male-1960-67")
+  id <- paste0(worker_type, "-", sex, "-", birth_yr, "-", age_claim)
 
   claim_age <- age_claim #Age a worker claims benefits.
   elig_age <- age_elig #Age a worker is eligible for benefits.
+  worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
 
-  worker <- data.frame(year = years, age = ages, id = id, claim_age = claim_age, elig_age = elig_age) %>% left_join(assumptions %>% select(year, awi, gdp_pi),
-                                                                                                                    by = "year")
+  worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age) %>%
+    left_join(assumptions %>% select(year, awi, gdp_pi), by = "year")
   #Initial dataframe that merges in necessary assumptions with the worker's trait variables.
 
 
@@ -81,7 +90,7 @@ earnings_generator <- function(birth_yr=1960, type="medium", age_claim, age_elig
   }
 
   if (!debugg) {
-    worker <- worker %>% select(id, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
+    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
   }
 
   return(worker)
