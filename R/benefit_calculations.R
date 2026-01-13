@@ -110,7 +110,13 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   #AIME Computation is described in Section 701 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, awi, taxmax, qc_rec),
+  # Determine which columns to join from assumptions (avoid duplicates when debugg=TRUE)
+  cols_to_join <- c("year", "taxmax", "qc_rec")
+  if (!"awi" %in% names(worker)) {
+    cols_to_join <- c(cols_to_join, "awi")
+  }
+
+  dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
                                   by = "year")
 
   dataset <- dataset %>% qc_comp(debugg)
