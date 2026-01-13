@@ -11,12 +11,23 @@
 #' @param factors Data frame for the Trustees' scaled earnings factors.
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions.
 #' @param custom_avg_earnings Numeric value for the real average earnings for the worker, if type="custom" is selected.
+#' @param spouse_type Character value specifying the spouse's earnings level. NULL if no spouse. Default is NULL.
+#' @param spouse_sex Character value specifying the spouse's sex: "male", "female", or "all". Default is "all".
+#' @param spouse_birth_yr Numeric value for the spouse's birth year. Default is NULL.
+#' @param spouse_age_claim Numeric value for the age at which the spouse claims benefits. Default is NULL.
+#' @param spouse_custom_avg_earnings Numeric value for spouse's real average earnings if spouse_type = "custom". Default is NULL.
 #' @param debugg Boolean variable used to output additional variables for debugging.
 #'
-#' @return worker Data frame with the earnings of the worker.
+#' @return worker Data frame with the earnings of the worker, including spouse_spec if spouse is specified.
 #' @examples
 #' \dontrun{
+#' # Single worker
 #' med_worker <- earnings_generator(birth_yr=1960, sex="male", type="medium", age_claim = 67, factors=sef, assumptions=tr2025)
+#'
+#' # Worker with spouse
+#' worker_with_spouse <- earnings_generator(birth_yr=1960, sex="male", type="high", age_claim = 67,
+#'   spouse_type="low", spouse_sex="female", spouse_birth_yr=1962, spouse_age_claim=65,
+#'   factors=sef, assumptions=tr2025)
 #' }
 #'
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else first row_number group_modify
@@ -24,12 +35,46 @@
 
 earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim, age_elig=62, factors, assumptions,
                                custom_avg_earnings=NULL,
+                               spouse_type=NULL, spouse_sex="all", spouse_birth_yr=NULL, spouse_age_claim=NULL,
+                               spouse_custom_avg_earnings=NULL,
                                debugg = FALSE) {
 
   # Validate sex parameter
   valid_sex <- c("male", "female", "all")
   if (!sex %in% valid_sex) {
     stop(paste("sex must be one of:", paste(valid_sex, collapse = ", ")))
+  }
+
+  # Validate and construct spouse_spec
+  # spouse_spec encodes spouse info in format: "type-sex-birthyr-claimage" (e.g., "low-female-1962-65")
+  # This single variable travels with worker data and is used for on-the-fly spousal PIA calculation
+  valid_types <- c("very_low", "low", "medium", "high", "max", "custom")
+
+  if (!is.null(spouse_type)) {
+    # Validate spouse parameters
+    if (!spouse_type %in% valid_types) {
+      stop(paste("spouse_type must be one of:", paste(valid_types, collapse = ", ")))
+    }
+    if (!spouse_sex %in% valid_sex) {
+      stop(paste("spouse_sex must be one of:", paste(valid_sex, collapse = ", ")))
+    }
+    if (is.null(spouse_birth_yr)) {
+      stop("spouse_birth_yr is required when spouse_type is specified")
+    }
+    if (is.null(spouse_age_claim)) {
+      stop("spouse_age_claim is required when spouse_type is specified")
+    }
+    if (spouse_type == "custom" && is.null(spouse_custom_avg_earnings)) {
+      stop("spouse_custom_avg_earnings is required when spouse_type = 'custom'")
+    }
+
+    # Construct spouse_spec
+    spouse_type_label <- if_else(spouse_type == "custom",
+                                  paste0("custom", spouse_custom_avg_earnings),
+                                  spouse_type)
+    spouse_spec <- paste0(spouse_type_label, "-", spouse_sex, "-", spouse_birth_yr, "-", spouse_age_claim)
+  } else {
+    spouse_spec <- NA_character_
   }
 
   first_yr <- birth_yr + 21 #First earnings year
@@ -47,9 +92,11 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   elig_age <- age_elig #Age a worker is eligible for benefits.
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
 
-  worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age) %>%
+  worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age,
+                       spouse_spec = spouse_spec, stringsAsFactors = FALSE) %>%
     left_join(assumptions %>% select(year, awi, gdp_pi), by = "year")
   #Initial dataframe that merges in necessary assumptions with the worker's trait variables.
+  #spouse_spec encodes spouse info for later spousal benefit calculation (NA if no spouse).
 
 
   if (type != "custom") {
@@ -90,7 +137,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   }
 
   if (!debugg) {
-    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, earnings) #Selects only the needed variables.
+    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, spouse_spec, earnings) #Selects only the needed variables.
   }
 
   return(worker)
