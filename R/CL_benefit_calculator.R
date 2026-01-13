@@ -1,56 +1,71 @@
 #' Calculate Social Security Benefits
 #'
-#' Convenience function that creates a stylized worker (and optionally their spouse)
+#' Convenience function that creates one or more stylized workers (and optionally their spouses)
 #' and calculates their Social Security benefits through their lifetime in a single call.
+#' Supports vectorized inputs to calculate benefits for multiple workers at once.
 #'
-#' @param birth_yr Numeric value representing the birth year of the worker.
-#' @param type Character value specifying the earnings level of the worker.
+#' @param birth_yr Numeric value(s) representing the birth year of the worker(s).
+#' @param sex Character value(s) specifying the sex of the worker(s): "male", "female", or "all" (gender-neutral).
+#' @param type Character value(s) specifying the earnings level of the worker(s).
 #'   Options: "very_low", "low", "medium", "high", "max", or "custom".
-#' @param age_claim Numeric value for the age at which the worker claims benefits.
+#' @param age_claim Numeric value(s) for the age(s) at which the worker(s) claim benefits.
 #' @param factors Data frame containing the Trustees' scaled earnings factors.
 #' @param assumptions Data frame containing the prepared Trustees assumptions.
-#' @param age_elig Numeric value for the age at which the worker becomes eligible for benefits. Default is 62.
-#' @param custom_avg_earnings Numeric value for real average earnings if type = "custom". Default is NULL.
-#' @param spouse_birth_yr Numeric value for the spouse's birth year. Default is NULL (no spouse).
-#' @param spouse_type Character value specifying the spouse's earnings level. Default is NULL.
-#' @param spouse_age_claim Numeric value for the age at which the spouse claims benefits. Default is NULL.
-#' @param spouse_age_elig Numeric value for the spouse's eligibility age. Default is 62.
-#' @param spouse_custom_avg_earnings Numeric value for spouse's real average earnings if spouse_type = "custom". Default is NULL.
+#' @param age_elig Numeric value(s) for the age(s) at which the worker(s) become eligible for benefits. Default is 62.
+#' @param custom_avg_earnings Numeric value(s) for real average earnings if type = "custom". Default is NULL.
+#' @param spouse_type Character value(s) specifying the spouse's earnings level. NULL if no spouse. Default is NULL.
+#' @param spouse_sex Character value(s) specifying the spouse's sex: "male", "female", or "all". Default is "all".
+#' @param spouse_birth_yr Numeric value(s) for the spouse's birth year. Default is NULL.
+#' @param spouse_age_claim Numeric value(s) for the age(s) at which the spouse claims benefits. Default is NULL.
+#' @param spouse_custom_avg_earnings Numeric value(s) for spouse's real average earnings if spouse_type = "custom". Default is NULL.
 #' @param debugg Boolean value that outputs additional variables if set to TRUE. Default is FALSE.
 #'
-#' @return Returns a data frame with the worker's earnings and benefits by age
+#' @return Returns a data frame with the worker's earnings and benefits by age.
+#'   When multiple workers are specified, their data is combined into a single data frame.
 #'
 #' @examples
 #' \dontrun{
 #' # Single worker example
 #' med_worker <- calculate_benefits(
 #'   birth_yr = 1960,
+#'   sex = "male",
 #'   type = "medium",
 #'   age_claim = 67,
-#'   factors = sef,
+#'   factors = sef2025,
 #'   assumptions = tr2025
 #' )
 #'
 #' # Worker with spouse example
-#' couple <- calculate_benefits(
+#' worker_with_spouse <- calculate_benefits(
 #'   birth_yr = 1960,
+#'   sex = "male",
 #'   type = "high",
 #'   age_claim = 67,
-#'   factors = sef,
+#'   factors = sef2025,
 #'   assumptions = tr2025,
-#'   spouse_birth_yr = 1962,
 #'   spouse_type = "low",
+#'   spouse_sex = "female",
+#'   spouse_birth_yr = 1962,
 #'   spouse_age_claim = 65
 #' )
-#' # Access worker: couple$worker
-#' # Access spouse: couple$spouse
+#'
+#' # Multiple workers (vectorized)
+#' multiple_workers <- calculate_benefits(
+#'   birth_yr = c(1960, 1970, 1980),
+#'   sex = c("male", "female", "all"),
+#'   type = c("low", "medium", "high"),
+#'   age_claim = c(62, 67, 70),
+#'   factors = sef2025,
+#'   assumptions = tr2025
+#' )
 #'
 #' # Custom earnings example
 #' custom_worker <- calculate_benefits(
 #'   birth_yr = 1970,
+#'   sex = "male",
 #'   type = "custom",
 #'   age_claim = 65,
-#'   factors = sef,
+#'   factors = sef2025,
 #'   assumptions = tr2025,
 #'   custom_avg_earnings = 50000
 #' )
@@ -60,130 +75,51 @@
 #' @export
 
 calculate_benefits <- function(birth_yr,
+                               sex = "all",
                                type,
                                age_claim,
                                factors,
                                assumptions,
                                age_elig = 62,
                                custom_avg_earnings = NULL,
-                               spouse_birth_yr = NULL,
                                spouse_type = NULL,
+                               spouse_sex = "all",
+                               spouse_birth_yr = NULL,
                                spouse_age_claim = NULL,
-                               spouse_age_elig = 62,
                                spouse_custom_avg_earnings = NULL,
                                debugg = FALSE) {
 
-  # Input validation
-  valid_types <- c("very_low", "low", "medium", "high", "max", "custom")
-  if (!type %in% valid_types) {
-    stop(paste("type must be one of:", paste(valid_types, collapse = ", ")))
-  }
+  # Generate worker(s) with earnings using earnings_generator
+  # This handles vectorized inputs and creates spouse_spec automatically
+  worker <- earnings_generator(
+    birth_yr = birth_yr,
+    sex = sex,
+    type = type,
+    age_claim = age_claim,
+    age_elig = age_elig,
+    factors = factors,
+    assumptions = assumptions,
+    custom_avg_earnings = custom_avg_earnings,
+    spouse_type = spouse_type,
+    spouse_sex = spouse_sex,
+    spouse_birth_yr = spouse_birth_yr,
+    spouse_age_claim = spouse_age_claim,
+    spouse_custom_avg_earnings = spouse_custom_avg_earnings,
+    debugg = debugg
+  )
 
-  if (type == "custom" && is.null(custom_avg_earnings)) {
-    stop("custom_avg_earnings is required when type = 'custom'")
-  }
+  # Calculate benefits through the pipeline
+  # The benefit functions handle multiple workers via group_by(id)
+  # and use spouse_spec for on-the-fly spousal benefit calculations
+  worker <- worker %>%
+    aime(assumptions, debugg) %>%
+    pia(assumptions, debugg) %>%
+    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = debugg) %>%
+    cola(assumptions, debugg) %>%
+    worker_benefit(assumptions, debugg) %>%
+    spouse_benefit(spouse = NULL, assumptions, debugg) %>%
+    final_benefit(debugg)
 
-  # Check if spouse is specified
-
-  has_spouse <- !is.null(spouse_birth_yr) && !is.null(spouse_type) && !is.null(spouse_age_claim)
-
-  # Validate spouse parameters if partially specified
-
-  if (!is.null(spouse_birth_yr) || !is.null(spouse_type) || !is.null(spouse_age_claim)) {
-    if (!has_spouse) {
-      stop("If specifying a spouse, all of spouse_birth_yr, spouse_type, and spouse_age_claim are required")
-    }
-    if (!spouse_type %in% valid_types) {
-      stop(paste("spouse_type must be one of:", paste(valid_types, collapse = ", ")))
-    }
-    if (spouse_type == "custom" && is.null(spouse_custom_avg_earnings)) {
-      stop("spouse_custom_avg_earnings is required when spouse_type = 'custom'")
-    }
-  }
-
-  # Calculate benefits for single worker (no spouse)
-  if (!has_spouse) {
-
-    worker <- earnings_generator(
-      birth_yr = birth_yr,
-      type = type,
-      age_claim = age_claim,
-      age_elig = age_elig,
-      factors = factors,
-      assumptions = assumptions,
-      custom_avg_earnings = custom_avg_earnings,
-      debugg = debugg
-    ) %>%
-      aime(assumptions, debugg) %>%
-      pia(assumptions, debugg) %>%
-      spousal_pia(spouse = NULL, assumptions, debugg) %>%
-      cola(assumptions, debugg) %>%
-      worker_benefit(assumptions, debugg) %>%
-      spouse_benefit(spouse = NULL, assumptions, debugg) %>%
-      final_benefit(debugg)
-
-    return(worker)
-
-  }
-
-  # Calculate benefits for worker with spouse
-  else {
-
-    # Step 1: Generate earnings for both worker and spouse
-    worker <- earnings_generator(
-      birth_yr = birth_yr,
-      type = type,
-      age_claim = age_claim,
-      age_elig = age_elig,
-      factors = factors,
-      assumptions = assumptions,
-      custom_avg_earnings = custom_avg_earnings,
-      debugg = debugg
-    )
-
-    spouse <- earnings_generator(
-      birth_yr = spouse_birth_yr,
-      type = spouse_type,
-      age_claim = spouse_age_claim,
-      age_elig = spouse_age_elig,
-      factors = factors,
-      assumptions = assumptions,
-      custom_avg_earnings = spouse_custom_avg_earnings,
-      debugg = debugg
-    )
-
-    # Step 2: Calculate AIME and PIA for both
-    worker <- worker %>%
-      aime(assumptions, debugg) %>%
-      pia(assumptions, debugg)
-
-    spouse <- spouse %>%
-      aime(assumptions, debugg) %>%
-      pia(assumptions, debugg)
-
-    # Step 3: Calculate spousal PIA (each person's spousal benefit based on the other's record)
-    worker <- worker %>%
-      spousal_pia(spouse = spouse, assumptions, debugg)
-
-    # Step 4: Apply COLA adjustments
-    worker <- worker %>%
-      cola(assumptions, debugg)
-
-    # Step 5: Calculate retired worker benefits
-    worker <- worker %>%
-      worker_benefit(assumptions, debugg)
-
-    # Step 6: Calculate spousal benefits
-    worker <- worker %>%
-      spouse_benefit(spouse = spouse, assumptions, debugg)
-
-    # Step 7: Calculate final benefits
-    worker <- worker %>%
-      final_benefit(debugg)
-
-    # Return
-    return(worker)
-
-  }
+  return(worker)
 
 }
