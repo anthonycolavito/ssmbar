@@ -581,13 +581,15 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker <- worker %>% left_join(dataset %>% select(id, age, ben),
                                    by=c("id","age"))
   } else {
+    # Join ben first, then select output columns
+    worker <- worker %>%
+      left_join(dataset %>% select(id, age, ben), by=c("id","age"))
+
     # Select core output columns, including sex and spouse_spec if they exist
     output_cols <- c("id", "sex", "year", "age", "spouse_spec", "earnings", "ben")
     available_cols <- intersect(output_cols, names(worker))
 
-    worker <- worker %>%
-      left_join(dataset %>% select(id, age, ben), by=c("id","age")) %>%
-      select(all_of(available_cols))
+    worker <- worker %>% select(all_of(available_cols))
   }
 
   return(worker)
