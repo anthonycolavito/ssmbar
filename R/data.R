@@ -9,6 +9,9 @@
 #' This dataset includes historical values and projections for key economic
 #' variables and Social Security program parameters used in benefit calculations.
 #'
+#' @name tr2025
+#' @docType data
+#' @usage data(tr2025)
 #' @format A data frame with the following variables:
 #' \describe{
 #'   \item{year}{Calendar year}
@@ -22,14 +25,14 @@
 #'   \item{bp1}{First bend point for PIA formula}
 #'   \item{bp2}{Second bend point for PIA formula}
 #'   \item{qc_rec}{Earnings required for one quarter of coverage}
-#'   \item{fact1}{PIA formula factor for earnings below first bend point (90\%)}
-#'   \item{fact2}{PIA formula factor for earnings between bend points (32\%)}
-#'   \item{fact3}{PIA formula factor for earnings above second bend point (15\%)}
+#'   \item{fact1}{PIA formula factor for earnings below first bend point (0.90)}
+#'   \item{fact2}{PIA formula factor for earnings between bend points (0.32)}
+#'   \item{fact3}{PIA formula factor for earnings above second bend point (0.15)}
 #'   \item{rf1}{Early retirement reduction factor (first 36 months)}
 #'   \item{rf2}{Early retirement reduction factor (months beyond 36)}
 #'   \item{drc}{Delayed retirement credit rate}
 #'   \item{nra}{Normal Retirement Age}
-#'   \item{s_pia_share}{Spousal PIA share (50\%)}
+#'   \item{s_pia_share}{Spousal PIA share (0.50)}
 #'   \item{s_rf1}{Spousal early retirement reduction factor (first 36 months)}
 #'   \item{s_rf2}{Spousal early retirement reduction factor (months beyond 36)}
 #' }
@@ -63,6 +66,9 @@
 #' Index (AWI) at each age, based on actual earnings patterns observed in
 #' Social Security administrative data.
 #'
+#' @name sef2025
+#' @docType data
+#' @usage data(sef2025)
 #' @format A data frame with the following variables:
 #' \describe{
 #'   \item{age}{Age of the worker (21-64)}
@@ -74,10 +80,10 @@
 #' Worker types correspond to different earnings levels relative to the AWI:
 #' \itemize{
 #'   \item \strong{raw}: Raw unadjusted factors (used for custom earnings calculations)
-#'   \item \strong{very_low}: Very low earner (approximately 25\% of AWI)
-#'   \item \strong{low}: Low earner (approximately 45\% of AWI)
-#'   \item \strong{medium}: Medium earner (approximately 100\% of AWI)
-#'   \item \strong{high}: High earner (approximately 160\% of AWI)
+#'   \item \strong{very_low}: Very low earner (approximately 25 percent of AWI)
+#'   \item \strong{low}: Low earner (approximately 45 percent of AWI)
+#'   \item \strong{medium}: Medium earner (approximately 100 percent of AWI)
+#'   \item \strong{high}: High earner (approximately 160 percent of AWI)
 #'   \item \strong{max}: Maximum earner (earnings at or above taxable maximum)
 #' }
 #'

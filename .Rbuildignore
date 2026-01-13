@@ -1,3 +1,10 @@
 ^ssmbar\.Rproj$
 ^\.Rproj\.user$
 ^data-raw$
+^CLAUDE\.md$
+^.*\.csv$
+^tmpclaude-.*$
+^LICENSE\.md$
+^ssmbar\.Rcheck$
+^ssmbar.*\.tar\.gz$
+^R/worker_builder\.R$

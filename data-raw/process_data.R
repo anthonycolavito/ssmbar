@@ -20,7 +20,7 @@ source("R/assumptions_prep.R")
 DATA_YEAR <- 2025
 
 # Input file paths (raw data in inst/extdata/)
-TR_RAW_FILE <- "inst/extdata/2025TR assumptions.csv"
+TR_RAW_FILE <- "inst/extdata/2025TR_assumptions.csv"
 SEF_RAW_FILE <- "inst/extdata/scaled_earnings_factors.csv"
 
 # =============================================================================
