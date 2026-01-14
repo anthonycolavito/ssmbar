@@ -148,3 +148,47 @@ The `ret()` function applies the Retirement Earnings Test per SSA Handbook Chapt
 - **Spouse handling**: If worker has spouse_spec, includes spouse's dependent benefit in total pot; reduction allocated proportionally
 - **DRC payback**: At NRA, actuarial factor is recalculated as if worker claimed later (by months withheld / 12)
 - **Debug output**: `excess_earnings`, `ret_reduction`, `months_withheld`, `cum_months_withheld`, `ret_adj_factor`, `spouse_dep_ben`
+
+---
+
+## Future Work To-Do List
+
+### 1. Add Additional Documentation
+- Fill in all `TODO-DOC:` markers throughout the R files
+- Add SSA Handbook section references where marked
+- Document program rules for each benefit calculation step
+
+### 2. Move Eligibility Ages Out of Hard Code
+- Currently age 62 (worker eligibility) and age 60 (spousal eligibility) are hard-coded
+- Move these to the assumptions dataframe to allow policy modeling
+- Affected functions: `aime()`, `pia()`, `cola()`, `spousal_pia()`, `generate_spouse_dependent_benefit()`
+
+### 3. Create Lifetime Benefit Measures
+- **Real lifetime benefits**: Sum of inflation-adjusted annual benefits over lifetime
+- **Present value (PV) lifetime benefits**: Discounted sum using interest rate from assumptions
+- Consider mortality adjustments (expected benefits accounting for survival probability)
+
+### 4. Create Lifetime Earnings Measures
+- **Real lifetime earnings**: Sum of inflation-adjusted earnings over working life
+- **Present value (PV) lifetime earnings**: Discounted sum using interest rate
+- May want to calculate through different endpoints (age 62, NRA, claim age)
+
+### 5. Create Lifetime Tax Measures
+- **Real lifetime SS taxes**: Sum of inflation-adjusted payroll taxes paid
+- **Present value (PV) lifetime taxes**: Discounted sum using interest rate
+- Need to apply OASDI tax rates (from assumptions) to capped earnings
+
+### 6. Create Replacement Rate Measures
+- Ratio of initial benefit to pre-retirement earnings
+- Options: benefit at claim age vs. AIME, career-average earnings, final years earnings
+- Consider both individual and couple replacement rates
+
+### 7. Create Annual Real Benefit Measures
+- Add `real_ben` column: nominal benefit adjusted to constant dollars
+- Use GDP price index or CPI-W for inflation adjustment
+- Allow user to specify base year for real values
+
+### 8. Add Interest Rate to Assumptions Dataset
+- Add `int_rate` (or `discount_rate`) column to tr2025
+- Source from Trustees Report intermediate assumptions
+- Used for PV calculations in items 3-5 above
