@@ -857,6 +857,8 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
       rf1_ind <- worker_data$rf1[worker_data$year == yr_62][1]
       rf2_ind <- worker_data$rf2[worker_data$year == yr_62][1]
       drc_ind <- worker_data$drc[worker_data$year == yr_62][1]
+      s_rf1_ind <- worker_data$s_rf1[worker_data$year == yr_62][1]
+      s_rf2_ind <- worker_data$s_rf2[worker_data$year == yr_62][1]
 
       # Calculate RET for each year
       worker_data <- worker_data %>%
