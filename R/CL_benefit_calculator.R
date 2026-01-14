@@ -122,9 +122,9 @@ calculate_benefits <- function(birth_yr,
   worker <- worker %>%
     aime(assumptions, debugg) %>%
     pia(assumptions, debugg) %>%
-    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = debugg) %>%
     cola(assumptions, debugg) %>%
     worker_benefit(assumptions, debugg) %>%
+    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = debugg) %>%
     spouse_benefit(spouse = NULL, assumptions, debugg) %>%
     ret(assumptions, factors = factors, debugg = debugg) %>%
     final_benefit(debugg)
@@ -157,8 +157,9 @@ calculate_benefits <- function(birth_yr,
     ) %>%
       aime(assumptions, debugg = FALSE) %>%
       pia(assumptions, debugg = FALSE) %>%
-      spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = FALSE) %>%
-      cola(assumptions, debugg = FALSE)
+      cola(assumptions, debugg = FALSE) %>%
+      spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = FALSE)
+
 
     # Calculate spouse's full benefit for each worker group
     worker <- worker %>%
