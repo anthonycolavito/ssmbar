@@ -252,7 +252,9 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
       group_by(id) %>%
       mutate(
         s_pia_share_ind = s_pia_share[which(age == elig_age)],
-        spouse_pia =  pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE)
+        spouse_pia =  case_when(
+          age >= 60 ~ pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE),
+          TRUE ~ 0)
       ) %>%
       ungroup()
 
@@ -301,7 +303,7 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
 
           # Calculate spousal PIA
           s_pia_share_ind <- .x$s_pia_share[which(.x$age == .x$elig_age[1])]
-          .x$spouse_pia <- pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE)
+          .x$spouse_pia <- if_else(.x$age >= 60, pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), 0)
         }
         .x
       }) %>%
