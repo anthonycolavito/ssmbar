@@ -607,7 +607,7 @@ final_benefit <- function(worker, debugg = FALSE) {
 #' Calculates the spouse's spousal benefit that is based on the worker's earnings record.
 #' This is used for RET calculations to determine the total benefit pot subject to reduction.
 #'
-#' @param worker_row A single row from the worker dataframe containing year, age, basic_pia, cola_basic_pia
+#' @param worker_data Dataframe for a single worker containing year, age, basic_pia, cola_basic_pia
 #' @param spouse_spec Character string with spouse specification
 #' @param factors Data frame for the Trustees' scaled earnings factors
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions

@@ -36,6 +36,16 @@ utils::globalVariables(c(
   "s_rf1_ind", "s_rf2_ind", "s_act_factor", "spouse_ben",
   "s_age", "s_claim_age",
 
+  # RET (Retirement Earnings Test) variables
+  "ret1", "ret2", "spouse_dep_ben", "spouse_dep_pia", "cola_spouse_dep_pia",
+  "s_dep_act_factor", "s_own_pia", "s_claim_age_val", "yr_s_claim", "cpi_factor",
+  "excess_earnings", "ret_reduction", "ret_reduction_capped",
+  "wrk_total_ben", "total_ben_pot", "annual_ben_pot",
+  "wrk_share", "wrk_reduction", "wrk_ben_share", "spouse_ben_share",
+  "wrk_ben_reduced", "spouse_ben_reduced", "wrk_ben_final", "spouse_ben_final",
+  "months_withheld", "cum_months_withheld", "ret_adj_factor",
+  "cum_months_withheld_final", "wrk_ben_orig", "spouse_ben_orig",
+
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",
 

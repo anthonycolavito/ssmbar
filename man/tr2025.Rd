@@ -25,6 +25,8 @@ A data frame with the following variables:
 \item{rf2}{Early retirement reduction factor (months beyond 36)}
 \item{drc}{Delayed retirement credit rate}
 \item{nra}{Normal Retirement Age}
+\item{ret1}{Retirement Earnings Test exempt amount (under NRA)}
+\item{ret2}{Retirement Earnings Test exempt amount (year of NRA)}
 \item{s_pia_share}{Spousal PIA share (0.50)}
 \item{s_rf1}{Spousal early retirement reduction factor (first 36 months)}
 \item{s_rf2}{Spousal early retirement reduction factor (months beyond 36)}

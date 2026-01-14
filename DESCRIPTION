@@ -2,7 +2,9 @@ Package: ssmbar
 Title: Social Security Microsimulation Benefit Calculator
 Version: 0.0.0.9001
 Authors@R:
-    person("Anthony", "Colavito", , "colavito@crfb.org", role = c("aut", "cre"))
+    person("Anthony", "Colavito", email = "colavito@crfb.org", role = c("aut", "cre"))
+Author: Anthony Colavito [aut, cre]
+Maintainer: Anthony Colavito <colavito@crfb.org>
 Description: Calculates Social Security retirement benefits for hypothetical
     workers using the exact formulas, rules, and parameters defined by the
     Social Security Administration. Supports preset worker types (very low, low,

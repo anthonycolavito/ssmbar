@@ -6,5 +6,7 @@
 ^tmpclaude-.*$
 ^LICENSE\.md$
 ^ssmbar\.Rcheck$
+^\.\.Rcheck$
 ^ssmbar.*\.tar\.gz$
-^R/worker_builder\.R$
+^legacy$
+^\.claude$
