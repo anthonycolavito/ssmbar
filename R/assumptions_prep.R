@@ -87,7 +87,7 @@ prep_assumptions <- function(dataset) {
 
       ret1_i <- max(floor(ret1_base * awi_end / awi_1992 * 10) / 10, prev_ret1)
 
-      assume[assume$year == i, "ret1"]
+      assume[assume$year == i, "ret1"] <- ret1_i
     }
 
     if (is.na(ret2_i)) {
@@ -95,7 +95,7 @@ prep_assumptions <- function(dataset) {
 
       ret2_i <- max(floor(ret2_base * awi_end / awi_2000 * 10) / 10, prev_ret2)
 
-      assume[assume$year == i, "ret2"]
+      assume[assume$year == i, "ret2"] <- ret2_i
 
     }
 
