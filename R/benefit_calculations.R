@@ -246,14 +246,15 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
 
   if (!is.null(spouse)) {
     # Original behavior: use provided spouse data frame
-    dataset <- worker %>% left_join(spouse %>% select(year, cola_basic_pia) %>% rename(s_pia = cola_basic_pia),
+    dataset <- worker %>% left_join(spouse %>% select(year, age, cola_basic_pia, claim_age) %>% rename(s_age = age, s_pia = cola_basic_pia, s_claim_age = claim_age),
                                     by="year") %>%
       left_join(assumptions %>% select(year, s_pia_share), by="year") %>%
       group_by(id) %>%
       mutate(
+        yr_s_claim = year[which(s_age == s_claim_age)],
         s_pia_share_ind = s_pia_share[which(age == elig_age)],
         spouse_pia =  case_when(
-          age >= 60 ~ pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE),
+          year >= yr_s_claim & age >= 60 ~ pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE),
           TRUE ~ 0)
       ) %>%
       ungroup()
@@ -298,12 +299,13 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
 
           # Join spouse PIA by year
           .x <- .x %>%
-            left_join(spouse_data %>% select(year, cola_basic_pia) %>% rename(s_pia = cola_basic_pia),
+            left_join(spouse_data %>% select(year, age, claim_age, cola_basic_pia) %>% rename(s_age = age, s_claim_age = claim_age, s_pia = cola_basic_pia),
                       by = "year")
 
           # Calculate spousal PIA
           s_pia_share_ind <- .x$s_pia_share[which(.x$age == .x$elig_age[1])]
-          .x$spouse_pia <- if_else(.x$age >= 60, pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), 0)
+          yr_s_claim <- .x$year[which(.x$s_age == .x$s_claim_age)]
+          .x$spouse_pia <- if_else(.x$age >= 60 & .x$year >= yr_s_claim, pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), 0)
         }
         .x
       }) %>%
