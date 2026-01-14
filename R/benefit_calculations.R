@@ -602,3 +602,52 @@ final_benefit <- function(worker, debugg = FALSE) {
 
 }
 
+#' Retirement Earnings Test Calculation
+#'
+#' Function that reduces an individual's benefits if their earnings exceed the
+#' exempt amounts in the Retirement Earnings Test
+#'
+#'
+#' @return worker
+#'
+#' @export
+ret <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
+
+  # Check if we need to use spouse_spec
+  use_spouse_spec <- is.null(spouse) &&
+    "spouse_spec" %in% names(worker) &&
+    any(!is.na(worker$spouse_spec))
+
+  if (!is.null(spouse)) {
+    # Original behavior: use provided spouse data frame
+    dataset <- worker %>% left_join(assumptions %>% select(year, ret1, nra), by="year") %>%
+      left_join(spouse %>% select(year, spouse_ben) %>% rename(s_ben = spouse_ben),
+                by = "year") %>%
+      group_by(id) %>% arrange(id, age) %>%
+      mutate(
+        ben_type = case_when( #Temporary benefit type to track which benefits need to be reduced.
+          wrk_ben > 0 & spouse_ben <= 0 ~ "R",
+          wrk_ben > 0 & spouse_ben > 0 ~ "D",
+          wrk_ben <= 0 & spouse_ben > 0 ~ "S",
+          TRUE ~ "N"
+        ),
+        ret_earn = case_when(
+          age < claim_age | age >= nra ~ 0,
+          TRUE ~ pmax(earnings - ret1, 0) / 2),
+        ret_ben = case_when(
+          ben_type == "R" ~ wrk_ben + spouse_ben + s_ben,
+          TRUE ~ wrk_ben + spouse_ben
+        ),
+        ret_share = (wrk_ben + spouse_ben) / ret_ben,
+        reduction = ret_ben - ret_earn,
+        wrk_ben = wrk_ben - ((reduction * ret_share) * (wrk_ben / (wrk_ben + spouse_ben))),
+        spouse_ben = spouse_ben - ((reduction * ret_share) * (spouse_ben / (wrk_ben + spouse_ben))),
+        months_red = pmax(pmin(ret_earn / ret_ben, 12), 0),
+        cum_months_red = cumsum(months_red),
+
+        )  %>% ungroup()
+  }
+
+}
+
+
