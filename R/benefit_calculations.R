@@ -666,7 +666,6 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
   # Calculate spouse's spousal PIA based on worker's record
   # Use cpi_w from worker_data (already joined in ret())
   s_pia_share_ind <- result$s_pia_share[which(result$age == 62)[1]]
-  cpi_age62 <- worker_data$cpi_w[which(worker_data$age == 62)[1]]
   yr_62 <- result$year[1] - result$age[1] + 62
   nra_ind <- worker_data$nra[worker_data$year == yr_62][1]
   s_rf1_ind <- result$s_rf1[result$year == yr_62][1]
