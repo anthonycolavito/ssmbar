@@ -722,6 +722,7 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
 ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
   # RET is described in Chapter 18 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
+  # Relevant sections are 1801, 1803, 1804, and 1806.
 
   # Check if worker has spouse_spec for dependent benefit calculation
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
@@ -773,7 +774,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
             age < claim_age | age >= nra_ind ~ 0,
             TRUE ~ pmax(earnings - ret1, 0)
           ),
-          ret_reduction = excess_earnings / 2,
+          ret_reduction = excess_earnings / 2, #Reflects 50% phase-out rate.
 
           # Cap reduction at total annual benefits
           annual_ben_pot = total_ben_pot * 12,
@@ -832,7 +833,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
             TRUE ~ floor(cola_basic_pia * new_act_factor)
           ),
 
-          # Spouse benefit also uses adjusted factor at NRA
+          # Spouse benefit does not use new actuarial factor past NRA
           # (spousal early retirement reduction is also adjusted)
           spouse_ben_final = case_when(
             age < claim_age ~ 0,
