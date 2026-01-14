@@ -636,7 +636,8 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
 
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
-    pia(assumptions, debugg = FALSE)
+    pia(assumptions, debugg = FALSE) %>%
+    cola(assumptions, debugg = FALSE)
 
   # Get spouse's claim age and birth year
   s_claim_age <- spec$age_claim
@@ -654,7 +655,7 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
       s_age = year - s_birth_yr,
       s_claim_age_val = s_claim_age
     ) %>%
-    left_join(spouse %>% select(year, basic_pia) %>% rename(s_own_pia = basic_pia), by = "year")
+    left_join(spouse %>% select(year, cola_basic_pia) %>% rename(s_own_pia = cola_basic_pia), by = "year")
 
   # Join additional assumption columns if needed
   if (length(cols_to_join) > 0) {
@@ -675,16 +676,12 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
   result <- result %>%
     mutate(
       # Spouse's spousal PIA = 50% of worker's PIA - spouse's own PIA
-      spouse_dep_pia = pmax((s_pia_share_ind * basic_pia) - pmax(s_own_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
-
-      # Apply COLA to spouse's spousal PIA (indexed from worker's age 62)
-      cpi_factor = pmax(worker_data$cpi_w / cpi_age62, 1),
-      cola_spouse_dep_pia = floor(spouse_dep_pia * cpi_factor),
+      spouse_dep_pia = pmax((s_pia_share_ind * cola_basic_pia) - pmax(s_own_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
 
       # Spouse's dependent benefit only starts when both worker has claimed AND spouse has reached their claim age
       yr_s_claim = s_birth_yr + s_claim_age_val,
       spouse_dep_ben = case_when(
-        age >= claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(cola_spouse_dep_pia * s_dep_act_factor),
+        age >= claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(spouse_dep_pia * s_dep_act_factor),
         TRUE ~ 0
       )
     )
