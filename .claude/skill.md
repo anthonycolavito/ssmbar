@@ -86,7 +86,13 @@ multiple <- calculate_benefits(
 
 ## Development Notes
 
-### File Locations
+### System Paths
+- **R 4.5.0**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/R.exe`
+- **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe`
+- **Package root**: `C:/Users/AnthonyColavito/ssmbar`
+- **GitHub repo**: `https://github.com/anthonycolavito/ssmbar.git`
+
+### Package File Locations
 - R source: `R/`
 - Package data: `data/` (tr2025.rda, sef2025.rda)
 - Raw data: `inst/extdata/`
@@ -95,6 +101,13 @@ multiple <- calculate_benefits(
 ### Known Issues
 - `legacy/worker_builder.R` is broken legacy code (moved out of R/ directory)
 - Rtools 4.5 not installed on dev machine (4.4 available but incompatible with R 4.5.0)
+
+### Running R Scripts
+To run R scripts or test the package:
+```bash
+cd /c/Users/AnthonyColavito/ssmbar
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
+```
 
 ### R CMD Check Status
 - Passes with 0 errors, 0 warnings, 2 notes (expected for source directory check)
@@ -120,6 +133,10 @@ multiple <- calculate_benefits(
    - Handles workers with dependent spouses (spouse_spec)
    - Calculates DRC payback at NRA based on months withheld
 9. Added `generate_spouse_dependent_benefit()` helper for RET calculations
+10. Added `annual_ind` and `annual_couple` output columns to `calculate_benefits()`:
+    - `annual_ind`: Individual worker's annual benefit (ben * 12)
+    - `annual_couple`: Combined couple's annual benefit (worker + spouse's full benefit)
+    - Added `calculate_spouse_full_benefit()` helper to compute spouse's total benefit
 
 ## RET (Retirement Earnings Test) Details
 
