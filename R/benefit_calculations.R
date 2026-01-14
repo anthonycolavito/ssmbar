@@ -838,7 +838,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
 
   # Join assumptions
   dataset <- worker %>%
-    left_join(assumptions %>% select(year, ret1, nra, rf1, rf2, drc, cpi_w), by = "year")
+    left_join(assumptions %>% select(year, ret1, nra, rf1, rf2, drc, s_rf1, s_rf2, cpi_w), by = "year")
 
   # Process each worker
 
