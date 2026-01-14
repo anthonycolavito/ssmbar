@@ -15,6 +15,11 @@ qc_comp <- function(worker, debugg=FALSE) {
   #Rules for acquiring Quarters of Coverage are detailed in Section 212 of the Social Security Handbook
   #https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0212.html#S0212
 
+  # TODO-DOC: Document program rules:
+  # - QC earning rules: max 4 per year, based on earnings threshold (qc_rec)
+  # - Fully insured status: 40 QCs required (Section 203)
+  # - How qc_rec is indexed to AWI (see assumptions_prep.R)
+
   dataset <- worker %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
@@ -53,6 +58,12 @@ comp_period <- function(worker, debugg=FALSE) {
   #A worker's computation period is equal to their elapsed years less their dropout years and cannot fall below 2.
   #See Section 704 for the definition of elapsed years.
   #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0704.html
+
+  # TODO-DOC: Document program rules:
+  # - Elapsed years formula: from age 22 through year before eligibility (Section 704)
+  # - Dropout years: up to 5 lowest years can be excluded
+  # - Minimum computation period: 2 years
+  # - Why dropout_years uses floor(elig_age/5) formula
 
   dataset <- worker %>% filter(age == elig_age) %>%
     group_by(id) %>%

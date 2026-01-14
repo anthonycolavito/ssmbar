@@ -102,9 +102,16 @@ prep_assumptions <- function(dataset) {
   }
 
   #Spousal PIA share
+  # TODO-DOC: Document spousal PIA share rule:
+  # - Spousal benefit is 50% of worker's PIA (Section 320)
+  # - This is the maximum; actual benefit may be reduced by early claiming
   assume$s_pia_share <- 0.5
 
   #Spousal reduction factors
+  # TODO-DOC: Document spousal reduction factors:
+  # - s_rf1 = 25/36 of 1% per month (vs 5/9 of 1% for workers) - Section 724
+  # - s_rf2 = same as worker rf2 (5/12 of 1% per month)
+  # - Maximum spousal reduction is 35% at age 62 (vs 30% for workers)
   assume$s_rf1 <- 25 / 36 / 100
   assume$s_rf2 <- assume$rf2
 
