@@ -733,9 +733,10 @@ calculate_spouse_full_benefit <- function(worker_data, spouse_spec, factors, ass
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
     pia(assumptions, debugg = FALSE) %>%
-    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = FALSE) %>%
     cola(assumptions, debugg = FALSE) %>%
-    worker_benefit(assumptions, debugg = FALSE)
+    worker_benefit(assumptions, debugg = FALSE) %>%
+    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = FALSE)
+
 
   # Get spouse's claim age and birth year
   s_claim_age <- spec$age_claim
@@ -758,7 +759,7 @@ calculate_spouse_full_benefit <- function(worker_data, spouse_spec, factors, ass
   # Join worker's basic_pia and cpi_w (from assumptions) to spouse data by year
   spouse <- spouse %>%
     left_join(
-      worker_data %>% select(year, basic_pia) %>% rename(w_basic_pia = basic_pia),
+      worker_data %>% select(year, cola_basic_pia) %>% rename(w_cola_basic_pia = cola_basic_pia),
       by = "year"
     ) %>%
     left_join(
@@ -767,16 +768,11 @@ calculate_spouse_full_benefit <- function(worker_data, spouse_spec, factors, ass
     ) %>%
     mutate(
       # Spouse's spousal PIA from worker's record
-      s_spousal_pia = pmax((s_pia_share_ind * w_basic_pia) - pmax(basic_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
-
-      # Apply COLA to spouse's spousal PIA (indexed from spouse's age 62)
-      cpi_age62 = cpi_w[which(age == 62)],
-      cpi_factor = pmax(cpi_w / cpi_age62, 1),
-      cola_s_spousal_pia = floor(s_spousal_pia * cpi_factor),
+      s_spousal_pia = pmax((s_pia_share_ind * w_cola_basic_pia) - pmax(cola_basic_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
 
       # Spouse's spousal benefit (only after spouse claims)
       s_spousal_ben = case_when(
-        age >= s_claim_age ~ floor(cola_s_spousal_pia * s_spousal_act_factor),
+        age >= s_claim_age ~ floor(s_spousal_pia * s_spousal_act_factor),
         TRUE ~ 0
       ),
 
