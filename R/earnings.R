@@ -194,7 +194,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   #spouse_spec encodes spouse info for later spousal benefit calculation (NA if no spouse).
 
 
-  if (type != "custom") {
+  if (type %in% c("very_low","low","medium","high")) {
   #Base condition -- when a worker is one of the Trustees' scaled workers.
 
     # TODO-DOC: Document scaled worker methodology:
@@ -209,6 +209,16 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
       )
 
   } # End of type conditional
+  else if (type == "max") {
+    worker <- worker %>% left_join(assumptions %>% select(year, taxmax),
+                                   by = "year") %>% #Left joins scaled earnings factors for the type of worker selected.
+      mutate(
+        earnings =  case_when(
+          age >= 21 & age <= 64 ~ taxmax,
+          TRUE ~ 0
+        ) #Creates earnings at each age
+      )
+  }
   else {
   #Condition for when a worker is specified as custom.
   #Earnings are generated using the raw scaled earnings factors provided by the trustee in five (5) steps
