@@ -195,11 +195,13 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       fact1_age62 = fact1[which(age == 62)],
       fact2_age62 = fact2[which(age == 62)],
       fact3_age62 = fact3[which(age == 62)],
-      basic_pia = floor(case_when(
-        aime > bp2_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (bp2_age62 - bp1_age62)) + (fact3_age62 * (aime - bp2_age62)),
-        aime > bp1_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (aime - bp1_age62)),
-        TRUE ~ fact1_age62 * aime
-      ))
+      basic_pia = case_when(
+      age >= elig_age ~ floor(case_when(
+                        aime > bp2_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (bp2_age62 - bp1_age62)) + (fact3_age62 * (aime - bp2_age62)),
+                        aime > bp1_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (aime - bp1_age62)),
+                        TRUE ~ fact1_age62 * aime
+                      )),
+      TRUE ~ 0)
     ) %>% select(-bp1, -bp2) %>% ungroup()
 
   if (debugg) {
