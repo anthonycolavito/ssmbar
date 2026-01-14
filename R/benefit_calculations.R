@@ -344,16 +344,15 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
     cpi_age62 = cpi_w[which(age == 62)],
     cpi_index_factor = pmax(cpi_w / cpi_age62, 1),
-    cola_basic_pia = floor(basic_pia * cpi_index_factor),
-    cola_spouse_pia = floor(spouse_pia * cpi_index_factor)
+    cola_basic_pia = floor(basic_pia * cpi_index_factor)
   ) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia, cola_spouse_pia, cpi_age62, cpi_index_factor),
+    worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia, cpi_age62, cpi_index_factor),
                                    by = c("id","age"))
   }
   else {
-    worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia, cola_spouse_pia),
+    worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia),
                                    by = c("id","age"))
   }
 
