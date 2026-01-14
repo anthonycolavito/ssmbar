@@ -493,7 +493,7 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
         s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
         yr_s_claim = year[s_age == s_claim_age],
         spouse_ben = case_when(
-          age >= claim_age & year >= yr_s_claim ~ floor(cola_spouse_pia * s_act_factor),
+          age >= claim_age & year >= yr_s_claim ~ floor(spouse_pia * s_act_factor),
           TRUE ~ 0
         )) %>% select(-claim_age) %>% ungroup()
 
@@ -535,7 +535,7 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
               s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
               yr_s_claim = year[s_age == s_claim_age_val],
               spouse_ben = case_when(
-                age >= claim_age & year >= yr_s_claim ~ floor(cola_spouse_pia * s_act_factor),
+                age >= claim_age & year >= yr_s_claim ~ floor(spouse_pia * s_act_factor),
                 TRUE ~ 0
               )
             ) %>%
