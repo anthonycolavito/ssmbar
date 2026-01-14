@@ -726,7 +726,7 @@ calculate_spouse_full_benefit <- function(worker_data, spouse_spec, factors, ass
 
   # Run spouse through benefit calculation pipeline
   # Note: spousal_pia is called with no spouse, which sets spouse_pia = 0
-  # This is needed because cola() expects spouse_pia to exist
+  # This is needed because cola() expects spouse_pia to exist -- AC NOTE: This may be able to change since cola() does not expect spouse_pia() to exist anymore
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
     pia(assumptions, debugg = FALSE) %>%
