@@ -924,9 +924,6 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
       # Recalculate benefits with the new actuarial factor
       worker_data <- worker_data %>%
         mutate(
-          # Get COLA-adjusted PIAs for recalculation
-          cpi_age62 = cpi_w[which(age == 62)[1]],
-          cpi_factor = pmax(cpi_w / cpi_age62, 1),
 
           # At NRA and beyond, use the new actuarial factor
           wrk_ben_final = case_when(
@@ -968,7 +965,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
           id, age, wrk_ben, spouse_ben, spouse_dep_ben,
           excess_earnings, ret_reduction, ret_reduction_capped,
           wrk_share, wrk_reduction, months_withheld, cum_months_withheld,
-          ret_adj_factor, cum_months_withheld_final
+          ret_adj_factor, ret_s_adj_factor, cum_months_withheld_final
         ),
         by = c("id", "age"),
         suffix = c("_orig", "")
