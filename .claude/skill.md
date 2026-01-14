@@ -18,7 +18,7 @@ Anthony Colavito (colavito@crfb.org) - Committee for a Responsible Federal Budge
 
 ### Benefit Calculation Pipeline
 ```
-Earnings → AIME → PIA → COLA → Actuarial Adjustment → Final Benefit
+Earnings → AIME → PIA → COLA → Actuarial Adjustment → RET → Final Benefit
 ```
 
 ### Key Functions
@@ -33,6 +33,7 @@ Earnings → AIME → PIA → COLA → Actuarial Adjustment → Final Benefit
 | `cola()` | Cost-of-Living Adjustments |
 | `worker_benefit()` | Applies early retirement/delayed credits |
 | `spouse_benefit()` | Spousal benefit with actuarial adjustments |
+| `ret()` | Retirement Earnings Test - reduces benefits if earnings > exempt amount |
 | `final_benefit()` | Combines worker + spousal benefits |
 
 ### Worker ID Format
@@ -46,7 +47,7 @@ Earnings → AIME → PIA → COLA → Actuarial Adjustment → Final Benefit
 - Used for on-the-fly spousal PIA calculation
 
 ### Data Objects
-- `tr2025` - Trustees Report assumptions (AWI, bend points, COLA factors, etc.)
+- `tr2025` - Trustees Report assumptions (AWI, bend points, COLA factors, ret1/ret2, etc.)
 - `sef2025` - Scaled Earnings Factors for worker types
 
 ### Worker Types
@@ -92,11 +93,11 @@ multiple <- calculate_benefits(
 - Data processing: `data-raw/process_data.R`
 
 ### Known Issues
-- `worker_builder.R` is broken legacy code (excluded from build via .Rbuildignore)
+- `legacy/worker_builder.R` is broken legacy code (moved out of R/ directory)
 - Rtools 4.5 not installed on dev machine (4.4 available but incompatible with R 4.5.0)
 
 ### R CMD Check Status
-- Passes with 0 errors, 0 warnings, 1 note (expected for dev version)
+- Passes with 0 errors, 0 warnings, 2 notes (expected for source directory check)
 
 ### Working Rules
 - Track all changes with meaningful git commits
@@ -112,3 +113,20 @@ multiple <- calculate_benefits(
 4. Simplified `calculate_benefits()` by removing dual-path logic
 5. Fixed `final_benefit()` bug where `ben` column was missing
 6. Added proper NAMESPACE imports and global variable declarations
+7. Added `ret1` and `ret2` (RET exempt amounts) to assumptions dataset
+8. Implemented `ret()` function for Retirement Earnings Test:
+   - Reduces benefits when earnings > ret1 (before NRA)
+   - $1 reduction for every $2 of excess earnings
+   - Handles workers with dependent spouses (spouse_spec)
+   - Calculates DRC payback at NRA based on months withheld
+9. Added `generate_spouse_dependent_benefit()` helper for RET calculations
+
+## RET (Retirement Earnings Test) Details
+
+The `ret()` function applies the Retirement Earnings Test per SSA Handbook Chapter 18:
+
+- **Who**: Workers with earnings > ret1 exempt amount, between claim_age and NRA
+- **Reduction**: (earnings - ret1) / 2 annually
+- **Spouse handling**: If worker has spouse_spec, includes spouse's dependent benefit in total pot; reduction allocated proportionally
+- **DRC payback**: At NRA, actuarial factor is recalculated as if worker claimed later (by months withheld / 12)
+- **Debug output**: `excess_earnings`, `ret_reduction`, `months_withheld`, `cum_months_withheld`, `ret_adj_factor`, `spouse_dep_ben`
