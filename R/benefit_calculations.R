@@ -894,7 +894,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
           # months_withheld = annual_reduction / monthly_benefit
           months_withheld = if_else(
             wrk_total_ben > 0 & age >= claim_age & age < nra_ind,
-            pmin(wrk_reduction / wrk_total_ben, 12),
+            floor(pmin(wrk_reduction / wrk_total_ben, 12)*10)/10,
             0
           )
         )
