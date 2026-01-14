@@ -86,11 +86,12 @@ multiple <- calculate_benefits(
 
 ## Development Notes
 
-### System Paths
-- **R 4.5.0**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/R.exe`
-- **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe`
-- **Package root**: `C:/Users/AnthonyColavito/ssmbar`
+### System Paths (Work Computer - CRFB)
+- **R 4.5.2**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/R.exe`
+- **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/Rscript.exe`
+- **Package root**: `C:/Users/AnthonyColavito/Dev/ssmbar`
 - **GitHub repo**: `https://github.com/anthonycolavito/ssmbar.git`
+- **Rtools**: Not installed on this computer
 
 ### Package File Locations
 - R source: `R/`
@@ -100,13 +101,13 @@ multiple <- calculate_benefits(
 
 ### Known Issues
 - `legacy/worker_builder.R` is broken legacy code (moved out of R/ directory)
-- Rtools 4.5 not installed on dev machine (4.4 available but incompatible with R 4.5.0)
+- Rtools not installed on work computer (CRFB)
 
 ### Running R Scripts
 To run R scripts or test the package:
 ```bash
-cd /c/Users/AnthonyColavito/ssmbar
-"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
+cd /c/Users/AnthonyColavito/Dev/ssmbar
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
 ```
 
 ### R CMD Check Status

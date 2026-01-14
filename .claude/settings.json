@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(C:/Users/AnthonyColavito/OneDrive/**)",
+      "Read(C:/Users/AnthonyColavito/OneDrive - Committee for a Responsible Federal Budget/**)",
+      "Edit(C:/Users/AnthonyColavito/OneDrive/**)",
+      "Edit(C:/Users/AnthonyColavito/OneDrive - Committee for a Responsible Federal Budget/**)",
+      "Write(C:/Users/AnthonyColavito/OneDrive/**)",
+      "Write(C:/Users/AnthonyColavito/OneDrive - Committee for a Responsible Federal Budget/**)",
+      "Bash(cd*OneDrive*)",
+      "Bash(ls*OneDrive*)",
+      "Bash(cat*OneDrive*)"
+    ]
+  }
+}
