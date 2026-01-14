@@ -82,10 +82,11 @@ generate_spouse_data <- function(spouse_spec, factors, assumptions) {
   # Calculate spouse's AIME and PIA
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
-    pia(assumptions, debugg = FALSE)
+    pia(assumptions, debugg = FALSE) %>%
+    cola(assumptions, debugg = FALSE)
 
   # Return only the columns needed for spousal benefit calculations
-  spouse %>% select(year, age, claim_age, basic_pia)
+  spouse %>% select(year, age, claim_age, cola_basic_pia)
 }
 
 
