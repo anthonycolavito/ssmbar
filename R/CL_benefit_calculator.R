@@ -118,6 +118,7 @@ calculate_benefits <- function(birth_yr,
     cola(assumptions, debugg) %>%
     worker_benefit(assumptions, debugg) %>%
     spouse_benefit(spouse = NULL, assumptions, debugg) %>%
+    ret(assumptions, factors = factors, debugg = debugg) %>%
     final_benefit(debugg)
 
   return(worker)

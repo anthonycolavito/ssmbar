@@ -602,52 +602,285 @@ final_benefit <- function(worker, debugg = FALSE) {
 
 }
 
+#' Generate Spouse's Dependent Benefit Based on Worker's Record (Internal)
+#'
+#' Calculates the spouse's spousal benefit that is based on the worker's earnings record.
+#' This is used for RET calculations to determine the total benefit pot subject to reduction.
+#'
+#' @param worker_row A single row from the worker dataframe containing year, age, basic_pia, cola_basic_pia
+#' @param spouse_spec Character string with spouse specification
+#' @param factors Data frame for the Trustees' scaled earnings factors
+#' @param assumptions Data frame of the pre-prepared Trustees assumptions
+#' @return Numeric value of spouse's spousal benefit based on worker's record for this year
+#' @keywords internal
+
+generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors, assumptions) {
+  # Parse the spouse specification
+  spec <- parse_spouse_spec(spouse_spec)
+  if (is.null(spec)) {
+    return(rep(0, nrow(worker_data)))
+  }
+
+  # Generate spouse's earnings and calculate their own PIA
+  spouse <- generate_single_worker(
+    birth_yr = spec$birth_yr,
+    sex = spec$sex,
+    type = spec$type,
+    age_claim = spec$age_claim,
+    age_elig = 62,
+    factors = factors,
+    assumptions = assumptions,
+    custom_avg_earnings = spec$custom_avg_earnings,
+    debugg = FALSE
+  )
+
+  spouse <- spouse %>%
+    aime(assumptions, debugg = FALSE) %>%
+    pia(assumptions, debugg = FALSE)
+
+  # Get spouse's claim age and birth year
+  s_claim_age <- spec$age_claim
+  s_birth_yr <- spec$birth_yr
+
+  # For each year in worker_data, calculate spouse's spousal benefit based on worker's record
+  # Note: worker_data is already for a single worker (from group_modify), so no need to group_by
+
+  # Get the columns we need from assumptions (only if not already present in worker_data)
+  cols_needed <- c("s_pia_share", "s_rf1", "s_rf2")
+  cols_to_join <- cols_needed[!cols_needed %in% names(worker_data)]
+
+  result <- worker_data %>%
+    mutate(
+      s_age = year - s_birth_yr,
+      s_claim_age_val = s_claim_age
+    ) %>%
+    left_join(spouse %>% select(year, basic_pia) %>% rename(s_own_pia = basic_pia), by = "year")
+
+  # Join additional assumption columns if needed
+  if (length(cols_to_join) > 0) {
+    result <- result %>%
+      left_join(assumptions %>% select(year, all_of(cols_to_join)), by = "year")
+  }
+
+  # Calculate spouse's spousal PIA based on worker's record
+  # Use cpi_w from worker_data (already joined in ret())
+  s_pia_share_ind <- result$s_pia_share[which(result$age == 62)[1]]
+  cpi_age62 <- worker_data$cpi_w[which(worker_data$age == 62)[1]]
+  yr_62 <- result$year[1] - result$age[1] + 62
+  nra_ind <- worker_data$nra[worker_data$year == yr_62][1]
+  s_rf1_ind <- result$s_rf1[result$year == yr_62][1]
+  s_rf2_ind <- result$s_rf2[result$year == yr_62][1]
+  s_dep_act_factor <- rf_and_drc(s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0)
+
+  result <- result %>%
+    mutate(
+      # Spouse's spousal PIA = 50% of worker's PIA - spouse's own PIA
+      spouse_dep_pia = pmax((s_pia_share_ind * basic_pia) - pmax(s_own_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
+
+      # Apply COLA to spouse's spousal PIA (indexed from worker's age 62)
+      cpi_factor = pmax(worker_data$cpi_w / cpi_age62, 1),
+      cola_spouse_dep_pia = floor(spouse_dep_pia * cpi_factor),
+
+      # Spouse's dependent benefit only starts when both worker has claimed AND spouse has reached their claim age
+      yr_s_claim = s_birth_yr + s_claim_age_val,
+      spouse_dep_ben = case_when(
+        age >= claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(cola_spouse_dep_pia * s_dep_act_factor),
+        TRUE ~ 0
+      )
+    )
+
+  return(result$spouse_dep_ben)
+}
+
+
 #' Retirement Earnings Test Calculation
 #'
 #' Function that reduces an individual's benefits if their earnings exceed the
-#' exempt amounts in the Retirement Earnings Test
+#' exempt amounts in the Retirement Earnings Test. Also calculates DRC payback
+#' at NRA to account for months of benefits withheld.
 #'
+#' The RET reduces benefits for workers who have earnings above the exempt amount
+#' (ret1) in years between their claiming age and Normal Retirement Age.
+#' For every $2 of excess earnings, $1 of benefits is withheld.
 #'
-#' @return worker
+#' If the worker has a spouse claiming benefits based on their record, the total
+#' benefit pot (worker's benefits + spouse's dependent benefit) is reduced, with
+#' the reduction allocated proportionally.
+#'
+#' At NRA, the actuarial factor is recalculated to account for months of benefits
+#' withheld, effectively treating the worker as if they claimed later.
+#'
+#' @param worker Dataframe with a worker's benefits by year and age
+#' @param assumptions Dataframe with the Social Security Trustees assumptions
+#' @param factors Data frame for the Trustees' scaled earnings factors. Required
+#'   if worker has spouse_spec for on-the-fly spouse benefit generation.
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with RET-adjusted benefits
 #'
 #' @export
-ret <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
+ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
+  # RET is described in Chapter 18 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
 
-  # Check if we need to use spouse_spec
-  use_spouse_spec <- is.null(spouse) &&
-    "spouse_spec" %in% names(worker) &&
-    any(!is.na(worker$spouse_spec))
+  # Check if worker has spouse_spec for dependent benefit calculation
+  has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
 
-  if (!is.null(spouse)) {
-    # Original behavior: use provided spouse data frame
-    dataset <- worker %>% left_join(assumptions %>% select(year, ret1, nra), by="year") %>%
-      left_join(spouse %>% select(year, spouse_ben) %>% rename(s_ben = spouse_ben),
-                by = "year") %>%
-      group_by(id) %>% arrange(id, age) %>%
-      mutate(
-        ben_type = case_when( #Temporary benefit type to track which benefits need to be reduced.
-          wrk_ben > 0 & spouse_ben <= 0 ~ "R",
-          wrk_ben > 0 & spouse_ben > 0 ~ "D",
-          wrk_ben <= 0 & spouse_ben > 0 ~ "S",
-          TRUE ~ "N"
-        ),
-        ret_earn = case_when(
-          age < claim_age | age >= nra ~ 0,
-          TRUE ~ pmax(earnings - ret1, 0) / 2),
-        ret_ben = case_when(
-          ben_type == "R" ~ wrk_ben + spouse_ben + s_ben,
-          TRUE ~ wrk_ben + spouse_ben
-        ),
-        ret_share = (wrk_ben + spouse_ben) / ret_ben,
-        reduction = ret_ben - ret_earn,
-        wrk_ben = wrk_ben - ((reduction * ret_share) * (wrk_ben / (wrk_ben + spouse_ben))),
-        spouse_ben = spouse_ben - ((reduction * ret_share) * (spouse_ben / (wrk_ben + spouse_ben))),
-        months_red = pmax(pmin(ret_earn / ret_ben, 12), 0),
-        cum_months_red = cumsum(months_red),
-
-        )  %>% ungroup()
+  if (has_spouse_spec && is.null(factors)) {
+    stop("factors parameter is required when worker has spouse_spec")
   }
 
+  # Join assumptions
+  dataset <- worker %>%
+    left_join(assumptions %>% select(year, ret1, nra, rf1, rf2, drc, cpi_w), by = "year")
+
+  # Process each worker
+
+  dataset <- dataset %>%
+    group_by(id) %>%
+    arrange(id, age) %>%
+    group_modify(~ {
+      worker_data <- .x
+      spec <- worker_data$spouse_spec[1]
+
+      # Calculate spouse's dependent benefit if spouse_spec exists
+      if (!is.na(spec) && !is.null(factors)) {
+        spouse_dep_ben <- generate_spouse_dependent_benefit(worker_data, spec, factors, assumptions)
+        worker_data$spouse_dep_ben <- spouse_dep_ben
+      } else {
+        worker_data$spouse_dep_ben <- 0
+      }
+
+      # Get worker's parameters
+      claim_age_val <- worker_data$claim_age[1]
+      yr_62 <- worker_data$year[1] - worker_data$age[1] + 62
+      nra_ind <- worker_data$nra[worker_data$year == yr_62][1]
+      rf1_ind <- worker_data$rf1[worker_data$year == yr_62][1]
+      rf2_ind <- worker_data$rf2[worker_data$year == yr_62][1]
+      drc_ind <- worker_data$drc[worker_data$year == yr_62][1]
+
+      # Calculate RET for each year
+      worker_data <- worker_data %>%
+        mutate(
+          # Worker's total monthly benefit (before RET)
+          wrk_total_ben = wrk_ben + spouse_ben,
+
+          # Total benefit pot includes spouse's dependent benefit
+          total_ben_pot = wrk_total_ben + spouse_dep_ben,
+
+          # Excess earnings and reduction amount (only between claim_age and NRA)
+          excess_earnings = case_when(
+            age < claim_age | age >= nra_ind ~ 0,
+            TRUE ~ pmax(earnings - ret1, 0)
+          ),
+          ret_reduction = excess_earnings / 2,
+
+          # Cap reduction at total annual benefits
+          annual_ben_pot = total_ben_pot * 12,
+          ret_reduction_capped = pmin(ret_reduction, annual_ben_pot),
+
+          # Worker's share of the reduction (proportional to their benefits)
+          wrk_share = if_else(total_ben_pot > 0, wrk_total_ben / total_ben_pot, 1),
+          wrk_reduction = ret_reduction_capped * wrk_share,
+
+          # Allocate worker's reduction between wrk_ben and spouse_ben proportionally
+          wrk_ben_share = if_else(wrk_total_ben > 0, wrk_ben / wrk_total_ben, 1),
+          spouse_ben_share = if_else(wrk_total_ben > 0, spouse_ben / wrk_total_ben, 0),
+
+          # Reduce benefits
+          wrk_ben_reduced = pmax(wrk_ben - (wrk_reduction * wrk_ben_share / 12), 0),
+          spouse_ben_reduced = pmax(spouse_ben - (wrk_reduction * spouse_ben_share / 12), 0),
+
+          # Calculate months of worker's benefits withheld
+          # months_withheld = annual_reduction / monthly_benefit
+          months_withheld = if_else(
+            wrk_total_ben > 0 & age >= claim_age & age < nra_ind,
+            pmin(wrk_reduction / wrk_total_ben, 12),
+            0
+          )
+        )
+
+      # Calculate cumulative months withheld (only up to NRA)
+      worker_data <- worker_data %>%
+        mutate(
+          cum_months_withheld = cumsum(if_else(age < nra_ind, months_withheld, 0))
+        )
+
+      # Get cumulative months withheld at NRA for DRC payback
+      cum_months_at_nra <- max(worker_data$cum_months_withheld[worker_data$age < nra_ind], 0, na.rm = TRUE)
+
+      # Calculate adjusted actuarial factor at NRA
+      # The worker is treated as if they claimed later by the number of months withheld
+      effective_claim_age <- min(claim_age_val + (cum_months_at_nra / 12), nra_ind)
+      new_act_factor <- rf_and_drc(effective_claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind)
+
+      # Get original actuarial factor for comparison
+      orig_act_factor <- rf_and_drc(claim_age_val, nra_ind, rf1_ind, rf2_ind, drc_ind)
+
+      # Apply DRC payback at NRA and beyond
+      # Recalculate benefits with the new actuarial factor
+      worker_data <- worker_data %>%
+        mutate(
+          # Get COLA-adjusted PIAs for recalculation
+          cpi_age62 = cpi_w[which(age == 62)[1]],
+          cpi_factor = pmax(cpi_w / cpi_age62, 1),
+
+          # At NRA and beyond, use the new actuarial factor
+          wrk_ben_final = case_when(
+            age < claim_age ~ 0,
+            age < nra_ind ~ wrk_ben_reduced,
+            TRUE ~ floor(cola_basic_pia * new_act_factor)
+          ),
+
+          # Spouse benefit also uses adjusted factor at NRA
+          # (spousal early retirement reduction is also adjusted)
+          spouse_ben_final = case_when(
+            age < claim_age ~ 0,
+            age < nra_ind ~ spouse_ben_reduced,
+            TRUE ~ spouse_ben  # Spouse benefit continues as calculated (no additional adjustment)
+          ),
+
+          # Store adjustment info
+          ret_adj_factor = if_else(age >= nra_ind, new_act_factor, orig_act_factor),
+          cum_months_withheld_final = cum_months_at_nra
+        )
+
+      # Update the benefit columns
+      worker_data <- worker_data %>%
+        mutate(
+          wrk_ben = wrk_ben_final,
+          spouse_ben = spouse_ben_final
+        )
+
+      worker_data
+    }) %>%
+    ungroup()
+
+  # Select output columns
+  if (debugg) {
+    worker <- worker %>%
+      left_join(
+        dataset %>% select(
+          id, age, wrk_ben, spouse_ben, spouse_dep_ben,
+          excess_earnings, ret_reduction, ret_reduction_capped,
+          wrk_share, wrk_reduction, months_withheld, cum_months_withheld,
+          ret_adj_factor, cum_months_withheld_final
+        ),
+        by = c("id", "age"),
+        suffix = c("_orig", "")
+      ) %>%
+      select(-wrk_ben_orig, -spouse_ben_orig)
+  } else {
+    worker <- worker %>%
+      left_join(
+        dataset %>% select(id, age, wrk_ben, spouse_ben),
+        by = c("id", "age"),
+        suffix = c("_orig", "")
+      ) %>%
+      select(-wrk_ben_orig, -spouse_ben_orig)
+  }
+
+  return(worker)
 }
 
 
