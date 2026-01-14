@@ -894,7 +894,7 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
           # months_withheld = annual_reduction / monthly_benefit
           months_withheld = if_else(
             wrk_total_ben > 0 & age >= claim_age & age < nra_ind,
-            floor(pmin(wrk_reduction / wrk_total_ben, 12)*10)/10,
+            ceiling(pmin(wrk_reduction / wrk_total_ben, 12)*10)/10,
             0
           )
         )
@@ -912,9 +912,11 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
       # The worker is treated as if they claimed later by the number of months withheld
       effective_claim_age <- min(claim_age_val + (cum_months_at_nra / 12), nra_ind)
       new_act_factor <- rf_and_drc(effective_claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind)
+      new_s_act_factor <- rf_and_drc(effective_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0)
 
       # Get original actuarial factor for comparison
       orig_act_factor <- rf_and_drc(claim_age_val, nra_ind, rf1_ind, rf2_ind, drc_ind)
+      orig_s_act_factor <- rf_and_drc(claim_age_val, nra_ind, s_rf1_ind, s_rf2_ind, 0)
 
       # Apply DRC payback at NRA and beyond
       # Recalculate benefits with the new actuarial factor
@@ -936,11 +938,12 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
           spouse_ben_final = case_when(
             age < claim_age ~ 0,
             age < nra_ind ~ spouse_ben_reduced,
-            TRUE ~ spouse_ben  # Spouse benefit continues as calculated (no additional adjustment)
+            TRUE ~ floor(spouse_pia * new_s_act_factor)  # Spouse benefit continues as calculated (no additional adjustment)
           ),
 
           # Store adjustment info
           ret_adj_factor = if_else(age >= nra_ind, new_act_factor, orig_act_factor),
+          ret_s_adj_factor = if_else(age >= nra_ind, new_s_act_factor, orig_s_act_factor),
           cum_months_withheld_final = cum_months_at_nra
         )
 
