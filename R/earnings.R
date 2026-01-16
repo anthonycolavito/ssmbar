@@ -46,7 +46,7 @@
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else first row_number group_modify bind_rows
 #' @export
 
-earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim, age_elig=62, factors, assumptions,
+earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim=65, age_elig=62, factors, assumptions,
                                custom_avg_earnings=NULL,
                                spouse_type=NULL, spouse_sex="all", spouse_birth_yr=NULL, spouse_age_claim=NULL,
                                spouse_custom_avg_earnings=NULL,

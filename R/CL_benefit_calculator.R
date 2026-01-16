@@ -85,7 +85,7 @@
 calculate_benefits <- function(birth_yr,
                                sex = "all",
                                type,
-                               age_claim,
+                               age_claim = 65,
                                factors,
                                assumptions,
                                age_elig = 62,
