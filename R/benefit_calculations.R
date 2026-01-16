@@ -39,15 +39,7 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
   #Delayed retirement credits are described in Section 720
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
 
-  # TODO-DOC: Document program rules for actuarial adjustments:
-  # - rf1 = 5/9 of 1% per month (first 36 months before NRA) = 6.67% per year
-  # - rf2 = 5/12 of 1% per month (months 37-60 before NRA) = 5% per year
-  # - Maximum early claiming reduction: 30% at age 62 for NRA=67
-  # - DRC varies by birth year: 8% per year for birth years 1943+
-  # - DRCs max out at age 70 (36 months of credits)
-  # - SSA Handbook Sections 720, 723, 724
-
-  dist_from_nra <- (claim_age - nra) * 12
+  dist_from_nra <- (claim_age - nra) * 12 #Distance from Normal Retirement Age in months
 
   #Calculate reduction factors
   rf_amt <- if_else(dist_from_nra >= 0, 0, #If claiming at or above NRA, no RFs
@@ -58,7 +50,7 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc) {
   drc_amt <- if_else(dist_from_nra <= 0, 0, #If claiming at or below NRA
                     pmin(36*drc, dist_from_nra * drc)) #If claiming above NRA. DRCs are capped at 70
 
-  act_factor <- 1 + rf_amt + drc_amt
+  act_factor <- 1 + rf_amt + drc_amt #Final actuarial factor for adjusting benefits
 
   return(act_factor)
 
@@ -103,21 +95,16 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
                                   by = "year")
 
-  dataset <- dataset %>% qc_comp(debugg)
-  dataset <- dataset %>% comp_period(debugg) #QC and Comp Period Calculation
+  dataset <- dataset %>% qc_comp(debugg) #Function for determing annual and cumulative QCs earned at each age
+  dataset <- dataset %>% comp_period(debugg) #Function for determing a worker's computation period based on their eligiblity age
 
   # Calculate indexed earnings
-  # TODO-DOC: Document indexing rules:
-  # - Earnings are indexed to AWI in year worker turns 60 (Section 700.3)
-  # - Earnings after age 60 are NOT indexed (index_factor = 1)
-  # - Earnings capped at taxable maximum (taxmax) before indexing
-  # - Why age 60 is used: worker becomes eligible at 62, minus 2-year lag
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
-      awi_age60 = awi[which(age == 60)],
-      index_factor = pmax(awi_age60 / awi, 1),
-      capped_earn = pmin(earnings, taxmax),
-      indexed_earn = capped_earn * index_factor) %>%
+      awi_age60 = awi[which(age == 60)], #Retrieve AWI at age 60 for indexing past earnings
+      index_factor = pmax(awi_age60 / awi, 1), #Calculate indexing factor at each age using the AWI at age 60. Earnings past age 60 are not indexed.
+      capped_earn = pmin(earnings, taxmax), #Cap earnings amounts at the taxable maximum at each age
+      indexed_earn = capped_earn * index_factor) %>% #Indexed capped earnings amounts
     ungroup()
 
   #AIME Calculation
@@ -129,30 +116,30 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       n <- nrow(.x)
       aime_vals <- numeric(n)
       indexed_earnings <- .x$indexed_earn
-      qc_eligible <- .x$qc_tot >= 40
-      comp_period <- .x$comp_period
-      age_eligible <- .x$age >= .x$elig_age
+      qc_eligible <- .x$qc_tot >= 40 #Workers need 40 QCs to be eligible for retirement benefits. This should be moved to the assumptions at some point
+      comp_period <- .x$comp_period #Worker's computation (or, averaging) period
+      age_eligible <- .x$age >= .x$elig_age #Worker's eligibility age (age 62 for retirement, age of disability, or age of death of deceased spouse)
 
       for (i in seq_len(n)) {
-        if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) {
-          years_to_use <- min(i, comp_period[i])
-          top_earnings_sum <- sum(sort(indexed_earnings[1:i], decreasing = TRUE)[1:years_to_use])
-          aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12))
+        if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) { #Only calculates AIME if worker has enough QCs and is at or past their eligiblity age.
+          years_to_use <- min(i, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
+          top_earnings_sum <- sum(sort(indexed_earnings[1:i], decreasing = TRUE)[1:years_to_use]) #Sum of highest indexed earnings in comp period (35 under current law)
+          aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12)) #AIME calculation, rounded to the next lowest dollar (see Handbook)
         }
       }
 
-      .x$aime <- aime_vals
+      .x$aime <- aime_vals #Stores AIME vals
       .x
     }) %>%
     ungroup()
 
   if (debugg) {
     worker <- worker %>% left_join(dataset %>% select(id, age, aime, qc_i, qc_tot, qc_rec, comp_period, elapsed_years, dropout_years, awi_age60, index_factor, capped_earn, indexed_earn),
-                                   by = c("id", "age"))
+                                   by = c("id", "age")) #Selects additional output if debugging
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, aime),
-                                   by = c("id", "age"))
+                                   by = c("id", "age")) #left joins only those variables needed to continue benefit calculation
   }
 
   return(worker)
@@ -182,36 +169,30 @@ pia <- function(worker, assumptions, debugg = FALSE) {
   dataset <- worker %>% left_join(assumptions %>% select(year, bp1, bp2, fact1, fact2, fact3),
                                   by="year")
 
-  # TODO-DOC: Document PIA formula rules (Section 706):
-  # - Three-tier formula: 90% * AIME up to BP1 + 32% * (AIME BP1-BP2) + 15% * (AIME above BP2)
-  # - Bend points are indexed to AWI and locked at year worker turns 62
-  # - PIA is floored (rounded down to nearest dollar)
-  # - Why age 62: this is first eligibility age for retirement benefits
-  # - Special rules for WEP (not implemented here)
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
-      bp1_age62 = bp1[which(age == 62)],
-      bp2_age62 = bp2[which(age == 62)],
-      fact1_age62 = fact1[which(age == 62)],
-      fact2_age62 = fact2[which(age == 62)],
-      fact3_age62 = fact3[which(age == 62)],
+      bp1_age62 = bp1[which(age == 62)], #First PIA bendpoint, determined by age of eligiblity to avoid hardcoding
+      bp2_age62 = bp2[which(age == 62)], #Second PIA bendpoint
+      fact1_age62 = fact1[which(age == 62)], #First replacement factor (90%)
+      fact2_age62 = fact2[which(age == 62)], #Second replacement factor (32%)
+      fact3_age62 = fact3[which(age == 62)], #Third replacement factor (15%)
       basic_pia = case_when(
-      age >= elig_age ~ floor(case_when(
+      age >= elig_age ~ floor(case_when( #PIA Calculation -- only occurs in and after a worker's eligibility age
                         aime > bp2_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (bp2_age62 - bp1_age62)) + (fact3_age62 * (aime - bp2_age62)),
                         aime > bp1_age62 ~ (fact1_age62 * bp1_age62) + (fact2_age62 * (aime - bp1_age62)),
                         TRUE ~ fact1_age62 * aime
                       )),
       TRUE ~ 0)
-    ) %>% select(-bp1, -bp2) %>% ungroup()
+    ) %>% select(-bp1, -bp2, -fact1, -fact2, -fact3) %>% ungroup()
 
   if (debugg) {
     worker <- worker %>% left_join(dataset %>% select(id, age, basic_pia, bp1_age62, bp2_age62, fact1_age62, fact2_age62, fact3_age62),
-                                   by = c("id","age"))
+                                   by = c("id","age")) #Left joins vars for debugging
   }
 
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, basic_pia),
-                                   by = c("id","age"))
+                                   by = c("id","age")) #Left joins ony vars needed to continue benefit calculation
   }
 
   return(worker)
@@ -235,30 +216,23 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 #'
 #' @export
 cola <- function (worker, assumptions, debugg = FALSE) {
-  # TODO-DOC: Document COLA rules:
-  # - COLAs are based on CPI-W (Consumer Price Index for Urban Wage Earners)
-  # - Applied annually in December, effective for January benefits
-  # - SSA Handbook Section 714 for COLA calculation
-  # - Why age 62 is base: aligns with PIA calculation timing
-  # - COLAs cannot be negative (cpi_index_factor >= 1)
-  # - Note: This is simplified - actual COLAs use Q3 CPI-W comparisons
 
   dataset <- worker %>% left_join(assumptions %>% select(year, cpi_w),
                                   by = "year")
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
-    cpi_age62 = cpi_w[which(age == 62)],
-    cpi_index_factor = pmax(cpi_w / cpi_age62, 1),
-    cola_basic_pia = floor(basic_pia * cpi_index_factor)
+    cpi_age62 = cpi_w[which(age == 62)], #CPI-W at age 62, used for indexing COLAs
+    cpi_index_factor = pmax(cpi_w / cpi_age62, 1), #Indexing factor to index COLAs. Negative COLAs are not payable under CL.
+    cola_basic_pia = floor(basic_pia * cpi_index_factor) #COLA'd PIA at each age, rounded down to the nearest dollar
   ) %>% ungroup()
 
   if (debugg) {
     worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia, cpi_age62, cpi_index_factor),
-                                   by = c("id","age"))
+                                   by = c("id","age")) #Left joins full vars for debugging
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia),
-                                   by = c("id","age"))
+                                   by = c("id","age")) #Left joins only those vars needed to continue benefit calc
   }
 
   return(worker)
@@ -288,31 +262,29 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
   #Delayed retirement credits are described in Section 720
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
 
-  # TODO: Add documentation about:
-  # - Why actuarial factors are locked at year worker turns 62
-  # - Interaction between claim_age and NRA
+  #Function currently can only handle retired beneficiaries.
 
   dataset <- worker %>% left_join(assumptions %>% select(year, rf1, rf2, drc, nra, s_rf1, s_rf2), by="year") %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
-      yr_62 = year - age + 62,
-      rf1_ind = rf1[which(year == yr_62)],
-      rf2_ind = rf2[which(year == yr_62)],
-      drc_ind = drc[which(year == yr_62)],
-      nra_ind = nra[which(year == yr_62)],
-      act_factor = rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind),
+      yr_62 = year - age + 62, #RF/DRC amounts and NRA are based on year turning age 62 in assumptions.
+      rf1_ind = rf1[which(year == yr_62)], #First reduction factor
+      rf2_ind = rf2[which(year == yr_62)], #Second reduction factor
+      drc_ind = drc[which(year == yr_62)], #Third reduction factor
+      nra_ind = nra[which(year == yr_62)], #NRA for age 62 cohort
+      act_factor = rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind), #Function that computes actuarial adjustment based on NRA, claiming age, and RFs and DRC levels
       wrk_ben = case_when(
-        age >= claim_age ~ floor(cola_basic_pia * act_factor),
+        age >= claim_age ~ floor(cola_basic_pia * act_factor), #Computees retired worker benefit with retired worker COLA'd PIA and the actuarial adjustment
         TRUE ~ 0
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
     worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor, wrk_ben),
-                                   by = c("id","age") )
+                                   by = c("id","age") ) #Left joins variable for debugging
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, wrk_ben),
-                                   by = c("id","age") )
+                                   by = c("id","age") ) #Left joins variables needed to continue benefit calculation
   }
 
   return(worker)
@@ -345,16 +317,6 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
   #The spousal insurance benefit is described in Section 320 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
 
-  # TODO-DOC: Document spousal PIA rules (Section 320):
-  # - Spousal PIA = 50% of spouse's COLA-adjusted PIA - worker's own COLA-adjusted PIA
-  # - Result floored at 0 (can't be negative)
-  # - IMPORTANT: Uses COLA-adjusted PIAs because spousal benefits are based on
-  #   what the spouse would receive at time of claiming, not at age 62
-  # - Age 60 requirement: dependent spouse must be at least 60 to receive spousal benefits
-  # - Timing requirement: the spouse (whose record provides the benefit) must have claimed
-  # - Dual entitlement: worker receives larger of own benefit OR spousal benefit (not both)
-  # - SSA Handbook Sections 305, 320 for spousal benefit rules
-
   # Check if we need to use spouse_spec for on-the-fly generation
   use_spouse_spec <- is.null(spouse) &&
                      "spouse_spec" %in% names(worker) &&
@@ -363,28 +325,29 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
   if (!is.null(spouse)) {
     # Original behavior: use provided spouse data frame
     dataset <- worker %>% left_join(spouse %>% select(year, age, cola_basic_pia, claim_age) %>% rename(s_age = age, s_pia = cola_basic_pia, s_claim_age = claim_age),
-                                    by="year") %>%
-      left_join(assumptions %>% select(year, s_pia_share), by="year") %>%
+                                    by="year") %>% #Selects and renames spouse's retired worker benefit information needed for computing dependent spousal PIA
+      left_join(assumptions %>% select(year, s_pia_share), by="year") %>% #Selects the dependent spousal PIA share of worker's PIA from assumptions
       group_by(id) %>%
       mutate(
-        yr_s_claim = year[which(s_age == s_claim_age)],
-        s_pia_share_ind = s_pia_share[which(age == elig_age)],
+        yr_s_claim = year[which(s_age == s_claim_age)], #Retrieves year the spouse claimed retired worker benefit, this is the first year an individual is eligible for dependent spousal benefits
+        s_pia_share_ind = s_pia_share[which(age == elig_age)], #Retrieves Spousal PIA share based on birth cohort (constant across time as of now)
         spouse_pia =  case_when(
-          year >= yr_s_claim & age >= 60 ~ pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE),
-          TRUE ~ 0)
+          year >= yr_s_claim & age >= 62 ~ pmax((s_pia_share_ind * s_pia) - pmax(cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), #Spousal PIA is equal to 50% of spouse's retired worker PIA, less individual's own retired worker PIA
+          TRUE ~ 0) #TODO: Eligiblity age is currently hardcoded and should be moved to the assumptions at some point
       ) %>%
       ungroup()
 
     if (debugg) {
       worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, s_pia_share_ind, spouse_pia),
-                                     by=c("id","year"))
+                                     by=c("id","year")) #Left joins variables needed for debugging
     } else {
       worker <- worker %>% left_join(dataset %>% select(id, year, spouse_pia),
-                                     by=c("id","year"))
+                                     by=c("id","year")) #Left joins only those variables needed to continue benefit calculation
     }
 
   } else if (use_spouse_spec) {
     # New behavior: generate spouse data on-the-fly from spouse_spec
+    #TODO: This should be the default behavior. The benefit functions should only care about a single worker.
     if (is.null(factors)) {
       stop("factors parameter is required when using spouse_spec for on-the-fly spouse data generation")
     }
@@ -400,7 +363,7 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
 
     # Process each worker group based on their spouse_spec
     dataset <- worker %>%
-      left_join(assumptions %>% select(year, s_pia_share), by="year") %>%
+      left_join(assumptions %>% select(year, s_pia_share), by="year") %>% #Grabs spousal PIA share from assumptions
       group_by(id) %>%
       group_modify(~ {
         spec <- .x$spouse_spec[1]  # spouse_spec is constant within a worker
@@ -416,12 +379,14 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
           # Join spouse PIA by year
           .x <- .x %>%
             left_join(spouse_data %>% select(year, age, claim_age, cola_basic_pia) %>% rename(s_age = age, s_claim_age = claim_age, s_pia = cola_basic_pia),
-                      by = "year")
+                      by = "year") #Grabs spouse's retired worker PIA info needed to calculate spousal PIA
 
           # Calculate spousal PIA
-          s_pia_share_ind <- .x$s_pia_share[which(.x$age == .x$elig_age[1])]
-          yr_s_claim <- .x$year[which(.x$s_age == .x$s_claim_age)]
-          .x$spouse_pia <- if_else(.x$age >= 60 & .x$year >= yr_s_claim, pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), 0)
+          s_pia_share_ind <- .x$s_pia_share[which(.x$age == .x$elig_age[1])] #Spousal PIA share based on birth cohort
+          yr_s_claim <- .x$year[which(.x$s_age == .x$s_claim_age)] #The first year in which the spouse whose record the Spousal PIA is based on claims benefits
+          .x$spouse_pia <- if_else(.x$age >= 62 & .x$year >= yr_s_claim, pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm=TRUE), 0, na.rm = TRUE), 0)
+          #Spousal PIA is equal to 50% of spouse's retired worker PIA, less individual's own retired worker PIA
+          #TODO: Eligibility age is hard-coded and should be moved to the assumptions file
         }
         .x
       }) %>%
@@ -429,10 +394,10 @@ spousal_pia <- function(worker, spouse=NULL, assumptions, factors=NULL, debugg=F
 
     if (debugg) {
       worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, spouse_pia),
-                                     by=c("id","year"))
+                                     by=c("id","year")) #Left joins full var set for debugging
     } else {
       worker <- worker %>% left_join(dataset %>% select(id, year, spouse_pia),
-                                     by=c("id","year"))
+                                     by=c("id","year")) #Left joins only those vars needed to continue the benefit calculation
     }
 
   } else {
@@ -474,15 +439,6 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
   #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
   #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
 
-  # TODO-DOC: Document spousal benefit calculation rules:
-  # - Spousal benefits use different reduction factors: 25/36 of 1% for first 36 months (s_rf1)
-  # - Spousal benefits have NO delayed retirement credits (drc=0 in rf_and_drc call)
-  # - Maximum spousal reduction at 62 for NRA=67 is 35% (vs 30% for worker benefits)
-  # - Requirements for spousal benefit to begin:
-  #   1. Worker (claiming spousal benefit) must have reached their own claim age
-  #   2. Spouse (whose record provides benefit) must have claimed their own benefits
-  # - SSA Handbook Section 724 for spousal reduction factors
-
   # Check if we need to use spouse_spec
   use_spouse_spec <- is.null(spouse) &&
                      "spouse_spec" %in% names(worker) &&
@@ -490,19 +446,19 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
 
   if (!is.null(spouse)) {
     # Original behavior: use provided spouse data frame
-    dataset <- worker %>% left_join(assumptions %>% select(year, nra, s_rf1, s_rf2), by="year") %>%
+    dataset <- worker %>% left_join(assumptions %>% select(year, nra, s_rf1, s_rf2), by="year") %>% #Left joins parameters needed to adjust spousal benefits (NRA and reduction factors)
       left_join(spouse %>% select(year, age, claim_age) %>% rename(s_age = age, s_claim_age = claim_age),
-                by = "year") %>%
+                by = "year") %>% #Renames needed vars to prevent forced renaming
       group_by(id) %>% arrange(id, age) %>%
       mutate(
-        yr_62 = year - age + 62,
-        nra_ind = nra[which(year == yr_62)],
-        s_rf1_ind = s_rf1[which(year == yr_62)],
-        s_rf2_ind = s_rf2[which(year == yr_62)],
-        s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
-        yr_s_claim = year[s_age == s_claim_age],
+        yr_62 = year - age + 62, #Year age 62 -- for grabbing parameters
+        nra_ind = nra[which(year == yr_62)], #NRA by birth cohort
+        s_rf1_ind = s_rf1[which(year == yr_62)], #First spousal reduction factor, based on birth cohort
+        s_rf2_ind = s_rf2[which(year == yr_62)], #Second spousal reduction factor
+        s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0), #Computes actuarial adjustment for spousal benefits -- dependent spouse's do not receive DRCs
+        yr_s_claim = year[s_age == s_claim_age], #Year their spouse first claims benefits, spousal benefits cannot be claimed before then
         spouse_ben = case_when(
-          age >= claim_age & year >= yr_s_claim ~ floor(spouse_pia * s_act_factor),
+          age >= claim_age & year >= yr_s_claim & age >= elig_age ~ floor(spouse_pia * s_act_factor), #Spousal benefit equals the spousal PIA adjusted for claiming
           TRUE ~ 0
         )) %>% select(-claim_age) %>% ungroup()
 
@@ -519,11 +475,11 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
           # No spouse - set spouse_ben to 0
           .x <- .x %>%
             mutate(
-              yr_62 = year - age + 62,
-              nra_ind = nra[which(year == yr_62)],
-              s_rf1_ind = s_rf1[which(year == yr_62)],
-              s_rf2_ind = s_rf2[which(year == yr_62)],
-              s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
+              yr_62 = year - age + 62, #Year age 62 -- for grabbing parameters
+              nra_ind = nra[which(year == yr_62)], #NRA by birth cohort
+              s_rf1_ind = s_rf1[which(year == yr_62)], #First spousal reduction factor, based on birth cohort
+              s_rf2_ind = s_rf2[which(year == yr_62)], #Second spousal reduction factor
+              s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0), #Actuarial reduction for spouses -- no DRCs are available to them under current law
               spouse_ben = 0
             )
         } else {
@@ -535,16 +491,16 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
           # Calculate spouse's age at each year and when they claim
           .x <- .x %>%
             mutate(
-              s_age = year - s_birth_yr,
-              s_claim_age_val = s_claim_age,
-              yr_62 = year - age + 62,
-              nra_ind = nra[which(year == yr_62)],
-              s_rf1_ind = s_rf1[which(year == yr_62)],
-              s_rf2_ind = s_rf2[which(year == yr_62)],
-              s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
-              yr_s_claim = year[s_age == s_claim_age_val],
+              s_age = year - s_birth_yr, #Spouse age
+              s_claim_age_val = s_claim_age, #Spouse claim age
+              yr_62 = year - age + 62, #Year age 62 -- for grabbing parameters
+              nra_ind = nra[which(year == yr_62)], #Individual's NRA
+              s_rf1_ind = s_rf1[which(year == yr_62)],#Spousal reduction factor 1
+              s_rf2_ind = s_rf2[which(year == yr_62)], #Spousal reduction factor 2
+              s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0), #Spousal actuarial adjustment -- no DRCs for spouses
+              yr_s_claim = year[s_age == s_claim_age_val], #Year spouse claims
               spouse_ben = case_when(
-                age >= claim_age & year >= yr_s_claim ~ floor(spouse_pia * s_act_factor),
+                age >= claim_age & year >= yr_s_claim & age >= elig_age ~ floor(spouse_pia * s_act_factor),
                 TRUE ~ 0
               )
             ) %>%
@@ -559,11 +515,11 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
     dataset <- worker %>% left_join(assumptions %>% select(year, nra, s_rf1, s_rf2), by="year") %>%
       group_by(id) %>% arrange(id, age) %>%
       mutate(
-        yr_62 = year - age + 62,
-        nra_ind = nra[which(year == yr_62)],
-        s_rf1_ind = s_rf1[which(year == yr_62)],
-        s_rf2_ind = s_rf2[which(year == yr_62)],
-        s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0),
+        yr_62 = year - age + 62, #Year age 62 for gathering parameters
+        nra_ind = nra[which(year == yr_62)], #NRA
+        s_rf1_ind = s_rf1[which(year == yr_62)], #First spousal reduction factor
+        s_rf2_ind = s_rf2[which(year == yr_62)], #Second spousal reduction factor
+        s_act_factor = rf_and_drc(claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0), #Spousal reduction factor
         spouse_ben = 0
       ) %>%
       ungroup()
@@ -571,10 +527,10 @@ spouse_benefit <- function(worker, spouse = NULL, assumptions, debugg = FALSE) {
 
   if (debugg) {
     worker <- worker %>% left_join(dataset %>% select(id, age, s_rf1_ind, s_rf2_ind, s_act_factor, spouse_ben),
-                                   by = c("id","age") )
+                                   by = c("id","age") ) #Left join all vars for debugging
   } else {
     worker <- worker %>% left_join(dataset %>% select(id, age, spouse_ben),
-                                   by = c("id","age") )
+                                   by = c("id","age") ) #Left join only vars needed for benefit calc
   }
 
   return(worker)
@@ -616,19 +572,6 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
   # RET is described in Chapter 18 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
   # Relevant sections are 1801, 1803, 1804, and 1806.
-
-  # TODO-DOC: Document Retirement Earnings Test rules (Chapter 18):
-  # - ret1: Exempt amount for years before reaching NRA ($22,320 in 2024)
-  # - ret2: Higher exempt amount for year reaching NRA ($59,520 in 2024)
-  # - Phase-out rates: $1 withheld per $2 excess (before NRA), $1 per $3 (year of NRA)
-  #   NOTE: This code only implements the $1/$2 rate (before NRA)
-  # - RET applies only from claim age through month before reaching NRA
-  # - Total benefit pot: includes worker's benefits AND spouse's dependent benefits
-  # - Reduction allocation: proportional to each person's share of total benefit pot
-  # - DRC payback at NRA: months of withheld benefits credited back via higher actuarial factor
-  #   Worker treated as if they claimed later by number of months withheld
-  # - Spousal reduction also adjusted at NRA (new_s_act_factor)
-  # - SSA Handbook Sections 1801 (overview), 1803 (exempt amounts), 1804 (deductions), 1806 (family max)
 
   # Check if worker has spouse_spec for dependent benefit calculation
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
@@ -809,9 +752,6 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
 #'
 #' @export
 final_benefit <- function(worker, debugg = FALSE) {
-  # TODO: Add documentation about:
-  # - Total benefit = worker benefit + spousal benefit
-  # - Output column selection when debugg=FALSE
 
   dataset <- worker %>%
     mutate(
@@ -957,9 +897,6 @@ generate_spouse_data <- function(spouse_spec, factors, assumptions) {
 #' @keywords internal
 
 generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors, assumptions) {
-  # TODO: Add documentation about:
-  # - This calculates the spouse's benefit FROM the worker's record (not the worker's spousal benefit)
-  # - Used in RET to determine total benefit pot subject to reduction
 
   # Parse the spouse specification
   spec <- parse_spouse_spec(spouse_spec)
@@ -1055,9 +992,6 @@ generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors,
 #' @keywords internal
 
 calculate_spouse_full_benefit <- function(worker_data, spouse_spec, factors, assumptions) {
-  # TODO: Add documentation about:
-  # - This calculates spouse's TOTAL benefit (their own worker benefit + their spousal benefit)
-  # - Used for annual_couple calculation in calculate_benefits()
 
   # Parse the spouse specification
   spec <- parse_spouse_spec(spouse_spec)
