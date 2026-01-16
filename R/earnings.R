@@ -197,11 +197,6 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   if (type %in% c("very_low","low","medium","high")) {
   #Base condition -- when a worker is one of the Trustees' scaled workers.
 
-    # TODO-DOC: Document scaled worker methodology:
-    # - Scaled earnings factors from SSA Trustees Report (Table V.C7)
-    # - very_low: ~25% of AWI, low: ~45% AWI, medium: ~100% AWI, high: ~160% AWI, max: at taxable maximum
-    # - Factors represent ratio of worker's earnings to AWI at each age
-    # - Reference: https://www.ssa.gov/oact/TR/2025/V_C_demo.html#wp258081
     worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(

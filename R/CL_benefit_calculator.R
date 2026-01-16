@@ -133,64 +133,6 @@ calculate_benefits <- function(birth_yr,
   worker <- worker %>%
     mutate(annual_ind = ben * 12)
 
-  # Calculate combined couple's annual benefit if spouse exists
-  # Check if any workers have a spouse_spec
-  has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
-
-  if (has_spouse_spec) {
-    # Need to regenerate worker data with basic_pia for spouse calculation
-    worker_full <- earnings_generator(
-      birth_yr = birth_yr,
-      sex = sex,
-      type = type,
-      age_claim = age_claim,
-      age_elig = age_elig,
-      factors = factors,
-      assumptions = assumptions,
-      custom_avg_earnings = custom_avg_earnings,
-      spouse_type = spouse_type,
-      spouse_sex = spouse_sex,
-      spouse_birth_yr = spouse_birth_yr,
-      spouse_age_claim = spouse_age_claim,
-      spouse_custom_avg_earnings = spouse_custom_avg_earnings,
-      debugg = FALSE
-    ) %>%
-      aime(assumptions, debugg = FALSE) %>%
-      pia(assumptions, debugg = FALSE) %>%
-      cola(assumptions, debugg = FALSE) %>%
-      spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = FALSE)
-
-
-    # Calculate spouse's full benefit for each worker group
-    worker <- worker %>%
-      group_by(id) %>%
-      group_modify(~ {
-        spec <- .x$spouse_spec[1]
-        # In group_modify, grouping column is in .y, not .x
-        worker_id <- .y$id
-
-        if (is.na(spec)) {
-          # No spouse - annual_couple is NA
-          .x$annual_couple <- NA_real_
-        } else {
-          # Get corresponding worker_full data for this worker
-          w_full_data <- worker_full %>% filter(id == worker_id)
-
-          # Calculate spouse's full benefit
-          spouse_ben <- calculate_spouse_full_benefit(w_full_data, spec, factors, assumptions)
-
-          # Combine with worker's benefit for couple total
-          .x$annual_couple <- (.x$ben + spouse_ben) * 12
-        }
-        .x
-      }) %>%
-      ungroup()
-  } else {
-    # No spouses - annual_couple is NA for all
-    worker <- worker %>%
-      mutate(annual_couple = NA_real_)
-  }
-
   return(worker)
 
 }
