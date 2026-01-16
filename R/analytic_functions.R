@@ -29,7 +29,8 @@ rep_rates <- function(worker, assumptions) {
 
            #Scalar bases
            awi_age65 = awi[which(age == 65)],
-           gdp_pi_age65 = awi[which(age == 65)],
+           gdp_pi_age65 = gdp_pi[which(age == 65)],
+
 
            #Scalars
            wage_scalar = awi_age65 / awi,
@@ -39,10 +40,11 @@ rep_rates <- function(worker, assumptions) {
            wage_earnings = earnings * wage_scalar,
            real_earnings = earnings * price_scalar,
 
-          #For PV replacement rate
-          real_earn_sum = sum(real_earnings),
-
-
+          #PV Payment Calcs
+          real_df_base = real_df[which(age == 21)],
+          real_df_wrk = real_df / real_df_base,
+          pv_real_earn = real_earnings / real_df_wrk,
+          real_pv_payment = sum(pv_real_earn) / real_df_wrk[which(age==64)]
 
            ) %>% ungroup()
 
