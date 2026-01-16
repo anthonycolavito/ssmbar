@@ -217,7 +217,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
           age >= 21 & age <= 64 ~ taxmax,
           TRUE ~ 0
         ) #Creates earnings at each age
-      )
+      ) %>% select(!taxmax) #Removing taxmax var to prevent errors with debugger
   }
   else {
   #Condition for when a worker is specified as custom.
