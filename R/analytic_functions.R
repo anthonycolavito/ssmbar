@@ -2,9 +2,7 @@
 # ANALYTIC FUNCTIONS
 # =============================================================================
 #
-# This file contains the core benefit calculation functions for the ssmbar package.
-# Functions are organized in the order they are called in the benefit calculation
-# pipeline (see calculate_benefits() in CL_benefit_calculator.R):
+# This file contains the core analytical functions for the ssmbar package.
 #
 # =============================================================================
 
@@ -22,9 +20,9 @@ rep_rates <- function(worker, assumptions) {
     stop(paste("assumptions file must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, gdp_pi, awi, df),
+  dataset <- worker %>% left_join(assumptions %>% select(year, gdp_pi, awi),
                                   by = "year") %>%
-    group_by(id) %>%
+    group_by(id) %>% arrange(id, age) %>%
     mutate(
            #Initial benefit (numerator in the replacement rate)
            init_ben = annual_ind[which(age == 65)],
@@ -32,24 +30,21 @@ rep_rates <- function(worker, assumptions) {
            #Scalar bases
            awi_age65 = awi[which(age == 65)],
            gdp_pi_age65 = awi[which(age == 65)],
-           df_age65 = df[which(age == 65)],
 
            #Scalars
            wage_scalar = awi_age65 / awi,
            price_scalar = gdp_pi_age65 / gdp_pi,
-           df_scalar = df_age65 / df,
 
            #Indexed Earnings
            wage_earnings = earnings * wage_scalar,
-           real_earnings = earnings * price_scalar
+           real_earnings = earnings * price_scalar,
 
-           ) %>% ungroup() %>%
-    group_by(id) %>% arrange(id, age) %>%
-    group_modify(
-      ~ {
+          #For PV replacement rate
+          real_earn_sum = sum(real_earnings),
 
-      }
-    )
+
+
+           ) %>% ungroup()
 
   if (measure %in% c("real","wage")) {
 
