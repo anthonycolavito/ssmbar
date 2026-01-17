@@ -13,7 +13,6 @@ rep_rates <- function(worker, assumptions) {
   if(!worker_cols_needed %in% names(worker)){
       stop(paste("worker file must contain:", paste(worker_cols_needed, collapse = ", ")))
     }
-  }
 
   assumption_cols_needed <- c("year","gdp_pi","awi","df")
   if(!assumption_cols_needed %in% names(assumptions)) {
@@ -50,9 +49,8 @@ rep_rates <- function(worker, assumptions) {
 
   if (measure %in% c("real","wage")) {
 
-    real_earnings <-
-
   }
 
-
 }
+
+
