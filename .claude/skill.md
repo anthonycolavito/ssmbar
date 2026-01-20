@@ -87,8 +87,8 @@ multiple <- calculate_benefits(
 ## Development Notes
 
 ### System Paths (Work Computer - CRFB)
-- **R 4.5.2**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/R.exe`
-- **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/Rscript.exe`
+- **R 4.5.2**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/R.exe`
+- **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe`
 - **Package root**: `C:/Users/AnthonyColavito/Dev/ssmbar`
 - **GitHub repo**: `https://github.com/anthonycolavito/ssmbar.git`
 - **Rtools**: Not installed on this computer
@@ -107,7 +107,7 @@ multiple <- calculate_benefits(
 To run R scripts or test the package:
 ```bash
 cd /c/Users/AnthonyColavito/Dev/ssmbar
-"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.2/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
 ```
 
 ### R CMD Check Status
@@ -165,9 +165,9 @@ Before any refactoring, create tests that verify current behavior. These tests w
 
 #### 1.1 Create regression test data
 
-- [ ] **Create `tests/testthat/fixtures/` directory** for storing expected outputs.
+- [x] **Create `tests/testthat/fixtures/` directory** for storing expected outputs.
 
-- [ ] **Generate baseline test cases**: Run the following code and save outputs as RDS files in `tests/testthat/fixtures/`:
+- [x] **Generate baseline test cases**: Run the following code and save outputs as RDS files in `tests/testthat/fixtures/`:
 
 ```r
 library(ssmbar)
@@ -221,11 +221,11 @@ saveRDS(baseline_max, "tests/testthat/fixtures/max_1960_claim67.rds")
 
 #### 1.2 Create regression test file
 
-- [ ] **Create `tests/testthat/test-regression.R`** that loads each fixture and compares key columns (ben, earnings, aime, basic_pia, spouse_ben, spouse_pia) to current output. See full template in detailed notes below.
+- [x] **Create `tests/testthat/test-regression.R`** that loads each fixture and compares key columns (ben, earnings, aime, basic_pia, spouse_ben, spouse_pia) to current output. See full template in detailed notes below.
 
 #### 1.3 Create unit tests for core calculations
 
-- [ ] **Create `tests/testthat/test-actuarial.R`** testing `rf_and_drc()`:
+- [x] **Create `tests/testthat/test-actuarial.R`** testing `rf_and_drc()`:
   - Claiming at 62 with NRA 67 should give factor of 0.70
   - Claiming at 70 with NRA 67 should give factor of 1.24
   - Claiming at NRA should give factor of 1.0
@@ -233,8 +233,8 @@ saveRDS(baseline_max, "tests/testthat/fixtures/max_1960_claim67.rds")
 
 #### 1.4 Run and commit
 
-- [ ] **Run `devtools::test()`** — all tests must pass
-- [ ] **Commit**: "Add regression and unit tests to establish baseline before refactoring"
+- [x] **Run `devtools::test()`** — all tests must pass
+- [x] **Commit**: "Add regression and unit tests to establish baseline before refactoring"
 
 ---
 
@@ -462,7 +462,18 @@ MAX_AGE <- 119
 
 ### Completed Items
 
-_(Move items here with date as completed, including notes on decisions made)_
+**Phase 1: Establish Testing Baseline** - Completed 2026-01-20
+- Created `tests/testthat/fixtures/` directory with 6 baseline RDS files
+- Created `tests/testthat/test-regression.R` with 6 regression tests (48 assertions)
+- Created `tests/testthat/test-actuarial.R` with 13 unit tests for `rf_and_drc()`
+- All 61 tests passing
+- Commit: 469edcd "Add regression and unit tests to establish baseline before refactoring"
+
+**Decisions made:**
+- Regression tests compare key columns: ben, earnings, aime, basic_pia, spouse_ben, spouse_pia
+- Used tolerance of 1e-10 for floating point comparisons
+- Actuarial tests use standard rf1=5/900, rf2=5/1200, drc=8%/12 values
+- Kept generate_fixtures.R script in fixtures/ for future reference/regeneration
 
 ---
 
