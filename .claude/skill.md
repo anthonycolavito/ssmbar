@@ -151,44 +151,364 @@ The `ret()` function applies the Retirement Earnings Test per SSA Handbook Chapt
 
 ---
 
-## Future Work To-Do List
+## Refactoring To-Do List
 
-### 1. Add Additional Documentation
-- Fill in all `TODO-DOC:` markers throughout the R files
-- Add SSA Handbook section references where marked
-- Document program rules for each benefit calculation step
+This section contains specific, actionable items for improving the ssmbar package. Items are organized in **execution order** — complete them sequentially. Each item includes the specific files, line numbers, and code changes needed.
 
-### 2. Move Eligibility Ages Out of Hard Code
-- Currently age 62 (worker eligibility) and age 60 (spousal eligibility) are hard-coded
-- Move these to the assumptions dataframe to allow policy modeling
-- Affected functions: `aime()`, `pia()`, `cola()`, `spousal_pia()`, `generate_spouse_dependent_benefit()`
+**Important**: Run `devtools::test()` and `devtools::check()` after completing each phase to catch regressions early.
 
-### 3. Create Lifetime Benefit Measures
+---
+
+### Phase 1: Establish Testing Baseline
+
+Before any refactoring, create tests that verify current behavior. These tests will catch any unintended changes during refactoring.
+
+#### 1.1 Create regression test data
+
+- [ ] **Create `tests/testthat/fixtures/` directory** for storing expected outputs.
+
+- [ ] **Generate baseline test cases**: Run the following code and save outputs as RDS files in `tests/testthat/fixtures/`:
+
+```r
+library(ssmbar)
+
+# Test case 1: Medium earner, no spouse, claiming at 67
+baseline_medium_67 <- calculate_benefits(
+  birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+  factors = sef2025, assumptions = tr2025, debugg = TRUE
+)
+saveRDS(baseline_medium_67, "tests/testthat/fixtures/medium_1960_claim67.rds")
+
+# Test case 2: Low earner, early claiming at 62
+baseline_low_62 <- calculate_benefits(
+  birth_yr = 1960, sex = "female", type = "low", age_claim = 62,
+  factors = sef2025, assumptions = tr2025, debugg = TRUE
+)
+saveRDS(baseline_low_62, "tests/testthat/fixtures/low_1960_claim62.rds")
+
+# Test case 3: High earner, delayed claiming at 70
+baseline_high_70 <- calculate_benefits(
+  birth_yr = 1960, sex = "male", type = "high", age_claim = 70,
+  factors = sef2025, assumptions = tr2025, debugg = TRUE
+)
+saveRDS(baseline_high_70, "tests/testthat/fixtures/high_1960_claim70.rds")
+
+# Test case 4: Worker with spouse
+baseline_with_spouse <- calculate_benefits(
+  birth_yr = 1960, sex = "male", type = "high", age_claim = 67,
+  factors = sef2025, assumptions = tr2025,
+  spouse_type = "low", spouse_sex = "female",
+  spouse_birth_yr = 1962, spouse_age_claim = 65,
+  debugg = TRUE
+)
+saveRDS(baseline_with_spouse, "tests/testthat/fixtures/high_1960_with_spouse.rds")
+
+# Test case 5: Custom earnings
+baseline_custom <- calculate_benefits(
+  birth_yr = 1970, sex = "male", type = "custom", age_claim = 65,
+  custom_avg_earnings = 50000,
+  factors = sef2025, assumptions = tr2025, debugg = TRUE
+)
+saveRDS(baseline_custom, "tests/testthat/fixtures/custom_50k_1970.rds")
+
+# Test case 6: Max earner
+baseline_max <- calculate_benefits(
+  birth_yr = 1960, sex = "male", type = "max", age_claim = 67,
+  factors = sef2025, assumptions = tr2025, debugg = TRUE
+)
+saveRDS(baseline_max, "tests/testthat/fixtures/max_1960_claim67.rds")
+```
+
+#### 1.2 Create regression test file
+
+- [ ] **Create `tests/testthat/test-regression.R`** that loads each fixture and compares key columns (ben, earnings, aime, basic_pia, spouse_ben, spouse_pia) to current output. See full template in detailed notes below.
+
+#### 1.3 Create unit tests for core calculations
+
+- [ ] **Create `tests/testthat/test-actuarial.R`** testing `rf_and_drc()`:
+  - Claiming at 62 with NRA 67 should give factor of 0.70
+  - Claiming at 70 with NRA 67 should give factor of 1.24
+  - Claiming at NRA should give factor of 1.0
+  - DRCs should cap at age 70
+
+#### 1.4 Run and commit
+
+- [ ] **Run `devtools::test()`** — all tests must pass
+- [ ] **Commit**: "Add regression and unit tests to establish baseline before refactoring"
+
+---
+
+### Phase 2: Parameterize Hardcoded Constants
+
+#### 2.1 Add new columns to assumptions
+
+- [ ] **Edit `R/assumptions_prep.R`**, add at end of `prep_assumptions()`:
+
+```r
+assume$qc_required <- 40
+assume$elig_age_retired <- 62
+assume$comp_period_base <- 35
+assume$max_dropout_years <- 5
+assume$drc_max_months <- 36
+assume$max_qc_per_year <- 4
+assume$ret_phaseout_rate <- 0.5
+```
+
+#### 2.2 Update data documentation
+
+- [ ] **Edit `R/data.R`**: Add roxygen documentation for each new column in the `tr2025` docblock.
+
+#### 2.3 Regenerate data
+
+- [ ] **Run `source("data-raw/process_data.R")`**
+- [ ] **Verify**: `names(tr2025)` includes new columns
+- [ ] **Run `devtools::test()`** — should still pass
+- [ ] **Commit**: "Add parameterized program rules to assumptions data frame"
+
+#### 2.4 Update eligibility.R
+
+- [ ] **Edit `qc_comp()`**: Change `pmin(..., 4)` to `pmin(..., max_qc_per_year)`. Add `assumptions` parameter. Join `max_qc_per_year` if not present.
+
+- [ ] **Edit `comp_period()`**: Change `pmin(5, ...)` to `pmin(max_dropout, ...)`. Add `assumptions` parameter.
+
+- [ ] **Update callers in `aime()`**: Lines 98-99, pass `assumptions` to both functions.
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Parameterize QC and computation period in eligibility.R"
+
+#### 2.5 Update benefit_calculations.R
+
+- [ ] **Edit `aime()`**: Line 119, change `>= 40` to `>= qc_required`. Add `qc_required` to joined columns.
+
+- [ ] **Edit `pia()`**: Lines 174-178, replace hardcoded `62` with `elig_age_retired`. Join the parameter.
+
+- [ ] **Edit `cola()`**: Line 224, replace `age == 62` with `age == elig_age_retired`. Join the parameter.
+
+- [ ] **Edit `spousal_pia()`**: Lines 335, 387, replace `age >= 62` with `age >= elig_age_retired`.
+
+- [ ] **Edit `rf_and_drc()`**: Line 51, add `drc_max_months = 36` parameter. Replace `36*drc` with `drc_max_months * drc`.
+
+- [ ] **Edit `ret()`**: Line 628, replace `/ 2` with `* ret_phaseout_rate`. Join the parameter.
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Parameterize eligibility age and other constants in benefit_calculations.R"
+
+#### 2.6 Update earnings.R
+
+- [ ] **Add constants at top of file**:
+```r
+FIRST_WORKING_AGE <- 21
+MAX_AGE <- 119
+```
+
+- [ ] **Update `generate_single_worker()`**: Use constants instead of hardcoded 21 and 119.
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Define working age constants in earnings.R"
+
+#### 2.7 Update globalVariables
+
+- [ ] **Edit `R/ssmbar-package.R`**: Add new variable names to `globalVariables()`.
+- [ ] **Run `devtools::check()`**
+- [ ] **Commit**: "Update globalVariables with new parameter names"
+
+---
+
+### Phase 3: Refactor Spouse Handling
+
+#### 3.1 Create R/spousal.R
+
+- [ ] **Create new file `R/spousal.R`**
+
+- [ ] **Move from benefit_calculations.R to spousal.R**:
+  - `parse_spouse_spec()` (lines 802-833)
+  - `spousal_pia()` (lines 299-415)
+  - `spouse_benefit()` (lines 418-538)
+
+- [ ] **Create `generate_spouse()` in spousal.R**: Consolidates spouse generation. Takes `spouse_spec`, `factors`, `assumptions`. Returns data frame with `s_year`, `s_age`, `s_claim_age`, `s_pia` columns, or NULL.
+
+- [ ] **Delete from benefit_calculations.R**:
+  - `generate_spouse_data()` (lines 840-880)
+  - `generate_spouse_dependent_benefit()` (lines 887-972)
+
+- [ ] **Commit**: "Create R/spousal.R and consolidate spouse functions"
+
+#### 3.2 Simplify spousal functions
+
+- [ ] **Rewrite `spousal_pia()`**: Single code path, expects pre-generated spouse data (or NULL).
+
+- [ ] **Rewrite `spouse_benefit()`**: Single code path, expects pre-generated spouse data (or NULL).
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Simplify spousal_pia and spouse_benefit to single code paths"
+
+#### 3.3 Update calculate_benefits()
+
+- [ ] **Edit `R/CL_benefit_calculator.R`**:
+  - Generate spouse data ONCE at start using `generate_spouse()`
+  - Pass `spouse_data` to `spousal_pia()`, `spouse_benefit()`, `ret()`
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Generate spouse data once and pass through pipeline"
+
+---
+
+### Phase 4: Decompose RET Function
+
+#### 4.1 Create R/ret.R
+
+- [ ] **Create new file `R/ret.R`**
+
+- [ ] **Create helper functions**:
+  - `calculate_excess_earnings(earnings, ret_threshold, age, claim_age, nra)`
+  - `calculate_ret_reduction(excess_earnings, phaseout_rate, total_annual_benefits)`
+  - `allocate_ret_reduction(total_reduction, worker_ben, spouse_ben, spouse_dep_ben)`
+  - `calculate_months_withheld(annual_reduction, monthly_benefit)`
+  - `calculate_drc_payback(claim_age, months_withheld, nra, rf1, rf2, drc, drc_max_months)`
+
+#### 4.2 Rewrite ret()
+
+- [ ] **Rewrite `ret()` to use helpers**: Target under 80 lines. Accept `spouse` parameter.
+
+- [ ] **Move `ret()` from benefit_calculations.R to ret.R**
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Decompose RET function into focused helpers in R/ret.R"
+
+---
+
+### Phase 5: Create Reform Infrastructure
+
+#### 5.1 Create R/reform.R
+
+- [ ] **Create `create_reform()`**: S3 class constructor. Parameters: `name`, `description`, `parameters` (named list), `effective_year`, `phase_in_years`, `affected_cohorts`.
+
+- [ ] **Create `print.Reform()`**: Print method.
+
+- [ ] **Create `apply_reform(assumptions, reform)`**: Returns modified assumptions. Handle immediate, step change, and phase-in cases.
+
+- [ ] **Create `compare_benefits(baseline, reformed)`**: Returns data frame with `_baseline`, `_reform`, `_diff` columns.
+
+- [ ] **Create `reform_impact_summary(comparison)`**: Returns ReformImpact object with winners/losers/mean change stats.
+
+- [ ] **Create `print.ReformImpact()`**: Print method.
+
+#### 5.2 Update calculate_benefits()
+
+- [ ] **Add `reform = NULL` parameter**
+- [ ] **At start**: `if (!is.null(reform)) assumptions <- apply_reform(assumptions, reform)`
+
+#### 5.3 Create reform tests
+
+- [ ] **Create `tests/testthat/test-reform.R`**:
+  - `create_reform()` validates parameters
+  - `apply_reform()` modifies correct years
+  - `apply_reform()` handles phase-in correctly
+  - `compare_benefits()` calculates differences
+
+- [ ] **Run `devtools::test()`**
+- [ ] **Commit**: "Add reform infrastructure"
+
+---
+
+### Phase 6: Performance Optimization
+
+#### 6.1 Benchmark
+
+- [ ] **Create `inst/benchmarks/benchmark_scaling.R`**: Test with 10, 100, 500, 1000 workers.
+- [ ] **Run and record baseline times**
+
+#### 6.2 Optimize AIME
+
+- [ ] **Profile `aime()`** with profvis
+- [ ] **Rewrite loop** to avoid repeated sorting (O(n log n) instead of O(n²))
+- [ ] **Re-benchmark**
+- [ ] **Commit**: "Optimize AIME calculation"
+
+#### 6.3 Reduce joins
+
+- [ ] **Create `join_all_assumptions()`** helper
+- [ ] **Call once in `calculate_benefits()`** before pipeline
+- [ ] **Update functions** to skip joins if columns present
+- [ ] **Re-benchmark**
+- [ ] **Commit**: "Reduce redundant joins"
+
+---
+
+### Phase 7: Documentation and Cleanup
+
+#### 7.1 File organization
+
+- [ ] **Rename `CL_benefit_calculator.R` to `calculate_benefits.R`**
+- [ ] **Run `devtools::document()`**
+- [ ] **Run `devtools::check()`**
+- [ ] **Commit**: "Finalize file organization"
+
+#### 7.2 Vignettes
+
+- [ ] **Create `vignettes/calculating-benefits.Rmd`**
+- [ ] **Create `vignettes/modeling-reforms.Rmd`**
+- [ ] **Create `vignettes/replacement-rates.Rmd`**
+- [ ] **Run `devtools::build_vignettes()`**
+- [ ] **Commit**: "Add package vignettes"
+
+#### 7.3 Validation
+
+- [ ] **Create `R/validation.R`** with `validate_worker_params()`, `validate_assumptions()`
+- [ ] **Add validation to exported functions**
+- [ ] **Commit**: "Add parameter validation"
+
+---
+
+### Completed Items
+
+_(Move items here with date as completed, including notes on decisions made)_
+
+---
+
+### Notes for Claude Code
+
+**Before each phase**: Run `devtools::test()` and `devtools::check()`
+
+**After each task**: Run tests, commit with descriptive message, check off item
+
+**Key rules**:
+- Do NOT delete files without permission
+- Preserve existing behavior unless intentionally changing
+- Update roxygen docs when parameters change
+- Add new variables to globalVariables
+- Run `devtools::document()` after roxygen changes
+
+**File locations**:
+- Source: `R/`
+- Tests: `tests/testthat/`
+- Fixtures: `tests/testthat/fixtures/`
+- Raw data: `inst/extdata/`
+- Data processing: `data-raw/`
+
+---
+
+## Future Enhancements (Lower Priority)
+
+### Lifetime Measures
 - **Real lifetime benefits**: Sum of inflation-adjusted annual benefits over lifetime
-- **Present value (PV) lifetime benefits**: Discounted sum using interest rate from assumptions
-- Consider mortality adjustments (expected benefits accounting for survival probability)
-
-### 4. Create Lifetime Earnings Measures
+- **PV lifetime benefits**: Discounted sum using interest rate from assumptions
 - **Real lifetime earnings**: Sum of inflation-adjusted earnings over working life
-- **Present value (PV) lifetime earnings**: Discounted sum using interest rate
-- May want to calculate through different endpoints (age 62, NRA, claim age)
-
-### 5. Create Lifetime Tax Measures
+- **PV lifetime earnings**: Discounted sum using interest rate
 - **Real lifetime SS taxes**: Sum of inflation-adjusted payroll taxes paid
-- **Present value (PV) lifetime taxes**: Discounted sum using interest rate
-- Need to apply OASDI tax rates (from assumptions) to capped earnings
+- **PV lifetime taxes**: Discounted sum using interest rate
 
-### 6. Create Replacement Rate Measures
+### Replacement Rate Measures
 - Ratio of initial benefit to pre-retirement earnings
 - Options: benefit at claim age vs. AIME, career-average earnings, final years earnings
 - Consider both individual and couple replacement rates
 
-### 7. Create Annual Real Benefit Measures
+### Annual Real Benefit Measures
 - Add `real_ben` column: nominal benefit adjusted to constant dollars
 - Use GDP price index or CPI-W for inflation adjustment
 - Allow user to specify base year for real values
 
-### 8. Add Interest Rate to Assumptions Dataset
+### Add Interest Rate to Assumptions Dataset
 - Add `int_rate` (or `discount_rate`) column to tr2025
 - Source from Trustees Report intermediate assumptions
-- Used for PV calculations in items 3-5 above
+- Used for PV calculations
