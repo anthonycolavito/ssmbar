@@ -8,7 +8,7 @@ earnings_generator(
   birth_yr = 1960,
   sex = "all",
   type = "medium",
-  age_claim,
+  age_claim = 65,
   age_elig = 62,
   factors,
   assumptions,

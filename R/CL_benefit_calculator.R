@@ -116,17 +116,28 @@ calculate_benefits <- function(birth_yr,
     debugg = debugg
   )
 
+  # Generate spouse data ONCE for all unique spouse_specs
+  # This avoids redundant calculations in spousal_pia(), spouse_benefit(), and ret()
+  spouse_data <- NULL
+  if ("spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))) {
+    unique_specs <- unique(worker$spouse_spec[!is.na(worker$spouse_spec)])
+    spouse_data <- lapply(unique_specs, function(spec) {
+      generate_spouse(spec, factors, assumptions)
+    })
+    names(spouse_data) <- unique_specs
+  }
+
   # Calculate benefits through the pipeline
   # The benefit functions handle multiple workers via group_by(id)
-  # and use spouse_spec for on-the-fly spousal benefit calculations
+  # spouse_data is passed to avoid redundant spouse calculations
   worker <- worker %>%
     aime(assumptions, debugg) %>%
     pia(assumptions, debugg) %>%
     cola(assumptions, debugg) %>%
     worker_benefit(assumptions, debugg) %>%
-    spousal_pia(spouse = NULL, assumptions, factors = factors, debugg = debugg) %>%
-    spouse_benefit(spouse = NULL, assumptions, debugg) %>%
-    ret(assumptions, factors = factors, debugg = debugg) %>%
+    spousal_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
+    spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
+    ret(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
     final_benefit(debugg)
 
   # Calculate annual individual benefit

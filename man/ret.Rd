@@ -4,15 +4,18 @@
 \alias{ret}
 \title{Retirement Earnings Test Calculation}
 \usage{
-ret(worker, assumptions, factors = NULL, debugg = FALSE)
+ret(worker, assumptions, spouse_data = NULL, factors = NULL, debugg = FALSE)
 }
 \arguments{
 \item{worker}{Dataframe with a worker's benefits by year and age}
 
 \item{assumptions}{Dataframe with the Social Security Trustees assumptions}
 
+\item{spouse_data}{List of spouse data frames (keyed by spouse_spec), where each contains
+year, s_age, s_birth_yr, s_claim_age, s_pia. NULL if no spouses or to generate on-the-fly.}
+
 \item{factors}{Data frame for the Trustees' scaled earnings factors. Required
-if worker has spouse_spec for on-the-fly spouse benefit generation.}
+if spouse_data is NULL and workers have spouse_spec for on-the-fly generation.}
 
 \item{debugg}{Boolean value that directs function to output additional variables if set to true}
 }

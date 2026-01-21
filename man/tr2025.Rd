@@ -30,6 +30,14 @@ A data frame with the following variables:
 \item{s_pia_share}{Spousal PIA share (0.50)}
 \item{s_rf1}{Spousal early retirement reduction factor (first 36 months)}
 \item{s_rf2}{Spousal early retirement reduction factor (months beyond 36)}
+\item{qc_required}{Quarters of coverage required for fully insured status (40)}
+\item{elig_age_retired}{Earliest age for retirement benefit eligibility (62)}
+\item{index_age_offset}{Offset for wage indexing year; indexing age = elig_age - offset (2)}
+\item{max_dropout_years}{Maximum dropout years in AIME computation period (5)}
+\item{min_comp_period}{Minimum computation period in years for AIME calculation (2)}
+\item{max_qc_per_year}{Maximum quarters of coverage that can be earned per year (4)}
+\item{drc_max_months}{Maximum months of delayed retirement credits (36)}
+\item{ret_phaseout_rate}{RET phaseout rate - reduction per dollar of excess earnings (0.5)}
 }
 }
 \source{

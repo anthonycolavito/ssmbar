@@ -341,14 +341,16 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'
 #' @param worker Dataframe with a worker's benefits by year and age
 #' @param assumptions Dataframe with the Social Security Trustees assumptions
+#' @param spouse_data List of spouse data frames (keyed by spouse_spec), where each contains
+#'   year, s_age, s_birth_yr, s_claim_age, s_pia. NULL if no spouses or to generate on-the-fly.
 #' @param factors Data frame for the Trustees' scaled earnings factors. Required
-#'   if worker has spouse_spec for on-the-fly spouse benefit generation.
+#'   if spouse_data is NULL and workers have spouse_spec for on-the-fly generation.
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
 #' @return worker Dataframe with RET-adjusted benefits
 #'
 #' @export
-ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
+ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg = FALSE) {
   # RET is described in Chapter 18 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
   # Relevant sections are 1801, 1803, 1804, and 1806.
@@ -361,8 +363,18 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
   # Check if worker has spouse_spec for dependent benefit calculation
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
 
-  if (has_spouse_spec && is.null(factors)) {
-    stop("factors parameter is required when worker has spouse_spec")
+  # If no spouse_data provided but workers have spouse_spec, generate it on-the-fly
+  if (is.null(spouse_data) && has_spouse_spec) {
+    if (is.null(factors)) {
+      stop("factors parameter is required when spouse_data is NULL and workers have spouse_spec")
+    }
+    # Get unique spouse_specs (excluding NA)
+    unique_specs <- unique(worker$spouse_spec[!is.na(worker$spouse_spec)])
+    # Generate spouse data for each unique spec
+    spouse_data <- lapply(unique_specs, function(spec) {
+      generate_spouse(spec, factors, assumptions)
+    })
+    names(spouse_data) <- unique_specs
   }
 
   # Join assumptions (including parameterized ret_phaseout_rate and elig_age_retired)
@@ -371,7 +383,6 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
                                      ret_phaseout_rate, elig_age_retired, drc_max_months), by = "year")
 
   # Process each worker
-
   dataset <- dataset %>%
     group_by(id) %>%
     arrange(id, age) %>%
@@ -383,8 +394,8 @@ ret <- function(worker, assumptions, factors = NULL, debugg = FALSE) {
       drc_max <- worker_data$drc_max_months[1] # Max DRC months from assumptions
 
       # Calculate spouse's dependent benefit if spouse_spec exists
-      if (!is.na(spec) && !is.null(factors)) {
-        spouse_dep_ben <- generate_spouse_dependent_benefit(worker_data, spec, factors, assumptions)
+      if (!is.na(spec) && !is.null(spouse_data) && !is.null(spouse_data[[spec]])) {
+        spouse_dep_ben <- calculate_spouse_dep_benefit(worker_data, spouse_data[[spec]], assumptions)
         worker_data$spouse_dep_ben <- spouse_dep_ben
       } else {
         worker_data$spouse_dep_ben <- 0
@@ -564,158 +575,4 @@ final_benefit <- function(worker, debugg = FALSE) {
 
   return(worker)
 
-}
-
-
-# =============================================================================
-# SECTION 3: Internal Helper Functions for Spouse Data Generation
-# =============================================================================
-# These functions support spousal benefit calculations by generating spouse
-# earnings and PIA data. They are internal (@keywords internal) and not exported.
-# Note: parse_spouse_spec(), spousal_pia(), and spouse_benefit() have been
-# moved to R/spousal.R
-
-
-# -----------------------------------------------------------------------------
-# 3.1 Generate Spouse Data
-# -----------------------------------------------------------------------------
-
-#' Generate Spouse Data for Benefit Calculations (Internal)
-#'
-#' Generates spouse's earnings, AIME, and PIA for use in spousal benefit calculations.
-#' This is called on-the-fly when spouse_spec is provided but no spouse data frame is passed.
-#'
-#' @param spouse_spec Character string with spouse specification
-#' @param factors Data frame for the Trustees' scaled earnings factors
-#' @param assumptions Data frame of the pre-prepared Trustees assumptions
-#' @return Data frame with spouse's year, age, claim_age, and basic_pia
-#' @keywords internal
-
-generate_spouse_data <- function(spouse_spec, factors, assumptions) {
-  # Parse the spouse specification
-
-  spec <- parse_spouse_spec(spouse_spec)
-  if (is.null(spec)) {
-    return(NULL)
-  }
-
-  # Get eligibility age from assumptions
-  elig_age_ret <- assumptions$elig_age_retired[1]
-
-  # Generate spouse earnings using internal function from earnings.R
-  spouse <- generate_single_worker(
-    birth_yr = spec$birth_yr,
-    sex = spec$sex,
-    type = spec$type,
-    age_claim = spec$age_claim,
-    age_elig = elig_age_ret,  # Retirement eligibility age from assumptions
-    factors = factors,
-    assumptions = assumptions,
-    custom_avg_earnings = spec$custom_avg_earnings,
-    debugg = FALSE
-  )
-
-  # Calculate spouse's AIME and PIA
-  spouse <- spouse %>%
-    aime(assumptions, debugg = FALSE) %>%
-    pia(assumptions, debugg = FALSE) %>%
-    cola(assumptions, debugg = FALSE)
-
-  # Return only the columns needed for spousal benefit calculations
-  spouse %>% select(year, age, claim_age, cola_basic_pia)
-}
-
-
-# -----------------------------------------------------------------------------
-# 3.2 Generate Spouse's Dependent Benefit
-# -----------------------------------------------------------------------------
-
-#' Generate Spouse's Dependent Benefit Based on Worker's Record (Internal)
-#'
-#' Calculates the spouse's spousal benefit that is based on the worker's earnings record.
-#' This is used for RET calculations to determine the total benefit pot subject to reduction.
-#'
-#' @param worker_data Dataframe for a single worker containing year, age, basic_pia, cola_basic_pia
-#' @param spouse_spec Character string with spouse specification
-#' @param factors Data frame for the Trustees' scaled earnings factors
-#' @param assumptions Data frame of the pre-prepared Trustees assumptions
-#' @return Numeric value of spouse's spousal benefit based on worker's record for this year
-#' @keywords internal
-
-generate_spouse_dependent_benefit <- function(worker_data, spouse_spec, factors, assumptions) {
-
-  # Parse the spouse specification
-  spec <- parse_spouse_spec(spouse_spec)
-  if (is.null(spec)) {
-    return(rep(0, nrow(worker_data)))
-  }
-
-  # Get eligibility age from assumptions
-  elig_age_ret <- assumptions$elig_age_retired[1]
-
-  # Generate spouse's earnings and calculate their own PIA
-  spouse <- generate_single_worker(
-    birth_yr = spec$birth_yr,
-    sex = spec$sex,
-    type = spec$type,
-    age_claim = spec$age_claim,
-    age_elig = elig_age_ret,  # Retirement eligibility age from assumptions
-    factors = factors,
-    assumptions = assumptions,
-    custom_avg_earnings = spec$custom_avg_earnings,
-    debugg = FALSE
-  )
-
-  spouse <- spouse %>%
-    aime(assumptions, debugg = FALSE) %>%
-    pia(assumptions, debugg = FALSE) %>%
-    cola(assumptions, debugg = FALSE)
-
-  # Get spouse's claim age and birth year
-  s_claim_age <- spec$age_claim
-  s_birth_yr <- spec$birth_yr
-
-  # For each year in worker_data, calculate spouse's spousal benefit based on worker's record
-  # Note: worker_data is already for a single worker (from group_modify), so no need to group_by
-
-  # Get the columns we need from assumptions (only if not already present in worker_data)
-  cols_needed <- c("s_pia_share", "s_rf1", "s_rf2")
-  cols_to_join <- cols_needed[!cols_needed %in% names(worker_data)]
-
-  result <- worker_data %>%
-    mutate(
-      s_age = year - s_birth_yr,
-      s_claim_age_val = s_claim_age
-    ) %>%
-    left_join(spouse %>% select(year, cola_basic_pia) %>% rename(s_own_pia = cola_basic_pia), by = "year")
-
-  # Join additional assumption columns if needed
-  if (length(cols_to_join) > 0) {
-    result <- result %>%
-      left_join(assumptions %>% select(year, all_of(cols_to_join)), by = "year")
-  }
-
-  # Calculate spouse's spousal PIA based on worker's record
-  # Use cpi_w from worker_data (already joined in ret())
-  s_pia_share_ind <- result$s_pia_share[which(result$age == elig_age_ret)[1]]
-  yr_elig <- result$year[1] - result$age[1] + elig_age_ret  # Year worker reaches eligibility age
-  nra_ind <- worker_data$nra[worker_data$year == yr_elig][1]
-  s_rf1_ind <- result$s_rf1[result$year == yr_elig][1]
-  s_rf2_ind <- result$s_rf2[result$year == yr_elig][1]
-  s_dep_act_factor <- rf_and_drc(s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0)
-
-  result <- result %>%
-    mutate(
-      # Spouse's spousal PIA = 50% of worker's PIA - spouse's own PIA
-      spouse_dep_pia = pmax((s_pia_share_ind * cola_basic_pia) - pmax(s_own_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
-
-      # Spouse's dependent benefit only starts when both worker has claimed AND spouse has reached their claim age
-      yr_s_claim = s_birth_yr + s_claim_age_val,
-      spouse_dep_ben = case_when(
-        age >= claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(spouse_dep_pia * s_dep_act_factor),
-        TRUE ~ 0
-      )
-    )
-
-  return(result$spouse_dep_ben)
 }

@@ -8,7 +8,7 @@ calculate_benefits(
   birth_yr,
   sex = "all",
   type,
-  age_claim,
+  age_claim = 65,
   factors,
   assumptions,
   age_elig = 62,
@@ -54,6 +54,14 @@ Options: "very_low", "low", "medium", "high", "max", or "custom".}
 \value{
 Returns a data frame with the worker's earnings and benefits by age.
 When multiple workers are specified, their data is combined into a single data frame.
+Output includes:
+\itemize{
+\item \code{ben}: Monthly benefit amount for the individual worker
+\item \code{annual_ind}: Annual benefit amount for the individual worker (ben * 12)
+\item \code{annual_couple}: Combined annual benefit for the couple (worker + spouse).
+NA if no spouse is specified. Includes both the spouse's own worker benefit
+(from their earnings record) and the spouse's spousal benefit (from the worker's record).
+}
 }
 \description{
 Convenience function that creates one or more stylized workers (and optionally their spouses)
