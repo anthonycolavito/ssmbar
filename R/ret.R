@@ -55,6 +55,9 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
   raw_reduction <- excess_earnings * phaseout_rate
 
   # Cap at total annual benefits
+  # TODO: Add SSA Handbook citation for the rule that RET reduction cannot
+  # exceed total annual benefits. Verify this is in Section 1803 or identify
+  # correct section.
   annual_benefits <- total_monthly_benefits * 12
   pmin(raw_reduction, annual_benefits)
 }
@@ -73,6 +76,11 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
 #' @keywords internal
 
 allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben) {
+  # TODO: Add SSA Handbook citation for the rule that RET reduction is allocated
+
+  # proportionally between worker and spouse benefits. Verify whether this is in
+  # Section 1806 or identify correct section.
+
   # Total benefit pot
   wrk_total_ben <- wrk_ben + spouse_ben
   total_ben_pot <- wrk_total_ben + spouse_dep_ben
@@ -113,7 +121,9 @@ allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_
 
 calculate_months_withheld <- function(annual_reduction, monthly_benefit, age, claim_age, nra) {
   # months_withheld = annual_reduction / monthly_benefit (Section 1806)
-  # Rounded up to nearest tenth, capped at 12 months
+  # TODO: Verify the rounding rule (ceiling to nearest tenth) in SSA Handbook
+  # Section 1806 or POMS. The current implementation rounds up to nearest 0.1 month.
+  # Capped at 12 months
   if_else(
     monthly_benefit > 0 & age >= claim_age & age < nra,
     ceiling(pmin(annual_reduction / monthly_benefit, 12) * 10) / 10,
@@ -141,6 +151,9 @@ calculate_months_withheld <- function(annual_reduction, monthly_benefit, age, cl
 
 calculate_drc_payback <- function(claim_age, cum_months_withheld, nra, rf1, rf2, drc, s_rf1, s_rf2, drc_max_months) {
   # Effective claim age is adjusted by months withheld (Section 1806)
+  # TODO: Add SSA Handbook citation explaining that spousal actuarial factor
+  # is also recalculated at NRA based on withheld months. Verify whether this
+  # is in Section 1806 or identify correct section.
   effective_claim_age <- min(claim_age + (cum_months_withheld / 12), nra)
 
   # Calculate new actuarial factors with effective claim age

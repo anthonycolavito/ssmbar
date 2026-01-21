@@ -259,6 +259,9 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
       claim_age_val <- .x$claim_age[1]
 
       # Actuarial adjustment for spousal benefits (no DRCs for spouses)
+      # TODO: Add SSA Handbook citation for rule that dependent spouses do not
+      # receive delayed retirement credits (DRCs). Reference Section 720 or
+      # relevant section explaining spousal benefit adjustments.
       s_act_factor <- rf_and_drc(claim_age_val, nra_ind, s_rf1_ind, s_rf2_ind, 0)
 
       if (is.na(spec)) {
@@ -335,6 +338,12 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
 #' @keywords internal
 
 calculate_spouse_dep_benefit <- function(worker_data, spouse_df, assumptions) {
+  # TODO: Add SSA Handbook reference - This function calculates the spouse's
+
+  # dependent benefit based on the worker's record. Reference Section 320.
+  # Document: (1) when dependent spouse benefits can begin, (2) the 50% formula
+  # and own-PIA offset, (3) eligibility conditions for dependent spouses.
+
   # Get spouse's info from spouse_df
   s_birth_yr <- spouse_df$s_birth_yr[1]
   s_claim_age <- spouse_df$s_claim_age[1]
