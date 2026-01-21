@@ -332,9 +332,9 @@ MAX_AGE <- 119
   - `spousal_pia()`
   - `spouse_benefit()`
 
-- [ ] **Create `generate_spouse()` in spousal.R**: Consolidates spouse generation. Takes `spouse_spec`, `factors`, `assumptions`. Returns data frame with `s_year`, `s_age`, `s_claim_age`, `s_pia` columns, or NULL.
+- [x] **Create `generate_spouse()` in spousal.R**: Consolidates spouse generation. Takes `spouse_spec`, `factors`, `assumptions`. Returns data frame with `year`, `s_age`, `s_birth_yr`, `s_claim_age`, `s_pia` columns, or NULL.
 
-- [ ] **Delete from benefit_calculations.R**:
+- [x] **Delete from benefit_calculations.R**:
   - `generate_spouse_data()`
   - `generate_spouse_dependent_benefit()`
 
@@ -342,21 +342,26 @@ MAX_AGE <- 119
 
 #### 3.2 Simplify spousal functions
 
-- [ ] **Rewrite `spousal_pia()`**: Single code path, expects pre-generated spouse data (or NULL).
+- [x] **Rewrite `spousal_pia()`**: Single code path using `spouse_data` parameter (list keyed by spouse_spec).
 
-- [ ] **Rewrite `spouse_benefit()`**: Single code path, expects pre-generated spouse data (or NULL).
+- [x] **Rewrite `spouse_benefit()`**: Single code path using `spouse_data` parameter.
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Simplify spousal_pia and spouse_benefit to single code paths"
+- [x] **Added `calculate_spouse_dep_benefit()`**: Helper for RET to calculate spouse's dependent benefit based on worker's record.
 
-#### 3.3 Update calculate_benefits()
+- [x] **Run `devtools::test()`**: All 55 tests pass
 
-- [ ] **Edit `R/CL_benefit_calculator.R`**:
+#### 3.3 Update calculate_benefits() and ret()
+
+- [x] **Edit `R/CL_benefit_calculator.R`**:
   - Generate spouse data ONCE at start using `generate_spouse()`
   - Pass `spouse_data` to `spousal_pia()`, `spouse_benefit()`, `ret()`
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Generate spouse data once and pass through pipeline"
+- [x] **Edit `R/benefit_calculations.R`**:
+  - Updated `ret()` to accept `spouse_data` parameter
+  - Uses `calculate_spouse_dep_benefit()` from spousal.R instead of internal function
+
+- [x] **Run `devtools::test()`**: All 55 tests pass
+- [x] **Commit**: "Phase 3: Refactor spouse handling - consolidate spouse data generation" (0a5697f)
 
 ---
 
@@ -500,18 +505,22 @@ MAX_AGE <- 119
 - Updated test fixtures with new column names (awi_index_age instead of awi_age60, added index_age)
 - All SSA Handbook references added inline in code comments
 
-**Phase 3: Refactor Spouse Handling** - In Progress (started 2026-01-20)
-- Created R/spousal.R with parse_spouse_spec(), spousal_pia(), spouse_benefit()
-- Removed these functions from benefit_calculations.R
-- Updated section numbering in benefit_calculations.R (3.2 → 3.1, 3.3 → 3.2)
+**Phase 3: Refactor Spouse Handling** - Completed 2026-01-20
+- Created R/spousal.R with parse_spouse_spec(), spousal_pia(), spouse_benefit(), generate_spouse(), calculate_spouse_dep_benefit()
+- Deleted generate_spouse_data() and generate_spouse_dependent_benefit() from benefit_calculations.R
+- Rewrote spousal_pia() and spouse_benefit() with unified code paths using spouse_data parameter
+- Updated ret() to accept spouse_data parameter and use calculate_spouse_dep_benefit()
+- Updated calculate_benefits() to generate spouse data ONCE and pass through pipeline
+- Performance improvement: Spouse data is now generated once per unique spouse_spec instead of multiple times
 - All 55 tests passing
-- Commit: c91fbd5 "Phase 3.1: Create R/spousal.R and move spouse functions"
+- Commits: c91fbd5 "Phase 3.1: Create R/spousal.R and move spouse functions"
+           0a5697f "Phase 3: Refactor spouse handling - consolidate spouse data generation"
 
-**Remaining for Phase 3:**
-- Create consolidated generate_spouse() function
-- Delete generate_spouse_data() and generate_spouse_dependent_benefit() from benefit_calculations.R
-- Rewrite spousal_pia() and spouse_benefit() to single code paths
-- Update calculate_benefits() to generate spouse data once and pass through pipeline
+**Decisions made:**
+- spouse_data is passed as a list keyed by spouse_spec (e.g., {"low-female-1962-65": df, ...})
+- generate_spouse() returns: year, s_age, s_birth_yr, s_claim_age, s_pia
+- calculate_spouse_dep_benefit() calculates spouse's dependent benefit based on worker's record (for RET)
+- Functions still support on-the-fly generation if spouse_data is NULL (for backward compatibility)
 
 ---
 
