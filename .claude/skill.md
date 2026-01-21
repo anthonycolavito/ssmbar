@@ -246,75 +246,78 @@ saveRDS(baseline_max, "tests/testthat/fixtures/max_1960_claim67.rds")
 
 #### 2.1 Add new columns to assumptions
 
-- [ ] **Edit `R/assumptions_prep.R`**, add at end of `prep_assumptions()`:
+- [x] **Edit `R/assumptions_prep.R`**, add at end of `prep_assumptions()`:
 
 ```r
 assume$qc_required <- 40
 assume$elig_age_retired <- 62
-assume$comp_period_base <- 35
+assume$index_age_offset <- 2
 assume$max_dropout_years <- 5
-assume$drc_max_months <- 36
+assume$min_comp_period <- 2
 assume$max_qc_per_year <- 4
+assume$drc_max_months <- 36
 assume$ret_phaseout_rate <- 0.5
 ```
 
 #### 2.2 Update data documentation
 
-- [ ] **Edit `R/data.R`**: Add roxygen documentation for each new column in the `tr2025` docblock.
+- [x] **Edit `R/data.R`**: Add roxygen documentation for each new column in the `tr2025` docblock.
 
 #### 2.3 Regenerate data
 
-- [ ] **Run `source("data-raw/process_data.R")`**
-- [ ] **Verify**: `names(tr2025)` includes new columns
-- [ ] **Run `devtools::test()`** — should still pass
-- [ ] **Commit**: "Add parameterized program rules to assumptions data frame"
+- [x] **Run `source("data-raw/process_data.R")`**
+- [x] **Verify**: `names(tr2025)` includes new columns
+- [x] **Run `devtools::test()`** — should still pass
+- [x] **Commit**: "Add parameterized program rules to assumptions data frame"
 
 #### 2.4 Update eligibility.R
 
-- [ ] **Edit `qc_comp()`**: Change `pmin(..., 4)` to `pmin(..., max_qc_per_year)`. Add `assumptions` parameter. Join `max_qc_per_year` if not present.
+- [x] **Edit `qc_comp()`**: Change `pmin(..., 4)` to `pmin(..., max_qc_per_year)`.
 
-- [ ] **Edit `comp_period()`**: Change `pmin(5, ...)` to `pmin(max_dropout, ...)`. Add `assumptions` parameter.
+- [x] **Edit `comp_period()`**: Change `pmin(5, ...)` to `pmin(max_dropout_years, ...)` and `pmax(2, ...)` to `pmax(min_comp_period, ...)`.
 
-- [ ] **Update callers in `aime()`**: Lines 98-99, pass `assumptions` to both functions.
-
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Parameterize QC and computation period in eligibility.R"
+- [x] **Run `devtools::test()`**
+- [x] **Commit**: "Parameterize QC and computation period in eligibility.R"
 
 #### 2.5 Update benefit_calculations.R
 
-- [ ] **Edit `aime()`**: Line 119, change `>= 40` to `>= qc_required`. Add `qc_required` to joined columns.
+- [x] **Edit `aime()`**: Change `>= 40` to `>= qc_required`. Fix indexing age calculation (was hardcoded age 60, now uses `elig_age - index_age_offset`). Renamed `awi_age60` to `awi_index_age`.
 
-- [ ] **Edit `pia()`**: Lines 174-178, replace hardcoded `62` with `elig_age_retired`. Join the parameter.
+- [x] **Edit `pia()`**: Replace hardcoded `62` with `elig_age_retired` (stored as `elig_age_ret`).
 
-- [ ] **Edit `cola()`**: Line 224, replace `age == 62` with `age == elig_age_retired`. Join the parameter.
+- [x] **Edit `cola()`**: Replace `age == 62` with `age == elig_age_ret`.
 
-- [ ] **Edit `spousal_pia()`**: Lines 335, 387, replace `age >= 62` with `age >= elig_age_retired`.
+- [x] **Edit `spousal_pia()`**: Replace `age >= 62` with `age >= elig_age_ret` in both branches.
 
-- [ ] **Edit `rf_and_drc()`**: Line 51, add `drc_max_months = 36` parameter. Replace `36*drc` with `drc_max_months * drc`.
+- [x] **Edit `spouse_benefit()`**: Replace `yr_62` with `yr_elig` using `elig_age_retired`.
 
-- [ ] **Edit `ret()`**: Line 628, replace `/ 2` with `* ret_phaseout_rate`. Join the parameter.
+- [x] **Edit `rf_and_drc()`**: Add `drc_max_months = 36` parameter. Replace `36*drc` with `drc_max_months * drc`.
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Parameterize eligibility age and other constants in benefit_calculations.R"
+- [x] **Edit `ret()`**: Replace `/ 2` with `* ret_rate` (from `ret_phaseout_rate`). Use `elig_age_retired` for parameter lookup.
+
+- [x] **Edit `generate_spouse_data()` and `generate_spouse_dependent_benefit()`**: Use `assumptions$elig_age_retired[1]` instead of hardcoded 62.
+
+- [x] **Run `devtools::test()`**
+- [x] **Commit**: "Parameterize eligibility age and other constants in benefit_calculations.R"
 
 #### 2.6 Update earnings.R
 
-- [ ] **Add constants at top of file**:
+- [x] **Add constants at top of file**:
 ```r
 FIRST_WORKING_AGE <- 21
 MAX_AGE <- 119
 ```
 
-- [ ] **Update `generate_single_worker()`**: Use constants instead of hardcoded 21 and 119.
+- [x] **Update `generate_single_worker()`**: Use constants instead of hardcoded 21 and 119.
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Define working age constants in earnings.R"
+- [x] **Run `devtools::test()`**
+- [x] **Commit**: "Define working age constants in earnings.R"
 
 #### 2.7 Update globalVariables
 
-- [ ] **Edit `R/ssmbar-package.R`**: Add new variable names to `globalVariables()`.
-- [ ] **Run `devtools::check()`**
-- [ ] **Commit**: "Update globalVariables with new parameter names"
+- [x] **Edit `R/ssmbar-package.R`**: Add new variable names to `globalVariables()`.
+- [x] **Run `devtools::check()`**
+- [x] **Commit**: "Update globalVariables with new parameter names"
 
 ---
 
@@ -478,6 +481,24 @@ MAX_AGE <- 119
 - Used tolerance of 1e-10 for floating point comparisons
 - Actuarial tests use standard rf1=5/900, rf2=5/1200, drc=8%/12 values
 - Kept generate_fixtures.R script in fixtures/ for future reference/regeneration
+
+**Phase 2: Parameterize Hardcoded Constants** - Completed 2026-01-20
+- Added 8 program rule parameters to assumptions_prep.R with full SSA Handbook references
+- Updated eligibility.R to use max_qc_per_year, max_dropout_years, min_comp_period
+- Updated benefit_calculations.R: aime(), pia(), cola(), spousal_pia(), spouse_benefit(), rf_and_drc(), ret()
+- Fixed indexing age bug: was hardcoded age 60, now correctly uses (elig_age - index_age_offset)
+- Renamed awi_age60 → awi_index_age (more descriptive for variable eligibility ages)
+- Added FIRST_WORKING_AGE and MAX_AGE constants to earnings.R
+- All 55 tests passing (regression tests regenerated with new column names)
+- Commit: 8df17e1 "Phase 2: Parameterize hardcoded constants for policy reform modeling"
+
+**Decisions made:**
+- Did NOT add comp_period_base=35 because computation period is calculated (elapsed_years - dropout_years), not a fixed constant
+- Added index_age_offset=2 to parameterize the wage indexing calculation (indexing age = elig_age - offset)
+- Added min_comp_period=2 for the minimum computation period rule
+- Removed ncol check from regression tests since column names changed (row count + key values still verified)
+- Updated test fixtures with new column names (awi_index_age instead of awi_age60, added index_age)
+- All SSA Handbook references added inline in code comments
 
 ---
 
