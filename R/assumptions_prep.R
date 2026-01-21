@@ -142,7 +142,7 @@ prep_assumptions <- function(dataset) {
   assume$max_dropout_years <- 5
 
   # Minimum computation period (years) for AIME calculation
-  # SSA Handbook Section 703
+  # SSA Handbook Section 703: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0703.html
   assume$min_comp_period <- 2
 
   # Maximum quarters of coverage that can be earned per year

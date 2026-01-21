@@ -5,7 +5,8 @@
 #
 # This file contains the core benefit calculation functions for the ssmbar package.
 # Functions are organized in the order they are called in the benefit calculation
-# pipeline (see calculate_benefits() in CL_benefit_calculator.R):
+# pipeline (see calculate_benefits() in CL_benefit_calculator.R). Spousal benefit
+# functions are included in a separate file:
 #
 #   earnings -> aime() -> pia() -> cola() -> worker_benefit() -> spousal_pia()
 #            -> spouse_benefit() -> ret() -> final_benefit()
@@ -97,7 +98,7 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   # - qc_required: QCs needed for eligibility (Section 203)
   # - max_qc_per_year: Max QCs per year (Section 212)
   # - max_dropout_years, min_comp_period: For computation period (Section 703)
-  # - index_age_offset: Indexing year offset from eligibility age (Section 700.3)
+  # - index_age_offset: Indexing year offset from eligibility age (Section 700.4)
   cols_to_join <- c("year", "taxmax", "qc_rec", "qc_required", "max_qc_per_year",
                     "max_dropout_years", "min_comp_period", "index_age_offset")
   if (!"awi" %in% names(worker)) {
@@ -112,12 +113,12 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 
   # Calculate indexed earnings
   # Earnings are indexed to AWI at (elig_age - index_age_offset) years before eligibility
-  # SSA Handbook Section 700.3: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
+  # SSA Handbook Section 700.4: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
       index_age = elig_age - first(index_age_offset), # Age for wage indexing (e.g., 62 - 2 = 60)
       awi_index_age = awi[which(age == index_age)], # Retrieve AWI at indexing age
-      index_factor = pmax(awi_index_age / awi, 1), # Calculate indexing factor. Earnings past indexing age are not indexed.
+      index_factor = pmax(awi_index_age / awi, 1), # Calculate indexing factor. Earnings past indexing age are taken at face value.
       capped_earn = pmin(earnings, taxmax), # Cap earnings amounts at the taxable maximum at each age
       indexed_earn = capped_earn * index_factor # Indexed capped earnings amounts
     ) %>%

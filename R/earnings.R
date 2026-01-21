@@ -209,7 +209,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
     worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
-        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age
+        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age -- earnings past age eligiblity age set to 0 if not a retired beneficiary (elig_age < 62)
       )
 
   } # End of type conditional
