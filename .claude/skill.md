@@ -87,9 +87,9 @@ multiple <- calculate_benefits(
 ## Development Notes
 
 ### System Paths (Work Computer - CRFB)
-- **R 4.5.2**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/R.exe`
+- **R 4.5.0**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/R.exe`
 - **Rscript**: `C:/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe`
-- **Package root**: `C:/Users/AnthonyColavito/Dev/ssmbar`
+- **Package root**: `C:/Users/AnthonyColavito/ssmbar`
 - **GitHub repo**: `https://github.com/anthonycolavito/ssmbar.git`
 - **Rtools**: Not installed on this computer
 
@@ -98,17 +98,21 @@ multiple <- calculate_benefits(
 - Package data: `data/` (tr2025.rda, sef2025.rda)
 - Raw data: `inst/extdata/`
 - Data processing: `data-raw/process_data.R`
+- Tests: `tests/testthat/`
+- Test fixtures: `tests/testthat/fixtures/`
+
+### Running R Commands
+Use Git Bash path format with the Rscript executable:
+```bash
+cd /c/Users/AnthonyColavito/ssmbar
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "devtools::test()"
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "devtools::check()"
+"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" path/to/script.R
+```
 
 ### Known Issues
 - `legacy/worker_builder.R` is broken legacy code (moved out of R/ directory)
 - Rtools not installed on work computer (CRFB)
-
-### Running R Scripts
-To run R scripts or test the package:
-```bash
-cd /c/Users/AnthonyColavito/Dev/ssmbar
-"/c/Users/AnthonyColavito/AppData/Local/Programs/R/R-4.5.0/bin/Rscript.exe" -e "library(devtools); load_all(); load('data/tr2025.rda'); load('data/sef2025.rda'); # your code here"
-```
 
 ### R CMD Check Status
 - Passes with 0 errors, 0 warnings, 2 notes (expected for source directory check)
