@@ -508,12 +508,21 @@ MAX_AGE <- 119
 
 **After each task**: Run tests, commit with descriptive message, check off item
 
+**MANDATORY: Regression Testing After Major Changes**
+Any major code changes (refactoring, parameterization, bug fixes to calculation functions) MUST be verified against baseline fixtures BEFORE finalizing:
+1. Run `devtools::test()` to execute all regression tests
+2. Verify key calculation columns match: `ben`, `earnings`, `aime`, `basic_pia`, `spouse_ben`, `spouse_pia`
+3. If column names change, regenerate fixtures BUT first compare old vs new values to confirm calculations unchanged
+4. Do NOT commit until all regression tests pass
+5. Document any intentional calculation changes explicitly in commit message
+
 **Key rules**:
 - Do NOT delete files without permission
 - Preserve existing behavior unless intentionally changing
 - Update roxygen docs when parameters change
 - Add new variables to globalVariables
 - Run `devtools::document()` after roxygen changes
+- ALWAYS run regression tests after modifying benefit calculation functions
 
 **File locations**:
 - Source: `R/`
