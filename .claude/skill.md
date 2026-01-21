@@ -509,11 +509,25 @@ MAX_AGE <- 119
 **After each task**: Run tests, commit with descriptive message, check off item
 
 **MANDATORY: Regression Testing After Major Changes**
-Any major code changes (refactoring, parameterization, bug fixes to calculation functions) MUST be verified against baseline fixtures BEFORE finalizing:
+Any major code changes (refactoring, parameterization, bug fixes) to the following files MUST be verified against baseline fixtures BEFORE finalizing:
+- `R/earnings.R` (earnings_generator, generate_single_worker)
+- `R/eligibility.R` (qc_comp, comp_period)
+- `R/benefit_calculations.R` (aime, pia, cola, worker_benefit, spousal_pia, spouse_benefit, rf_and_drc, ret, final_benefit)
+
+**Verification Steps:**
 1. Run `devtools::test()` to execute all regression tests
-2. Verify key calculation columns match: `ben`, `earnings`, `aime`, `basic_pia`, `spouse_ben`, `spouse_pia`
+2. Verify ALL intermediate calculation columns match (not just final outputs):
+   - **Earnings step**: earnings, factor, capped_earn
+   - **Eligibility step**: qc_i, qc_tot, comp_period, elapsed_years, dropout_years
+   - **AIME step**: aime, index_age, awi_index_age, index_factor, indexed_earn
+   - **PIA step**: basic_pia, bp1_elig, bp2_elig, fact1_elig, fact2_elig, fact3_elig
+   - **COLA step**: cola_basic_pia, cpi_elig, cpi_index_factor
+   - **Worker benefit step**: wrk_ben, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor
+   - **Spousal steps**: spouse_pia, s_pia, s_rf1_ind, s_rf2_ind, s_act_factor, spouse_ben
+   - **RET step**: excess_earnings, ret_reduction, months_withheld, cum_months_withheld, ret_adj_factor
+   - **Final step**: ben, annual_ind
 3. If column names change, regenerate fixtures BUT first compare old vs new values to confirm calculations unchanged
-4. Do NOT commit until all regression tests pass
+4. Do NOT commit until all regression tests pass and ALL intermediate values verified
 5. Document any intentional calculation changes explicitly in commit message
 
 **Key rules**:
