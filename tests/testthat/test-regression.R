@@ -36,10 +36,8 @@ test_that("Medium earner (1960, claim 67) matches baseline", {
     factors = sef2025, assumptions = tr2025, debugg = TRUE
   )
 
-  # Check dimensions match
-
-expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
+  # Check row count matches
+  expect_equal(nrow(current), nrow(expected))
 
   # Compare key calculation columns
   compare_key_columns(current, expected)
@@ -54,7 +52,6 @@ test_that("Low earner (1960, claim 62) matches baseline", {
   )
 
   expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
   compare_key_columns(current, expected)
 })
 
@@ -67,7 +64,6 @@ test_that("High earner (1960, claim 70) matches baseline", {
   )
 
   expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
   compare_key_columns(current, expected)
 })
 
@@ -83,7 +79,6 @@ test_that("High earner with spouse (1960, claim 67) matches baseline", {
   )
 
   expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
   compare_key_columns(current, expected)
 })
 
@@ -97,7 +92,6 @@ test_that("Custom earner $50k (1970, claim 65) matches baseline", {
   )
 
   expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
   compare_key_columns(current, expected)
 })
 
@@ -110,6 +104,5 @@ test_that("Max earner (1960, claim 67) matches baseline", {
   )
 
   expect_equal(nrow(current), nrow(expected))
-  expect_equal(ncol(current), ncol(expected))
   compare_key_columns(current, expected)
 })

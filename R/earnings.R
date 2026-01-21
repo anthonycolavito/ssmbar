@@ -1,4 +1,13 @@
 
+# =============================================================================
+# Constants for Earnings Generation
+# =============================================================================
+# These constants define the age range for earnings generation.
+# They are not expected to change under policy reforms.
+
+FIRST_WORKING_AGE <- 21  # First age at which earnings can be recorded
+MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime)
+
 #' Earnings Generator
 #'
 #' Function that generates the lifetime earnings for one or more specified workers.
@@ -172,11 +181,11 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
     spouse_spec <- NA_character_
   }
 
-  first_yr <- birth_yr + 21 #First earnings year
-  last_yr <- birth_yr + 119 #Last possible year alive (used for benefit amounts)
+  first_yr <- birth_yr + FIRST_WORKING_AGE  # First earnings year
+  last_yr <- birth_yr + MAX_AGE  # Last possible year alive (used for benefit amounts)
 
   years <- seq(first_yr, last_yr, 1)
-  ages <- seq(21, 119, 1)
+  ages <- seq(FIRST_WORKING_AGE, MAX_AGE, 1)
 
   worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's ID
 

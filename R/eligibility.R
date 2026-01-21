@@ -12,19 +12,19 @@
 
 qc_comp <- function(worker, debugg=FALSE) {
 
-  #Rules for acquiring Quarters of Coverage are detailed in Section 212 of the Social Security Handbook
-  #https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0212.html#S0212
-
-  # TODO-DOC: Document program rules:
-  # - QC earning rules: max 4 per year, based on earnings threshold (qc_rec)
-  # - Fully insured status: 40 QCs required (Section 203)
-  # - How qc_rec is indexed to AWI (see assumptions_prep.R)
+  # Rules for acquiring Quarters of Coverage are detailed in Section 212 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0212.html
+  #
+  # Program rules (from assumptions):
+  # - max_qc_per_year: Maximum QCs that can be earned per year (currently 4)
+  # - qc_rec: Earnings required for one QC (indexed to AWI, see assumptions_prep.R)
+  # - Fully insured status requires qc_required QCs (currently 40) - see Section 203
 
   dataset <- worker %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
-      qc_i = pmin(floor(earnings / qc_rec), 4), #Annual QCs earned.
-      qc_tot = cumsum(qc_i) #Cumulative QCs earned through each age. Used for determining eligibility.
+      qc_i = pmin(floor(earnings / qc_rec), max_qc_per_year), # Annual QCs earned (capped at max_qc_per_year)
+      qc_tot = cumsum(qc_i) # Cumulative QCs earned through each age. Used for determining eligibility.
     ) %>% ungroup()
 
   if(debugg) {
@@ -53,24 +53,24 @@ qc_comp <- function(worker, debugg=FALSE) {
 
 comp_period <- function(worker, debugg=FALSE) {
 
-  #Rules for determining a worker's computation period are outlined in Section 703 of the Social Security Handbook
-  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0703.html
-  #A worker's computation period is equal to their elapsed years less their dropout years and cannot fall below 2.
-  #See Section 704 for the definition of elapsed years.
-  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0704.html
-
-  # TODO-DOC: Document program rules:
-  # - Elapsed years formula: from age 22 through year before eligibility (Section 704)
-  # - Dropout years: up to 5 lowest years can be excluded
-  # - Minimum computation period: 2 years
-  # - Why dropout_years uses floor(elig_age/5) formula
+  # Rules for determining a worker's computation period are outlined in Section 703 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0703.html
+  # A worker's computation period is equal to their elapsed years less their dropout years.
+  # See Section 704 for the definition of elapsed years.
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0704.html
+  #
+  # Program rules (from assumptions):
+  # - max_dropout_years: Maximum years that can be dropped (currently 5)
+  # - min_comp_period: Minimum computation period (currently 2)
+  # - Elapsed years: from age 22 through year before eligibility (elig_age - 1 - 21)
+  # - Dropout years formula: min(max_dropout_years, elapsed_years - floor(elig_age/5))
 
   dataset <- worker %>% filter(age == elig_age) %>%
     group_by(id) %>%
     mutate(
-      elapsed_years = pmax(elig_age - 1 - 21,0),
-      dropout_years = pmin(5, elapsed_years - floor(elig_age/5)),
-      comp_period = pmax(2, elapsed_years - dropout_years)
+      elapsed_years = pmax(elig_age - 1 - 21, 0),
+      dropout_years = pmin(max_dropout_years, elapsed_years - floor(elig_age / 5)),
+      comp_period = pmax(min_comp_period, elapsed_years - dropout_years)
     ) %>% ungroup()
 
   if(debugg) {

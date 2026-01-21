@@ -10,28 +10,32 @@ utils::globalVariables(c(
   "spouse_spec", "ben",
 
 
-  # Assumptions variables
+  # Assumptions variables (including parameterized program rules)
   "awi", "cpi_w", "gdp_pi", "taxmax", "qc_rec",
   "bp1", "bp2", "fact1", "fact2", "fact3",
   "nra", "rf1", "rf2", "drc",
   "s_pia_share", "s_rf1", "s_rf2",
+  "qc_required", "elig_age_retired", "index_age_offset",
+  "max_dropout_years", "min_comp_period", "max_qc_per_year",
+  "drc_max_months", "ret_phaseout_rate",
 
   # AIME calculation variables
-  "awi_age60", "index_factor", "capped_earn", "indexed_earn",
+  "awi_age60", "awi_index_age", "index_age", "index_factor", "capped_earn", "indexed_earn",
   "qc_i", "qc_tot", "comp_period", "elapsed_years", "dropout_years",
 
   # PIA calculation variables
-  "basic_pia", "bp1_age62", "bp2_age62",
-  "fact1_age62", "fact2_age62", "fact3_age62",
+  "basic_pia", "bp1_age62", "bp2_age62", "bp1_elig", "bp2_elig",
+  "fact1_age62", "fact2_age62", "fact3_age62", "fact1_elig", "fact2_elig", "fact3_elig",
+  "elig_age_ret",
 
   # COLA calculation variables
-  "cpi_age62", "cpi_index_factor", "cola_basic_pia", "cola_spouse_pia",
+  "cpi_age62", "cpi_elig", "cpi_index_factor", "cola_basic_pia", "cola_spouse_pia",
 
   # Spousal PIA variables
   "s_pia", "s_pia_share_ind", "spouse_pia",
 
   # Benefit calculation variables
-  "yr_62", "nra_ind", "rf1_ind", "rf2_ind", "drc_ind",
+  "yr_62", "yr_elig", "nra_ind", "rf1_ind", "rf2_ind", "drc_ind",
   "act_factor", "wrk_ben",
   "s_rf1_ind", "s_rf2_ind", "s_act_factor", "spouse_ben",
   "s_age", "s_claim_age",
@@ -45,12 +49,16 @@ utils::globalVariables(c(
   "wrk_ben_reduced", "spouse_ben_reduced", "wrk_ben_final", "spouse_ben_final",
   "months_withheld", "cum_months_withheld", "ret_adj_factor",
   "cum_months_withheld_final", "wrk_ben_orig", "spouse_ben_orig",
+  "ret_rate", "drc_max",
 
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",
 
   # Worker builder variables (if used)
-  "dataset", ".data"
+  "dataset", ".data",
+
+  # Constants (defined in earnings.R)
+  "FIRST_WORKING_AGE", "MAX_AGE"
 ))
 
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange

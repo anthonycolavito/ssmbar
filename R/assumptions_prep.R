@@ -101,22 +101,62 @@ prep_assumptions <- function(dataset) {
 
   }
 
-  #Spousal PIA share
-  # TODO-DOC: Document spousal PIA share rule:
-  # - Spousal benefit is 50% of worker's PIA (Section 320)
-  # - This is the maximum; actual benefit may be reduced by early claiming
+  # Spousal PIA share
+  # SSA Handbook Section 320: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
+  # Spousal benefit is 50% of worker's PIA (before any reductions for early claiming)
   assume$s_pia_share <- 0.5
 
-  #Spousal reduction factors
-  # TODO-DOC: Document spousal reduction factors:
-  # - s_rf1 = 25/36 of 1% per month (vs 5/9 of 1% for workers) - Section 724
-  # - s_rf2 = same as worker rf2 (5/12 of 1% per month)
-  # - Maximum spousal reduction is 35% at age 62 (vs 30% for workers)
+  # Spousal reduction factors
+  # SSA Handbook Section 724: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
+  # s_rf1: 25/36 of 1% per month for first 36 months (vs 5/9 of 1% for workers)
+  # s_rf2: 5/12 of 1% per month beyond 36 months (same as worker rf2)
+  # Maximum spousal reduction is 35% at age 62 with NRA 67 (vs 30% for workers)
   assume$s_rf1 <- 25 / 36 / 100
   assume$s_rf2 <- assume$rf2
 
   #Retirement Earnings Test Exempt Amounts
 
+  # =============================================================================
+  # Program Rule Parameters
+  # =============================================================================
+  # These parameters represent Social Security program rules that are currently
+
+  # constant but may change under policy reforms. Storing them in the assumptions
+  # data frame allows for policy modeling by modifying these values.
+
+  # Quarters of Coverage required for fully insured status
+  # SSA Handbook Section 203: https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0203.html
+  assume$qc_required <- 40
+
+  # Earliest age for retirement benefit eligibility
+  # SSA Handbook Section 300: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0300.html
+  assume$elig_age_retired <- 62
+
+  # Offset for wage indexing year (indexing year = elig_age - offset)
+  # Earnings are indexed to AWI two years before eligibility age (age 60 for age-62 eligibility)
+  # SSA Handbook Section 700.3: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
+  assume$index_age_offset <- 2
+
+  # Maximum dropout years in AIME computation period
+  # SSA Handbook Section 703: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0703.html
+  assume$max_dropout_years <- 5
+
+  # Minimum computation period (years) for AIME calculation
+  # SSA Handbook Section 703
+  assume$min_comp_period <- 2
+
+  # Maximum quarters of coverage that can be earned per year
+  # SSA Handbook Section 212: https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0212.html
+  assume$max_qc_per_year <- 4
+
+  # Maximum months of delayed retirement credits (caps at age 70, which is 36 months past NRA 67)
+  # SSA Handbook Section 720: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
+  assume$drc_max_months <- 36
+
+  # Retirement Earnings Test phaseout rate (reduction per dollar of excess earnings)
+  # SSA Handbook Section 1803: https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1803.html
+  # $1 withheld for every $2 of excess earnings = 0.5 rate
+  assume$ret_phaseout_rate <- 0.5
 
   return(assume)
 
