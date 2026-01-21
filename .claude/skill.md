@@ -325,20 +325,20 @@ MAX_AGE <- 119
 
 #### 3.1 Create R/spousal.R
 
-- [ ] **Create new file `R/spousal.R`**
+- [x] **Create new file `R/spousal.R`**
 
-- [ ] **Move from benefit_calculations.R to spousal.R**:
-  - `parse_spouse_spec()` (lines 802-833)
-  - `spousal_pia()` (lines 299-415)
-  - `spouse_benefit()` (lines 418-538)
+- [x] **Move from benefit_calculations.R to spousal.R**:
+  - `parse_spouse_spec()`
+  - `spousal_pia()`
+  - `spouse_benefit()`
 
 - [ ] **Create `generate_spouse()` in spousal.R**: Consolidates spouse generation. Takes `spouse_spec`, `factors`, `assumptions`. Returns data frame with `s_year`, `s_age`, `s_claim_age`, `s_pia` columns, or NULL.
 
 - [ ] **Delete from benefit_calculations.R**:
-  - `generate_spouse_data()` (lines 840-880)
-  - `generate_spouse_dependent_benefit()` (lines 887-972)
+  - `generate_spouse_data()`
+  - `generate_spouse_dependent_benefit()`
 
-- [ ] **Commit**: "Create R/spousal.R and consolidate spouse functions"
+- [x] **Commit**: "Phase 3.1: Create R/spousal.R and move spouse functions" (c91fbd5)
 
 #### 3.2 Simplify spousal functions
 
@@ -500,6 +500,19 @@ MAX_AGE <- 119
 - Updated test fixtures with new column names (awi_index_age instead of awi_age60, added index_age)
 - All SSA Handbook references added inline in code comments
 
+**Phase 3: Refactor Spouse Handling** - In Progress (started 2026-01-20)
+- Created R/spousal.R with parse_spouse_spec(), spousal_pia(), spouse_benefit()
+- Removed these functions from benefit_calculations.R
+- Updated section numbering in benefit_calculations.R (3.2 → 3.1, 3.3 → 3.2)
+- All 55 tests passing
+- Commit: c91fbd5 "Phase 3.1: Create R/spousal.R and move spouse functions"
+
+**Remaining for Phase 3:**
+- Create consolidated generate_spouse() function
+- Delete generate_spouse_data() and generate_spouse_dependent_benefit() from benefit_calculations.R
+- Rewrite spousal_pia() and spouse_benefit() to single code paths
+- Update calculate_benefits() to generate spouse data once and pass through pipeline
+
 ---
 
 ### Notes for Claude Code
@@ -537,6 +550,7 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
 - Add new variables to globalVariables
 - Run `devtools::document()` after roxygen changes
 - ALWAYS run regression tests after modifying benefit calculation functions
+- ALWAYS document progress in this skill.md file at the end of each session (track what was completed, decisions made, and what remains)
 
 **File locations**:
 - Source: `R/`
