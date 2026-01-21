@@ -369,23 +369,24 @@ MAX_AGE <- 119
 
 #### 4.1 Create R/ret.R
 
-- [ ] **Create new file `R/ret.R`**
+- [x] **Create new file `R/ret.R`**
 
-- [ ] **Create helper functions**:
+- [x] **Create helper functions**:
   - `calculate_excess_earnings(earnings, ret_threshold, age, claim_age, nra)`
-  - `calculate_ret_reduction(excess_earnings, phaseout_rate, total_annual_benefits)`
-  - `allocate_ret_reduction(total_reduction, worker_ben, spouse_ben, spouse_dep_ben)`
-  - `calculate_months_withheld(annual_reduction, monthly_benefit)`
-  - `calculate_drc_payback(claim_age, months_withheld, nra, rf1, rf2, drc, drc_max_months)`
+  - `calculate_ret_reduction(excess_earnings, phaseout_rate, total_monthly_benefits)`
+  - `allocate_ret_reduction(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben)`
+  - `calculate_months_withheld(annual_reduction, monthly_benefit, age, claim_age, nra)`
+  - `calculate_drc_payback(claim_age, cum_months_withheld, nra, rf1, rf2, drc, s_rf1, s_rf2, drc_max_months)`
 
 #### 4.2 Rewrite ret()
 
-- [ ] **Rewrite `ret()` to use helpers**: Target under 80 lines. Accept `spouse` parameter.
+- [x] **Rewrite `ret()` to use helpers**: ~85 lines (was 183 lines). Uses spouse_data parameter.
 
-- [ ] **Move `ret()` from benefit_calculations.R to ret.R**
+- [x] **Move `ret()` from benefit_calculations.R to ret.R**
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Decompose RET function into focused helpers in R/ret.R"
+- [x] **Run `devtools::test()`**: All 55 tests pass
+- [x] **Verify all intermediate calculations**: All 6 test cases pass (38-40 columns each)
+- [x] **Commit**: "Phase 4: Decompose RET function into focused helpers in R/ret.R"
 
 ---
 
@@ -522,6 +523,25 @@ MAX_AGE <- 119
 - calculate_spouse_dep_benefit() calculates spouse's dependent benefit based on worker's record (for RET)
 - Functions still support on-the-fly generation if spouse_data is NULL (for backward compatibility)
 
+**Phase 4: Decompose RET Function** - Completed 2026-01-20
+- Created R/ret.R with 5 helper functions:
+  - calculate_excess_earnings(): Calculates excess earnings above RET threshold
+  - calculate_ret_reduction(): Calculates reduction with phaseout rate, caps at annual benefits
+  - allocate_ret_reduction(): Allocates reduction proportionally between worker/spouse benefits
+  - calculate_months_withheld(): Calculates months of benefits withheld for DRC payback
+  - calculate_drc_payback(): Calculates adjusted actuarial factors after withheld months
+- Rewrote ret() from 183 lines to ~85 lines using helper functions
+- Moved ret() from benefit_calculations.R to ret.R
+- All 55 tests passing
+- All 6 test cases verified with 38-40 intermediate calculation columns each
+- Commit: "Phase 4: Decompose RET function into focused helpers in R/ret.R"
+
+**Decisions made:**
+- Helper functions are internal (@keywords internal), not exported
+- Each helper has single responsibility and clear documentation
+- ret() main function now follows clear 5-step process (commented in code)
+- Maintained backward compatibility: spouse_data can be NULL for on-the-fly generation
+
 ---
 
 ### Notes for Claude Code
@@ -534,7 +554,9 @@ MAX_AGE <- 119
 Any major code changes (refactoring, parameterization, bug fixes) to the following files MUST be verified against baseline fixtures BEFORE finalizing:
 - `R/earnings.R` (earnings_generator, generate_single_worker)
 - `R/eligibility.R` (qc_comp, comp_period)
-- `R/benefit_calculations.R` (aime, pia, cola, worker_benefit, spousal_pia, spouse_benefit, rf_and_drc, ret, final_benefit)
+- `R/benefit_calculations.R` (aime, pia, cola, worker_benefit, rf_and_drc, final_benefit)
+- `R/spousal.R` (spousal_pia, spouse_benefit, generate_spouse, calculate_spouse_dep_benefit)
+- `R/ret.R` (ret, calculate_excess_earnings, calculate_ret_reduction, allocate_ret_reduction, calculate_months_withheld, calculate_drc_payback)
 
 **Verification Steps:**
 1. Run `devtools::test()` to execute all regression tests
