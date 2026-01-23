@@ -453,23 +453,28 @@ MAX_AGE <- 119
 
 #### 6.1 Benchmark
 
-- [ ] **Create `inst/benchmarks/benchmark_scaling.R`**: Test with 10, 100, 500, 1000 workers.
-- [ ] **Run and record baseline times**
+- [x] **Create `inst/benchmarks/benchmark_scaling.R`**: Test with 10, 100, 500, 1000 workers.
+- [x] **Run and record baseline times**
 
 #### 6.2 Optimize AIME
 
-- [ ] **Profile `aime()`** with profvis
-- [ ] **Rewrite loop** to avoid repeated sorting (O(n log n) instead of O(n²))
-- [ ] **Re-benchmark**
-- [ ] **Commit**: "Optimize AIME calculation"
+- [x] **Profile `aime()`** with profvis
+- [x] **Rewrite loop** to avoid repeated sorting (O(n log n) instead of O(n²))
+- [x] **Re-benchmark**
+- [x] **Commit**: "Optimize AIME calculation"
 
 #### 6.3 Reduce joins
 
-- [ ] **Create `join_all_assumptions()`** helper
-- [ ] **Call once in `calculate_benefits()`** before pipeline
-- [ ] **Update functions** to skip joins if columns present
-- [ ] **Re-benchmark**
-- [ ] **Commit**: "Reduce redundant joins"
+- [x] **Create `join_all_assumptions()`** helper
+- [x] **Call once in `calculate_benefits()`** before pipeline
+- [x] **Update functions** to skip joins if columns present
+- [x] **Re-benchmark**
+- [x] **Commit**: "Reduce redundant joins"
+
+#### 6.4 Bug Fix (discovered during benchmarking)
+
+- [x] **Fix duplicate worker ID bug**: Workers with identical configurations got same ID
+- [x] **Add numeric suffix** to duplicate IDs in earnings_generator()
 
 ---
 
@@ -633,6 +638,31 @@ All 76 tests passing (13 actuarial + 63 regression).
 - Reform metadata stored as attribute on modified assumptions
 - Template functions provided for common reform types (NRA, benefit formula, cuts)
 - Comprehensive validation in `create_reform()` for early error detection
+
+**Phase 6: Performance Optimization** - Completed 2026-01-23
+- Created `inst/benchmarks/` directory with benchmarking infrastructure:
+  - `benchmark_scaling.R`: Tests scaling with 10-1000 workers
+  - `pipeline_benchmark.R`: Times each step in the benefit calculation pipeline
+  - Baseline results saved in `baseline_results.rds` and `pipeline_baseline.rds`
+- AIME optimization: Changed from full sort to partial sort (O(n) vs O(n log n) per iteration)
+- Join optimization: Created `join_all_assumptions()` helper to join all columns once
+- Updated `aime()`, `pia()`, `cola()`, `worker_benefit()`, `spousal_pia()`, `spouse_benefit()`,
+  and `ret()` to skip redundant joins if columns already present
+- Fixed duplicate worker ID bug: Workers with identical configurations now get unique IDs
+  with numeric suffix (e.g., "low-male-1966-63-1", "low-male-1966-63-2")
+- All 143 tests passing
+- Commit: 40bb940 "Phase 6: Performance optimization"
+
+**Performance Results:**
+- 100 workers: ~1.7 sec (0.017 sec/worker)
+- Scaling exponent: 0.68 (sub-linear, improved from 0.71)
+- Pipeline bottlenecks: earnings_generator (37%), ret (24%), aime (10%)
+
+**Decisions made:**
+- Used partial sorting in AIME for performance (sort(x, partial=k) is O(n) vs O(n log n))
+- Join optimization done at pipeline level, not individual function level
+- Duplicate IDs fixed by adding numeric suffix rather than throwing error
+- Benchmark scripts kept in inst/benchmarks/ for future performance regression testing
 
 ---
 
