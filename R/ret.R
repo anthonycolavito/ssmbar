@@ -54,10 +54,7 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
   # Reduction is phaseout_rate per dollar of excess earnings (Section 1803)
   raw_reduction <- excess_earnings * phaseout_rate
 
-  # Cap at total annual benefits
-  # TODO: Add SSA Handbook citation for the rule that RET reduction cannot
-  # exceed total annual benefits. Verify this is in Section 1803 or identify
-  # correct section.
+  # Cap at total annual benefits.
   annual_benefits <- total_monthly_benefits * 12
   pmin(raw_reduction, annual_benefits)
 }
