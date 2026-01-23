@@ -249,7 +249,7 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
     elig_age_ret = first(elig_age_retired), # Retirement eligibility age from assumptions
     cpi_elig = cpi_w[which(age == elig_age_ret)], # CPI-W at eligibility age, used for indexing COLAs
-    cpi_index_factor = pmax(cpi_w / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
+    cpi_index_factor = pmax(cummax(cpi_w) / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
     cola_basic_pia = floor(basic_pia * cpi_index_factor) # COLA'd PIA at each age, rounded down to the nearest dollar
   ) %>% select(-elig_age_retired) %>% ungroup()
 
