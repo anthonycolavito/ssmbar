@@ -171,8 +171,19 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
   }
 
   # Process each worker group based on their spouse_spec
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, s_pia_share, elig_age_retired), by = "year") %>%
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("s_pia_share", "elig_age_retired")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>%
+      left_join(assumptions %>% select(all_of(cols_to_join)), by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  dataset <- dataset %>%
     group_by(id) %>%
     group_modify(~ {
       spec <- .x$spouse_spec[1]  # spouse_spec is constant within a worker
@@ -243,8 +254,19 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
   # Birth cohort-specific parameters (NRA, reduction factors) are determined at eligibility age
 
   # Process each worker group
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, nra, s_rf1, s_rf2, elig_age_retired), by = "year") %>%
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("nra", "s_rf1", "s_rf2", "elig_age_retired")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>%
+      left_join(assumptions %>% select(all_of(cols_to_join)), by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  dataset <- dataset %>%
     group_by(id) %>%
     arrange(id, age) %>%
     group_modify(~ {

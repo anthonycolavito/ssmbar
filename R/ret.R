@@ -220,9 +220,18 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
   }
 
   # Join required assumption columns
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, ret1, nra, rf1, rf2, drc, s_rf1, s_rf2,
-                                     ret_phaseout_rate, elig_age_retired, drc_max_months), by = "year")
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("ret1", "nra", "rf1", "rf2", "drc", "s_rf1", "s_rf2",
+                   "ret_phaseout_rate", "elig_age_retired", "drc_max_months")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>%
+      left_join(assumptions %>% select(all_of(cols_to_join)), by = "year")
+  } else {
+    dataset <- worker
+  }
 
   # Process each worker
 

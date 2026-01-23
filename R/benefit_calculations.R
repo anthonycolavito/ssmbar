@@ -15,6 +15,52 @@
 
 
 # =============================================================================
+# SECTION 0: Assumptions Join Helper
+# =============================================================================
+# This helper joins all assumption columns needed by the benefit calculation
+# pipeline in a single operation, avoiding redundant joins in each function.
+
+#' Join All Required Assumptions Columns
+#'
+#' Joins all assumption columns needed by the benefit calculation pipeline
+#' in a single operation. This avoids redundant joins in individual functions.
+#'
+#' @param worker Data frame with worker data (must have 'year' column)
+#' @param assumptions Data frame with assumptions (tr2025 or similar)
+#'
+#' @return Worker data frame with all assumption columns joined
+#'
+#' @keywords internal
+join_all_assumptions <- function(worker, assumptions) {
+  # All columns needed by the benefit calculation pipeline
+  # - aime: awi, taxmax, qc_rec, qc_required, max_qc_per_year, max_dropout_years, min_comp_period, index_age_offset
+  # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired
+  # - cola: cpi_w
+  # - worker_benefit: nra, rf1, rf2, drc, drc_max_months
+  # - spousal_pia: s_pia_share
+  # - spouse_benefit: s_rf1, s_rf2
+  # - ret: ret1, ret_phaseout_rate
+
+  cols_needed <- c("year", "awi", "taxmax", "qc_rec", "qc_required", "max_qc_per_year",
+                   "max_dropout_years", "min_comp_period", "index_age_offset",
+                   "bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
+                   "cpi_w", "nra", "rf1", "rf2", "drc", "drc_max_months",
+                   "s_pia_share", "s_rf1", "s_rf2", "ret1", "ret_phaseout_rate")
+
+  # Only join columns that aren't already present
+  cols_present <- names(worker)
+  cols_to_join <- cols_needed[!cols_needed %in% cols_present | cols_needed == "year"]
+
+  if (length(cols_to_join) > 1) {  # More than just 'year'
+    worker <- worker %>%
+      left_join(assumptions %>% select(all_of(cols_to_join)), by = "year")
+  }
+
+  return(worker)
+}
+
+
+# =============================================================================
 # SECTION 1: Actuarial Adjustment Helper
 # =============================================================================
 # This helper function is used by worker_benefit(), spouse_benefit(), and ret()
@@ -93,20 +139,24 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   #AIME Computation is described in Section 701 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
 
-  # Determine which columns to join from assumptions (avoid duplicates when debugg=TRUE)
+  # Determine which columns to join from assumptions (avoid duplicates)
+  # Skip join if all columns already present (from join_all_assumptions)
   # Program rule parameters needed for AIME calculation:
   # - qc_required: QCs needed for eligibility (Section 203)
   # - max_qc_per_year: Max QCs per year (Section 212)
   # - max_dropout_years, min_comp_period: For computation period (Section 703)
   # - index_age_offset: Indexing year offset from eligibility age (Section 700.4)
-  cols_to_join <- c("year", "taxmax", "qc_rec", "qc_required", "max_qc_per_year",
-                    "max_dropout_years", "min_comp_period", "index_age_offset")
-  if (!"awi" %in% names(worker)) {
-    cols_to_join <- c(cols_to_join, "awi")
-  }
+  cols_needed <- c("taxmax", "qc_rec", "qc_required", "max_qc_per_year",
+                   "max_dropout_years", "min_comp_period", "index_age_offset", "awi")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
-  dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
-                                  by = "year")
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
+                                    by = "year")
+  } else {
+    dataset <- worker
+  }
 
   dataset <- dataset %>% qc_comp(debugg) # Function for determining annual and cumulative QCs earned at each age
   dataset <- dataset %>% comp_period(debugg) # Function for determining a worker's computation period based on their eligibility age
@@ -141,7 +191,16 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       for (i in seq_len(n)) {
         if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) { #Only calculates AIME if worker has enough QCs and is at or past their eligiblity age.
           years_to_use <- min(i, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
-          top_earnings_sum <- sum(sort(indexed_earnings[1:i], decreasing = TRUE)[1:years_to_use]) #Sum of highest indexed earnings in comp period (35 under current law)
+          # Optimized: use partial sort when years_to_use < i (O(n) vs O(n log n))
+          # partial = k ensures elements 1:k are the k smallest, so we negate to get largest
+          earnings_subset <- indexed_earnings[1:i]
+          if (i > years_to_use) {
+            # Partial sort: get the years_to_use largest values efficiently
+            top_earnings_sum <- sum(-sort(-earnings_subset, partial = 1:years_to_use)[1:years_to_use])
+          } else {
+            # Use all available earnings
+            top_earnings_sum <- sum(earnings_subset)
+          }
           aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12)) #AIME calculation, rounded to the next lowest dollar (see Handbook)
         }
       }
@@ -188,8 +247,17 @@ pia <- function(worker, assumptions, debugg = FALSE) {
   # (elig_age_retired from assumptions, currently 62 for retirement benefits)
 
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, bp1, bp2, fact1, fact2, fact3, elig_age_retired),
-                                  by="year")
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
+                                    by = "year")
+  } else {
+    dataset <- worker
+  }
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
@@ -243,8 +311,17 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   # Negative COLAs are not payable under current law
   # SSA Handbook Section 719: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0719.html
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, cpi_w, elig_age_retired),
-                                  by = "year")
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("cpi_w", "elig_age_retired")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
+                                    by = "year")
+  } else {
+    dataset <- worker
+  }
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
     elig_age_ret = first(elig_age_retired), # Retirement eligibility age from assumptions
@@ -291,7 +368,19 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
   #Function currently can only handle retired beneficiaries.
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, rf1, rf2, drc, nra, s_rf1, s_rf2), by="year") %>%
+  # Skip join if columns already present (from join_all_assumptions)
+  cols_needed <- c("rf1", "rf2", "drc", "nra", "s_rf1", "s_rf2")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>% left_join(assumptions %>% select(all_of(cols_to_join)),
+                                    by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  dataset <- dataset %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
       yr_62 = year - age + 62, #RF/DRC amounts and NRA are based on year turning age 62 in assumptions.

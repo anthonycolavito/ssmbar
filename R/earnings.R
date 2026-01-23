@@ -124,6 +124,24 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   # Combine all workers into single data frame
   workers <- bind_rows(workers_list)
 
+  # Fix duplicate IDs by adding numeric suffix
+  # This handles cases where multiple workers have the same type-sex-birthyr-claimage
+  unique_ids <- unique(workers$id)
+  for (base_id in unique_ids) {
+    id_rows <- which(workers$id == base_id)
+    # Count unique workers with this base ID (each worker has multiple rows for different ages)
+    n_ages <- sum(workers$id == base_id) / length(unique(workers$age[id_rows]))
+    if (n_ages > 1) {
+      # There are duplicate workers - add numeric suffix
+      ages <- unique(workers$age)
+      rows_per_worker <- length(ages)
+      worker_indices <- split(id_rows, rep(1:n_ages, each = rows_per_worker))
+      for (j in seq_along(worker_indices)) {
+        workers$id[worker_indices[[j]]] <- paste0(base_id, "-", j)
+      }
+    }
+  }
+
   return(workers)
 }
 

@@ -147,6 +147,10 @@ calculate_benefits <- function(birth_yr,
     names(spouse_data) <- unique_specs
   }
 
+  # Join all assumption columns ONCE at the start (performance optimization)
+  # This avoids redundant joins in each pipeline function
+  worker <- join_all_assumptions(worker, assumptions)
+
   # Calculate benefits through the pipeline
   # The benefit functions handle multiple workers via group_by(id)
   # spouse_data is passed to avoid redundant spouse calculations
