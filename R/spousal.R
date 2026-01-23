@@ -110,8 +110,7 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
     pia(assumptions, debugg = FALSE) %>%
-    cola(assumptions, debugg = FALSE) %>%
-    worker_benefit(assumptions, debugg = FALSE)
+    cola(assumptions, debugg = FALSE)
 
   # Return data frame with columns needed for spousal benefit calculations
   # Rename columns with s_ prefix for clarity when joining with worker data
@@ -120,10 +119,9 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
       s_age = age,
       s_birth_yr = spec$birth_yr,
       s_claim_age = claim_age,
-      s_pia = cola_basic_pia, # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
-      s_wrk_ben = wrk_ben #Spouse's retired worker benefit
+      s_pia = cola_basic_pia  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
     ) %>%
-    select(year, s_age, s_birth_yr, s_claim_age, s_pia, s_wrk_ben)
+    select(year, s_age, s_birth_yr, s_claim_age, s_pia)
 }
 
 
@@ -153,7 +151,7 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
   # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
   #
   # Spousal benefits can begin at elig_age_retired (currently 62)
-  # Spousal PIA = (s_pia_share * spouse's PIA)
+  # Spousal PIA = (s_pia_share * spouse's PIA) - own PIA (if positive)
 
   # Check if we have spouse_spec in the worker data
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
@@ -198,7 +196,7 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
 
         .x$spouse_pia <- if_else(
           .x$age >= elig_age_ret & .x$year >= yr_s_claim,
-          pmax((s_pia_share_ind * .x$s_pia), 0, na.rm = TRUE),
+          pmax((s_pia_share_ind * .x$s_pia) - pmax(.x$cola_basic_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
           0
         )
       }
@@ -300,7 +298,7 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
             s_act_factor = s_act_factor,
             yr_s_claim = year[s_age == s_claim_age_val],
             spouse_ben = case_when(
-              age >= claim_age & year >= yr_s_claim & age >= elig_age ~ floor(spouse_pia * s_act_factor) - pmax(wrk_ben, 0, na.rm = TRUE),
+              age >= claim_age & year >= yr_s_claim & age >= elig_age ~ floor(spouse_pia * s_act_factor),
               TRUE ~ 0
             )
           ) %>%
@@ -356,8 +354,7 @@ calculate_spouse_dep_benefit <- function(worker_data, spouse_df, assumptions) {
   # Prepare spouse data for join - rename s_pia to s_own_pia before joining
   spouse_pia_data <- spouse_df %>%
     select(year, s_pia) %>%
-    rename(s_own_pia = s_pia,
-           s_own_wrk_ben = s_wrk_ben)
+    rename(s_own_pia = s_pia)
 
   # Join spouse's own PIA by year
   result <- worker_data %>%
@@ -390,13 +387,13 @@ calculate_spouse_dep_benefit <- function(worker_data, spouse_df, assumptions) {
 
   result <- result %>%
     mutate(
-      # Spouse's spousal PIA = 50% of worker's PIA
-      spouse_dep_pia = pmax((s_pia_share_ind * cola_basic_pia), 0, na.rm = TRUE),
+      # Spouse's spousal PIA = 50% of worker's PIA - spouse's own PIA
+      spouse_dep_pia = pmax((s_pia_share_ind * cola_basic_pia) - pmax(s_own_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
 
       # Spouse's dependent benefit only starts when both worker has claimed AND spouse has reached their claim age
       yr_s_claim = s_birth_yr + s_claim_age_val,
       spouse_dep_ben = case_when(
-        age >= worker_claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(spouse_dep_pia * s_dep_act_factor) - pmax(wrk_ben, 0, na.rm = TRUE),
+        age >= worker_claim_age & year >= yr_s_claim & s_age >= s_claim_age_val ~ floor(spouse_dep_pia * s_dep_act_factor),
         TRUE ~ 0
       )
     )

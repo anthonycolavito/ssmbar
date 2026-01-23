@@ -56,4 +56,50 @@ baseline_max <- calculate_benefits(
 saveRDS(baseline_max, "tests/testthat/fixtures/max_1960_claim67.rds")
 cat("Created max_1960_claim67.rds\n")
 
-cat("\nAll 6 baseline test cases generated successfully!\n")
+# ============================================================================
+# Additional spousal benefit test cases (added 2026-01-23)
+# These test the interaction of early claiming with spousal benefits,
+# where different reduction factors (rf1/rf2 vs s_rf1/s_rf2) matter.
+#
+# Key insight: The spousal benefit calculation order matters because
+# worker reduction factors differ from spousal reduction factors.
+# See skill.md for detailed mathematical explanation.
+# ============================================================================
+
+# Test case 7: Low earner claiming EARLY (62) with HIGH spouse at NRA (67)
+# This is the key case where different reduction factors matter
+baseline_low_early_high <- calculate_benefits(
+  birth_yr = 1960, sex = "female", type = "low", age_claim = 62,
+  factors = sef2025, assumptions = tr2025,
+  spouse_type = "high", spouse_sex = "male",
+  spouse_birth_yr = 1960, spouse_age_claim = 67,
+  debugg = TRUE
+)
+saveRDS(baseline_low_early_high, "tests/testthat/fixtures/low_early_62_high_spouse_67.rds")
+cat("Created low_early_62_high_spouse_67.rds\n")
+
+# Test case 8: Low earner at NRA (67) with HIGH spouse at NRA (67)
+# Comparison case - no early reduction on worker benefit
+baseline_low_nra_high <- calculate_benefits(
+  birth_yr = 1960, sex = "female", type = "low", age_claim = 67,
+  factors = sef2025, assumptions = tr2025,
+  spouse_type = "high", spouse_sex = "male",
+  spouse_birth_yr = 1960, spouse_age_claim = 67,
+  debugg = TRUE
+)
+saveRDS(baseline_low_nra_high, "tests/testthat/fixtures/low_nra_67_high_spouse_67.rds")
+cat("Created low_nra_67_high_spouse_67.rds\n")
+
+# Test case 9: Medium earner claiming EARLY (62) with medium spouse claiming EARLY (62)
+# Both claiming early - tests interaction of two early claimers
+baseline_medium_early_both <- calculate_benefits(
+  birth_yr = 1960, sex = "male", type = "medium", age_claim = 62,
+  factors = sef2025, assumptions = tr2025,
+  spouse_type = "medium", spouse_sex = "female",
+  spouse_birth_yr = 1960, spouse_age_claim = 62,
+  debugg = TRUE
+)
+saveRDS(baseline_medium_early_both, "tests/testthat/fixtures/medium_early_62_medium_spouse_62.rds")
+cat("Created medium_early_62_medium_spouse_62.rds\n")
+
+cat("\nAll 9 baseline test cases generated successfully!\n")

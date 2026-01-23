@@ -106,3 +106,52 @@ test_that("Max earner (1960, claim 67) matches baseline", {
   expect_equal(nrow(current), nrow(expected))
   compare_key_columns(current, expected)
 })
+
+# Additional spousal benefit test cases (added 2026-01-23)
+# These test the interaction of early claiming with spousal benefits,
+# where different reduction factors (rf1/rf2 vs s_rf1/s_rf2) matter
+
+test_that("Low earner early (62) with high spouse (67) matches baseline", {
+  expected <- readRDS(test_path("fixtures", "low_early_62_high_spouse_67.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})
+
+test_that("Low earner NRA (67) with high spouse (67) matches baseline", {
+  expected <- readRDS(test_path("fixtures", "low_nra_67_high_spouse_67.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "low", age_claim = 67,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})
+
+test_that("Medium earner early (62) with medium spouse early (62) matches baseline", {
+  expected <- readRDS(test_path("fixtures", "medium_early_62_medium_spouse_62.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "male", type = "medium", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "medium", spouse_sex = "female",
+    spouse_birth_yr = 1960, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})

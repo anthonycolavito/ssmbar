@@ -143,6 +143,31 @@ cd /c/Users/AnthonyColavito/ssmbar
     - `annual_couple`: Combined couple's annual benefit (worker + spouse's full benefit)
     - Added `calculate_spouse_full_benefit()` helper to compute spouse's total benefit
 
+### Changes on 2026-01-23: Spousal Benefit Calculation Analysis & Reversion
+
+**Summary:** Investigated an alternative spousal benefit calculation order, determined the ORIGINAL method is correct, and reverted all changes.
+
+**Original (CORRECT) formula:**
+```
+spouse_pia = (50% × spouse_PIA - own_PIA)
+spouse_ben = floor(spouse_pia × spousal_actuarial_factor)
+```
+
+**Alternative method tested (REVERTED):**
+```
+spouse_pia = 50% × spouse_PIA
+spouse_ben = max(floor(spouse_pia × factor) - wrk_ben, 0)
+```
+
+**Key mathematical insight discovered:** The two methods produce different results because worker reduction factors (rf1, rf2) differ from spousal reduction factors (s_rf1, s_rf2). If the factors were identical, both methods would be mathematically equivalent.
+
+**Added test cases:** Created 3 new spousal benefit test scenarios to catch future calculation order issues:
+- Low earner early (62) with high spouse (67)
+- Low earner NRA (67) with high spouse (67)
+- Medium earner early (62) with medium spouse early (62)
+
+**Tests:** All 76 tests passing (13 actuarial + 63 regression).
+
 ## RET (Retirement Earnings Test) Details
 
 The `ret()` function applies the Retirement Earnings Test per SSA Handbook Chapter 18:
@@ -542,6 +567,48 @@ MAX_AGE <- 119
 - ret() main function now follows clear 5-step process (commented in code)
 - Maintained backward compatibility: spouse_data can be NULL for on-the-fly generation
 
+**Spousal Benefit Calculation - Session 2026-01-23**
+
+**CORRECT FORMULA (confirmed):**
+```
+spouse_pia = (50% × spouse_PIA - own_PIA)
+spouse_ben = floor(spouse_pia × spousal_actuarial_factor)
+```
+
+This session initially attempted to change the calculation order, but after analysis it was determined the ORIGINAL method is correct.
+
+**Attempted change (REVERTED):**
+An alternative calculation order was tested:
+- spouse_pia = 50% × spouse_PIA (no subtraction)
+- spouse_ben = max(floor(spouse_pia × factor) - wrk_ben, 0)
+
+This was reverted because the original formula is the correct SSA calculation.
+
+**Key insight documented:** The two methods produce mathematically different results because worker reduction factors (rf1, rf2) differ from spousal reduction factors (s_rf1, s_rf2). If the factors were identical, both methods would produce the same result.
+
+**Mathematical analysis (preserved for reference):**
+
+Let:
+- S = spouse's PIA, P = own PIA
+- A_s = spousal actuarial factor, A_w = worker actuarial factor
+
+Method 1 (CORRECT): `(0.5 × S - P) × A_s`
+Method 2 (alternative): `(0.5 × S × A_s) - (P × A_w)`
+
+These are equivalent only if A_s = A_w. Since rf1 ≠ s_rf1 and rf2 ≠ s_rf2, the methods produce different results.
+
+**Files reverted:**
+- `R/spousal.R`: spousal_pia(), spouse_benefit(), generate_spouse(), calculate_spouse_dep_benefit()
+- `R/ret.R`: spouse_ben calculation at NRA
+
+**Test fixtures regenerated:**
+- high_1960_with_spouse.rds
+- low_early_62_high_spouse_67.rds
+- low_nra_67_high_spouse_67.rds
+- medium_early_62_medium_spouse_62.rds
+
+All 76 tests passing (13 actuarial + 63 regression).
+
 ---
 
 ### Notes for Claude Code
@@ -582,6 +649,7 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
 - Run `devtools::document()` after roxygen changes
 - ALWAYS run regression tests after modifying benefit calculation functions
 - ALWAYS document progress in this skill.md file at the end of each session (track what was completed, decisions made, and what remains)
+- **MANDATORY: Preserve SSA Documentation** - Any changes to benefit calculation functions (in `R/benefit_calculations.R`, `R/spousal.R`, `R/ret.R`, `R/eligibility.R`) MUST retain existing SSA Handbook citations and references to current law Social Security rules. When adding new calculations or modifying existing ones, include appropriate SSA Handbook section references (e.g., `# https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html`). Never remove documentation links without explicit permission.
 
 **File locations**:
 - Source: `R/`

@@ -18,6 +18,7 @@
 #' @param spouse_birth_yr Numeric value(s) for the spouse's birth year. Default is NULL.
 #' @param spouse_age_claim Numeric value(s) for the age(s) at which the spouse claims benefits. Default is NULL.
 #' @param spouse_custom_avg_earnings Numeric value(s) for spouse's real average earnings if spouse_type = "custom". Default is NULL.
+#' @param reform A Reform object created by `create_reform()` that specifies policy changes. Default is NULL (current law).
 #' @param debugg Boolean value that outputs additional variables if set to TRUE. Default is FALSE.
 #'
 #' @return Returns a data frame with the worker's earnings and benefits by age.
@@ -77,6 +78,19 @@
 #'   assumptions = tr2025,
 #'   custom_avg_earnings = 50000
 #' )
+#'
+#' # Reform example: Raise NRA to 69
+#' my_reform <- create_reform(
+#'   name = "Raise NRA",
+#'   description = "Raise NRA from 67 to 69",
+#'   parameters = list(list(param = "nra", value = 69, type = "replace")),
+#'   effective_year = 2030,
+#'   phase_in_years = 10
+#' )
+#' reformed_worker <- calculate_benefits(
+#'   birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025, reform = my_reform
+#' )
 #' }
 #'
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else
@@ -95,7 +109,13 @@ calculate_benefits <- function(birth_yr,
                                spouse_birth_yr = NULL,
                                spouse_age_claim = NULL,
                                spouse_custom_avg_earnings = NULL,
+                               reform = NULL,
                                debugg = FALSE) {
+
+  # Apply reform to assumptions if provided
+  if (!is.null(reform)) {
+    assumptions <- apply_reform(assumptions, reform)
+  }
 
   # Generate worker(s) with earnings using earnings_generator
   # This handles vectorized inputs and creates spouse_spec automatically
