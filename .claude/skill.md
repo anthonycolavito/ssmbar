@@ -419,33 +419,33 @@ MAX_AGE <- 119
 
 #### 5.1 Create R/reform.R
 
-- [ ] **Create `create_reform()`**: S3 class constructor. Parameters: `name`, `description`, `parameters` (named list), `effective_year`, `phase_in_years`, `affected_cohorts`.
+- [x] **Create `create_reform()`**: S3 class constructor. Parameters: `name`, `description`, `parameters` (named list), `effective_year`, `phase_in_years`, `affected_cohorts`.
 
-- [ ] **Create `print.Reform()`**: Print method.
+- [x] **Create `print.Reform()`**: Print method.
 
-- [ ] **Create `apply_reform(assumptions, reform)`**: Returns modified assumptions. Handle immediate, step change, and phase-in cases.
+- [x] **Create `apply_reform(assumptions, reform)`**: Returns modified assumptions. Handle immediate, step change, and phase-in cases.
 
-- [ ] **Create `compare_benefits(baseline, reformed)`**: Returns data frame with `_baseline`, `_reform`, `_diff` columns.
+- [x] **Create `compare_benefits(baseline, reformed)`**: Returns data frame with `_baseline`, `_reform`, `_diff` columns.
 
-- [ ] **Create `reform_impact_summary(comparison)`**: Returns ReformImpact object with winners/losers/mean change stats.
+- [x] **Create `reform_impact_summary(comparison)`**: Returns ReformImpact object with winners/losers/mean change stats.
 
-- [ ] **Create `print.ReformImpact()`**: Print method.
+- [x] **Create `print.ReformImpact()`**: Print method.
 
 #### 5.2 Update calculate_benefits()
 
-- [ ] **Add `reform = NULL` parameter**
-- [ ] **At start**: `if (!is.null(reform)) assumptions <- apply_reform(assumptions, reform)`
+- [x] **Add `reform = NULL` parameter**
+- [x] **At start**: `if (!is.null(reform)) assumptions <- apply_reform(assumptions, reform)`
 
 #### 5.3 Create reform tests
 
-- [ ] **Create `tests/testthat/test-reform.R`**:
+- [x] **Create `tests/testthat/test-reform.R`**:
   - `create_reform()` validates parameters
   - `apply_reform()` modifies correct years
   - `apply_reform()` handles phase-in correctly
   - `compare_benefits()` calculates differences
 
-- [ ] **Run `devtools::test()`**
-- [ ] **Commit**: "Add reform infrastructure"
+- [x] **Run `devtools::test()`**
+- [x] **Commit**: "Add reform infrastructure"
 
 ---
 
@@ -609,6 +609,31 @@ These are equivalent only if A_s = A_w. Since rf1 ≠ s_rf1 and rf2 ≠ s_rf2, t
 
 All 76 tests passing (13 actuarial + 63 regression).
 
+**Phase 5: Create Reform Infrastructure** - Completed 2026-01-23
+- Created `R/reform.R` with full reform modeling infrastructure:
+  - `create_reform()`: S3 class constructor for policy reforms
+  - `print.Reform()`: Print method for Reform objects
+  - `apply_reform()`: Applies reform to assumptions (immediate or phase-in)
+  - `apply_single_parameter()`: Internal helper for parameter modifications
+  - `compare_benefits()`: Compares baseline vs reformed benefits
+  - `reform_impact_summary()`: Calculates winners/losers/mean change statistics
+  - `print.ReformImpact()`: Print method for impact summaries
+  - `reform_raise_nra()`: Template for NRA increase reforms
+  - `reform_benefit_formula()`: Template for benefit formula changes
+  - `reform_benefit_cut()`: Template for across-the-board cuts
+- Updated `calculate_benefits()` with `reform` parameter
+- Created `tests/testthat/test-reform.R` with 67 tests
+- All 143 tests passing (13 actuarial + 67 reform + 63 regression)
+- Commit: 449d83e "Revert spousal benefit calculation & add Phase 5 reform infrastructure"
+
+**Decisions made:**
+- Reform objects use S3 class system for simplicity
+- Three modification types: "replace", "add", "multiply"
+- Phase-in uses linear interpolation between original and target values
+- Reform metadata stored as attribute on modified assumptions
+- Template functions provided for common reform types (NRA, benefit formula, cuts)
+- Comprehensive validation in `create_reform()` for early error detection
+
 ---
 
 ### Notes for Claude Code
@@ -624,6 +649,7 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
 - `R/benefit_calculations.R` (aime, pia, cola, worker_benefit, rf_and_drc, final_benefit)
 - `R/spousal.R` (spousal_pia, spouse_benefit, generate_spouse, calculate_spouse_dep_benefit)
 - `R/ret.R` (ret, calculate_excess_earnings, calculate_ret_reduction, allocate_ret_reduction, calculate_months_withheld, calculate_drc_payback)
+- `R/reform.R` (create_reform, apply_reform, compare_benefits, reform_impact_summary)
 
 **Verification Steps:**
 1. Run `devtools::test()` to execute all regression tests
