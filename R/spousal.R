@@ -110,7 +110,8 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
   spouse <- spouse %>%
     aime(assumptions, debugg = FALSE) %>%
     pia(assumptions, debugg = FALSE) %>%
-    cola(assumptions, debugg = FALSE)
+    cola(assumptions, debugg = FALSE) %>%
+    worker_benefit(assumptions, debugg = FALSE)
 
   # Return data frame with columns needed for spousal benefit calculations
   # Rename columns with s_ prefix for clarity when joining with worker data
@@ -120,9 +121,10 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
       s_earnings = earnings,
       s_birth_yr = spec$birth_yr,
       s_claim_age = claim_age,
-      s_pia = cola_basic_pia  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
+      s_pia = cola_basic_pia,  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
+      s_wrk_ben = wrk_ben
     ) %>%
-    select(year, s_age, s_earnings, s_birth_yr, s_claim_age, s_pia)
+    select(year, s_age, s_earnings, s_birth_yr, s_claim_age, s_death_age, s_pia, s_wrk_ben)
 }
 
 
