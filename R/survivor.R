@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# 3. Widow(er) PIA Calculation
+# 4.1 Widow(er) PIA Calculation
 # -----------------------------------------------------------------------------
 
 #' Widow(er) PIA Calculation
@@ -28,7 +28,7 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
   #
   # Widow(er) benefits can begin at the later of age 60 or the death of the spouse
   #
-  # Widow(er) PIA = Spouse's Retired Worker PIA - Own Retired Worker PIA (if positive)
+  # Widow(er) PIA amount is described in https://www.ssa.gov/OP_Home/ssact/title02/0202.htm
 
   # Check if we have spouse_spec in the worker data
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
@@ -110,7 +110,7 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
 }
 
 # -----------------------------------------------------------------------------
-# 2.4 Widow Benefit Calculation
+# 4.2 Widow Benefit Calculation
 # -----------------------------------------------------------------------------
 
 #' Widow Benefit Calculation
@@ -151,17 +151,17 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
       w_elig_age_ind = elig_age_retired[which(year==yr_62)] - 2,
       w_rf = .285/((nra_ind - w_elig_age_ind)*12),
       w_act_factor = rf_and_drc(claim_age, nra_ind, w_rf, w_rf, 0), #Function that computes actuarial adjustment based on NRA, claiming age, and RFs and DRC levels
-      wrk_ben = case_when(
-        age >= claim_age ~ floor(cola_basic_pia * act_factor), #Computees retired worker benefit with retired worker COLA'd PIA and the actuarial adjustment
+      survivor_ben = case_when(
+        age >= claim_age ~ floor(survivor_pia * w_act_factor), #Computees retired worker benefit with retired worker COLA'd PIA and the actuarial adjustment
         TRUE ~ 0
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor, wrk_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, w_rf, w_act_factor, survivor_ben),
                                    by = c("id","age") ) #Left joins variable for debugging
   }
   else {
-    worker <- worker %>% left_join(dataset %>% select(id, age, wrk_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, survivor_ben),
                                    by = c("id","age") ) #Left joins variables needed to continue benefit calculation
   }
 
