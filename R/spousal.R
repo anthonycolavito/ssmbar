@@ -150,7 +150,8 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
   # The spousal insurance benefit is described in Section 320 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
   #
-  # Spousal benefits can begin at elig_age_retired (currently 62)
+  # Spousal benefits can begin at elig_age_retired (currently 62).
+  # They cannot be claimed before the spouse whose record they are based on claims retired worker benefits.
   # Spousal PIA = (s_pia_share * spouse's PIA) - own PIA (if positive)
 
   # Check if we have spouse_spec in the worker data
@@ -359,11 +360,12 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
 #' @keywords internal
 
 calculate_spouse_dep_benefit <- function(worker_data, spouse_df, assumptions) {
-  # TODO: Add SSA Handbook reference - This function calculates the spouse's
-
-  # dependent benefit based on the worker's record. Reference Section 320.
-  # Document: (1) when dependent spouse benefits can begin, (2) the 50% formula
-  # and own-PIA offset, (3) eligibility conditions for dependent spouses.
+  # The spousal insurance benefit is described in Section 320 of the Social Security Handbook
+  # https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
+  #
+  # Spousal benefits can begin at elig_age_retired (currently 62).
+  # They cannot be claimed before the spouse whose record they are based on claims retired worker benefits.
+  # Spousal PIA = (s_pia_share * spouse's PIA) - own PIA (if positive)
 
   # Get spouse's info from spouse_df
   s_birth_yr <- spouse_df$s_birth_yr[1]

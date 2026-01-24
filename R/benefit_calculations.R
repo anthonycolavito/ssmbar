@@ -87,8 +87,8 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, drc_max_months = 36) {
   # Delayed retirement credits are described in Section 720
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
   #
-  # rf1: Reduction for first 36 months early (5/9 of 1% per month)
-  # rf2: Reduction for months beyond 36 early (5/12 of 1% per month)
+  # rf1: Reduction for first 36 months early (5/9 of 1% per month for retired worker beneficiaries)
+  # rf2: Reduction for months beyond 36 early (5/12 of 1% per month for retired worker beneficiaries)
   # drc: Delayed retirement credit per month (varies by birth year, max 8%/yr)
   # drc_max_months: Maximum months of DRC (36 = 3 years past NRA, capping at age 70)
 
@@ -162,7 +162,7 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   dataset <- dataset %>% comp_period(debugg) # Function for determining a worker's computation period based on their eligibility age
 
   # Calculate indexed earnings
-  # Earnings are indexed to AWI at (elig_age - index_age_offset) years before eligibility
+  # Earnings are indexed to AWI at (elig_age - index_age_offset) 2 years before eligibility
   # SSA Handbook Section 700.4: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
@@ -425,6 +425,11 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'
 #' @export
 final_benefit <- function(worker, debugg = FALSE) {
+  #Section 734: Entitlement to Retirement or Disability Insurance Benefits and Another Benefit
+  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0734.html
+  #Individuals entitled to a retired worker benefit and another, higher benefit receive their
+  #full retired worker and the difference between that benefit and their other, higher benefit.
+  #In this calculator, spousal benefits are reduced prior to the final_benefit() call.
 
   dataset <- worker %>%
     mutate(

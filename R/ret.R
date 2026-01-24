@@ -73,10 +73,16 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
 #' @keywords internal
 
 allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben) {
-  # TODO: Add SSA Handbook citation for the rule that RET reduction is allocated
+  # Section 1804: How Excess Earnings are Charged Against Benefits
+  # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1804.html
+  # Section 1806: Payment of Partial Benefit
+  # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1806.html
+  # Reductions are allocated proportionally to beneficiaries' "original entitlement rate."
+  # That is, the share of the retired worker's benefits without any adjustments for
+  # claiming timing or partial benefits received (dual eligibles)
+  # For example, a spouse receiving a dependent spousal benefit would be allocated
+  # 1/3 of the reduction since their PIA is 50% of the retired worker's (100% + 50% = 150%)
 
-  # proportionally between worker and spouse benefits. Verify whether this is in
-  # Section 1806 or identify correct section.
 
   # Total benefit pot
   wrk_total_ben <- wrk_ben + spouse_ben
