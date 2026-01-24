@@ -155,3 +155,44 @@ test_that("Medium earner early (62) with medium spouse early (62) matches baseli
   expect_equal(nrow(current), nrow(expected))
   compare_key_columns(current, expected)
 })
+
+# Spouse's RET effect test case (added 2026-01-24)
+# Tests the scenario where a lower earner receives spousal benefit from their
+# higher-earning spouse's record, and the spouse has excess earnings that
+# trigger RET and reduce the worker's spouse_ben.
+# - Worker (very_low) receives spouse_ben from spouse's record
+# - Spouse (high) has excess earnings at ages 62-64 (~$65-66k above ret1)
+# - Spouse's RET allocates 1/3 of reduction to worker's spouse_ben
+# - Worker's spouse_ben is reduced to $0 at ages 62-64 (reduction > benefit)
+
+test_that("Very low earner with high spouse (spouse RET effect) matches baseline", {
+  expected <- readRDS(test_path("fixtures", "very_low_1960_high_spouse_ret.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "very_low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Additional assertions specific to spouse's RET effect
+  # Verify spouse_ben is 0 at ages 62-64 (when spouse has excess earnings)
+  expect_equal(current$spouse_ben[current$age == 62], 0)
+  expect_equal(current$spouse_ben[current$age == 63], 0)
+  expect_equal(current$spouse_ben[current$age == 64], 0)
+
+  # Verify spouse_ben is positive at age 65+ (when spouse stops earning)
+  expect_true(current$spouse_ben[current$age == 65] > 0)
+
+  # Verify spouse had excess earnings at ages 62-64
+  expect_true(current$s_excess_earnings[current$age == 62] > 0)
+  expect_true(current$s_excess_earnings[current$age == 63] > 0)
+  expect_true(current$s_excess_earnings[current$age == 64] > 0)
+
+  # Verify spouse's RET was allocated to worker's spouse_ben
+  expect_true(current$spouse_ret_to_spouse_ben[current$age == 62] > 0)
+})
