@@ -117,11 +117,12 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
   spouse %>%
     mutate(
       s_age = age,
+      s_earnings = earnings,
       s_birth_yr = spec$birth_yr,
       s_claim_age = claim_age,
       s_pia = cola_basic_pia  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
     ) %>%
-    select(year, s_age, s_birth_yr, s_claim_age, s_pia)
+    select(year, s_age, s_earnings, s_birth_yr, s_claim_age, s_pia)
 }
 
 

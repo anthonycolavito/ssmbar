@@ -72,7 +72,7 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
 #' @return List with wrk_ben_reduced and spouse_ben_reduced (monthly)
 #' @keywords internal
 
-allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben) {
+allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben, s_pia_share) {
   # Section 1804: How Excess Earnings are Charged Against Benefits
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1804.html
   # Section 1806: Payment of Partial Benefit
@@ -83,13 +83,13 @@ allocate_ret_reduction <- function(total_reduction, wrk_ben, spouse_ben, spouse_
   # For example, a spouse receiving a dependent spousal benefit would be allocated
   # 1/3 of the reduction since their PIA is 50% of the retired worker's (100% + 50% = 150%)
 
+  wrk_share <- if_else(spouse_dep_ben > 0, 1/(1+s_pia_share), 1)
 
   # Total benefit pot
   wrk_total_ben <- wrk_ben + spouse_ben
   total_ben_pot <- wrk_total_ben + spouse_dep_ben
 
   # Worker's share of reduction (proportional to their benefits vs total pot)
-  wrk_share <- if_else(total_ben_pot > 0, wrk_total_ben / total_ben_pot, 1)
   wrk_reduction <- total_reduction * wrk_share
 
   # Allocate worker's reduction between wrk_ben and spouse_ben proportionally
@@ -251,6 +251,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       ret_rate <- wd$ret_phaseout_rate[1]
       drc_max <- wd$drc_max_months[1]
       claim_age_val <- wd$claim_age[1]
+      s_pia_share_val <- wd$s_pia_share[1]
 
       # Get birth-cohort parameters at eligibility age
       yr_elig <- wd$year[1] - wd$age[1] + elig_age_ret
@@ -275,7 +276,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       wd$ret_reduction <- calculate_ret_reduction(wd$excess_earnings, ret_rate, total_ben_pot)
 
       # Step 3: Allocate reduction between benefits
-      alloc <- allocate_ret_reduction(wd$ret_reduction, wd$wrk_ben, wd$spouse_ben, wd$spouse_dep_ben)
+      alloc <- allocate_ret_reduction(wd$ret_reduction, wd$wrk_ben, wd$spouse_ben, wd$spouse_dep_ben, s_pia_share_val)
       wd$wrk_share <- alloc$wrk_share
       wd$wrk_reduction <- alloc$wrk_reduction
       wrk_ben_reduced <- alloc$wrk_ben_reduced
