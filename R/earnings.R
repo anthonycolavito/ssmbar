@@ -213,8 +213,18 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   claim_age <- age_claim #Age a worker claims benefits.
   elig_age <- age_elig #Age a worker is eligible for benefits.
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
+  death_age <- if(sex == "male") {
+    assumptions$le_m[which(year == birth_yr + 65)]
+  }
+  else if (sex == "female") {
+    assumptions$le_f[which(year == birth_yr + 65)]
+  }
+  else {
+    mean(assumptions$le_m[which(year == birth_yr + 65)], assumptions$le_f[which(year == birth_yr + 65)])
+  }
 
   worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age,
+                       death_age = death_age,
                        spouse_spec = spouse_spec, stringsAsFactors = FALSE) %>%
     left_join(assumptions %>% select(year, awi, gdp_pi), by = "year")
   #Initial dataframe that merges in necessary assumptions with the worker's trait variables.
@@ -269,7 +279,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   }
 
   if (!debugg) {
-    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, spouse_spec, earnings) #Selects only the needed variables.
+    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, death_age, spouse_spec, earnings) #Selects only the needed variables.
   }
 
   return(worker)
