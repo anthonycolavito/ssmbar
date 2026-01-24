@@ -47,9 +47,13 @@ utils::globalVariables(c(
   "wrk_total_ben", "total_ben_pot", "annual_ben_pot",
   "wrk_share", "wrk_reduction", "wrk_ben_share", "spouse_ben_share",
   "wrk_ben_reduced", "spouse_ben_reduced", "wrk_ben_final", "spouse_ben_final",
-  "months_withheld", "cum_months_withheld", "ret_adj_factor",
+  "months_withheld", "cum_months_withheld", "ret_adj_factor", "ret_s_adj_factor",
   "cum_months_withheld_final", "wrk_ben_orig", "spouse_ben_orig",
   "ret_rate", "drc_max",
+  # Spouse's RET effect on worker's spouse_ben
+  "s_excess_earnings", "s_ret_reduction", "s_own_ben", "s_earnings",
+  "spouse_ret_to_spouse_ben", "s_months_withheld", "s_cum_months_withheld",
+  "s_cum_months_withheld_final", "s_nra_ind", "s_drc_payback_factor",
 
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",

@@ -4,7 +4,13 @@
 \alias{allocate_ret_reduction}
 \title{Allocate RET Reduction Between Benefits (Internal)}
 \usage{
-allocate_ret_reduction(total_reduction, wrk_ben, spouse_ben, spouse_dep_ben)
+allocate_ret_reduction(
+  total_reduction,
+  wrk_ben,
+  spouse_ben,
+  spouse_dep_ben,
+  s_pia_share
+)
 }
 \arguments{
 \item{total_reduction}{Numeric vector of total annual reduction}

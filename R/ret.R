@@ -178,6 +178,111 @@ calculate_drc_payback <- function(claim_age, cum_months_withheld, nra, rf1, rf2,
 }
 
 
+#' Calculate Spouse's RET Effect on Worker's Spousal Benefit (Internal)
+#'
+#' When the worker receives a spousal benefit based on their spouse's record,
+#' and the spouse has excess earnings, part of the spouse's RET reduction
+#' is allocated to the worker's spousal benefit.
+#'
+#' Section 1803: RET applies to benefits based on the earner's record.
+#' When the spouse (whose record the worker's spousal benefit is based on)
+#' has excess earnings, benefits on their record are reduced, including
+#' any dependent spousal benefits the worker receives.
+#'
+#' The reduction is allocated based on original entitlement rate:
+#' - Spouse's own benefit: 100% of PIA -> share = 1/(1+s_pia_share) = 2/3
+#' - Worker's spouse_ben: 50% of PIA -> share = s_pia_share/(1+s_pia_share) = 1/3
+#'
+#' @param worker_data Data frame for a single worker (one row per age)
+#' @param spouse_df Data frame from generate_spouse() with s_earnings, s_pia, etc.
+#' @param assumptions Data frame of assumptions
+#' @param s_pia_share Numeric, spousal PIA share (typically 0.5)
+#' @return List with:
+#'   \itemize{
+#'     \item \code{spouse_ben_reduction}: Monthly reduction to worker's spouse_ben
+#'     \item \code{s_excess_earnings}: Spouse's excess earnings
+#'     \item \code{s_ret_reduction}: Spouse's total RET reduction
+#'     \item \code{s_own_ben}: Spouse's own benefit
+#'     \item \code{s_nra}: Spouse's NRA
+#'     \item \code{s_months_withheld}: Months of worker's spouse_ben withheld
+#'   }
+#' @keywords internal
+
+calculate_spouse_ret_effect <- function(worker_data, spouse_df, assumptions, s_pia_share) {
+  # Get spouse's parameters
+  s_birth_yr <- spouse_df$s_birth_yr[1]
+  s_claim_age <- spouse_df$s_claim_age[1]
+  s_earnings <- spouse_df$s_earnings
+  s_pia <- spouse_df$s_pia  # COLA-adjusted PIA
+
+  # Calculate spouse's age at each year
+  s_age <- worker_data$year - s_birth_yr
+
+  # Get spouse's birth-cohort parameters (NRA, reduction factors)
+  # Based on the year spouse turns eligibility age
+  # NOTE: Edge case - if spouse's eligibility year is outside assumptions data range,
+
+  # the lookup will return NA. This is not currently handled.
+  elig_age_ret <- assumptions$elig_age_retired[1]
+  s_yr_elig <- s_birth_yr + elig_age_ret
+
+  # Look up spouse's NRA and actuarial factors at their eligibility year
+  s_nra <- assumptions$nra[assumptions$year == s_yr_elig][1]
+  s_rf1 <- assumptions$rf1[assumptions$year == s_yr_elig][1]
+  s_rf2 <- assumptions$rf2[assumptions$year == s_yr_elig][1]
+  s_drc <- assumptions$drc[assumptions$year == s_yr_elig][1]
+  drc_max <- assumptions$drc_max_months[1]
+  ret_rate <- assumptions$ret_phaseout_rate[1]
+
+  # Calculate spouse's actuarial factor
+  s_act_factor <- rf_and_drc(s_claim_age, s_nra, s_rf1, s_rf2, s_drc, drc_max)
+
+  # Calculate spouse's own benefit at each age (after actuarial adjustment)
+  s_own_ben <- if_else(s_age >= s_claim_age, floor(s_pia * s_act_factor), 0)
+
+  # Get worker's spouse_ben (benefit worker receives from spouse's record)
+  worker_spouse_ben <- worker_data$spouse_ben
+
+  # Total benefit pot on spouse's record = spouse's own + worker's spousal
+  s_total_pot <- s_own_ben + worker_spouse_ben
+
+  # Calculate spouse's excess earnings (RET window: claim_age to NRA)
+  ret1 <- worker_data$ret1
+  s_excess <- calculate_excess_earnings(s_earnings, ret1, s_age, s_claim_age, s_nra)
+
+  # Calculate spouse's total RET reduction (capped at total pot)
+  s_ret_reduction <- calculate_ret_reduction(s_excess, ret_rate, s_total_pot)
+
+  # Allocate reduction based on original entitlement rate:
+  # - Spouse's own benefit: 100% of PIA -> share = 1/(1+s_pia_share) = 2/3
+  # - Worker's spouse_ben: 50% of PIA -> share = s_pia_share/(1+s_pia_share) = 1/3
+  worker_share <- s_pia_share / (1 + s_pia_share)
+
+  # Annual reduction to worker's spouse_ben
+  spouse_ben_reduction_annual <- s_ret_reduction * worker_share
+
+  # Monthly reduction to worker's spouse_ben
+  spouse_ben_reduction_monthly <- spouse_ben_reduction_annual / 12
+
+  # Calculate months of spouse_ben withheld (for potential DRC payback)
+  s_months_withheld <- if_else(
+    worker_spouse_ben > 0 & s_age >= s_claim_age & s_age < s_nra,
+    pmin(spouse_ben_reduction_annual / worker_spouse_ben, 12),
+    0
+  )
+
+  list(
+    spouse_ben_reduction = spouse_ben_reduction_monthly,
+    s_excess_earnings = s_excess,
+    s_ret_reduction = s_ret_reduction,
+    s_own_ben = s_own_ben,
+    s_nra = s_nra,
+    s_act_factor = s_act_factor,
+    s_months_withheld = s_months_withheld
+  )
+}
+
+
 # -----------------------------------------------------------------------------
 # 2. Main RET Function
 # -----------------------------------------------------------------------------
@@ -262,12 +367,57 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       s_rf1_ind <- wd$s_rf1[wd$year == yr_elig][1]
       s_rf2_ind <- wd$s_rf2[wd$year == yr_elig][1]
 
-      # Calculate spouse's dependent benefit
+      # =====================================================
+      # Step 0: Apply SPOUSE's RET to worker's spouse_ben
+      # =====================================================
+      # If worker receives spouse_ben from spouse's record, and spouse has
+      # excess earnings, reduce spouse_ben first (before worker's own RET).
+      # The spouse is the "primary worker" for benefits based on their record.
+
+      # Initialize spouse RET debug variables
+      wd$s_excess_earnings <- 0
+      wd$s_ret_reduction <- 0
+      wd$s_own_ben <- 0
+      wd$spouse_ret_to_spouse_ben <- 0
+      wd$s_months_withheld <- 0
+      wd$s_cum_months_withheld <- 0
+      s_nra_ind <- NA_real_
+      s_cum_months_at_s_nra <- 0
+
+      if (!is.na(spec) && !is.null(spouse_data[[spec]]) && any(wd$spouse_ben > 0)) {
+        spouse_ret <- calculate_spouse_ret_effect(wd, spouse_data[[spec]], assumptions, s_pia_share_val)
+
+        # Store debug variables
+        wd$s_excess_earnings <- spouse_ret$s_excess_earnings
+        wd$s_ret_reduction <- spouse_ret$s_ret_reduction
+        wd$s_own_ben <- spouse_ret$s_own_ben
+        wd$spouse_ret_to_spouse_ben <- spouse_ret$spouse_ben_reduction * 12  # Annual for consistency
+        wd$s_months_withheld <- spouse_ret$s_months_withheld
+        s_nra_ind <- spouse_ret$s_nra
+
+        # Apply spouse's RET reduction to worker's spouse_ben
+        wd$spouse_ben <- pmax(wd$spouse_ben - spouse_ret$spouse_ben_reduction, 0)
+
+        # Calculate cumulative months of spouse_ben withheld (for DRC payback)
+        s_birth_yr <- spouse_data[[spec]]$s_birth_yr[1]
+        wd$s_cum_months_withheld <- cumsum(if_else(
+          (wd$year - s_birth_yr) < s_nra_ind,
+          wd$s_months_withheld, 0
+        ))
+        s_cum_months_at_s_nra <- max(wd$s_cum_months_withheld, 0, na.rm = TRUE)
+      }
+
+      # =====================================================
+      # Steps 1-5: Apply WORKER's RET (existing logic)
+      # =====================================================
+      # Now uses the already-reduced spouse_ben from Step 0
+
+      # Calculate spouse's dependent benefit (based on worker's record)
       wd$spouse_dep_ben <- if (!is.na(spec) && !is.null(spouse_data[[spec]])) {
         calculate_spouse_dep_benefit(wd, spouse_data[[spec]], assumptions)
       } else { 0 }
 
-      # Step 1: Calculate excess earnings
+      # Step 1: Calculate worker's excess earnings
       wd$excess_earnings <- calculate_excess_earnings(wd$earnings, wd$ret1, wd$age, claim_age_val, nra_ind)
 
       # Step 2: Calculate reduction (capped at annual benefits)
@@ -282,14 +432,26 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       wrk_ben_reduced <- alloc$wrk_ben_reduced
       spouse_ben_reduced <- alloc$spouse_ben_reduced
 
-      # Step 4: Calculate months withheld
+      # Step 4: Calculate months withheld (from worker's own RET)
       wd$months_withheld <- calculate_months_withheld(wd$wrk_reduction, wrk_total_ben, wd$age, claim_age_val, nra_ind)
       wd$cum_months_withheld <- cumsum(if_else(wd$age < nra_ind, wd$months_withheld, 0))
       cum_months_at_nra <- max(wd$cum_months_withheld[wd$age < nra_ind], 0, na.rm = TRUE)
 
-      # Step 5: Calculate DRC payback factors
+      # Step 5: Calculate DRC payback factors for worker's own benefits
       drc_factors <- calculate_drc_payback(claim_age_val, cum_months_at_nra, nra_ind,
                                             rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, drc_max)
+
+      # TODO: Verify DRC payback for spouse_ben withheld due to spouse's RET.
+      # Currently assuming the worker gets DRC payback on their spousal actuarial
+      # factor based on months of spouse_ben withheld. This needs SSA verification.
+      # The payback would occur at the SPOUSE's NRA, not the worker's NRA.
+      s_drc_payback_factor <- if (s_cum_months_at_s_nra > 0 && !is.na(s_nra_ind)) {
+        # Recalculate spousal actuarial factor based on effective claim age
+        effective_s_claim_age <- min(claim_age_val + (s_cum_months_at_s_nra / 12), s_nra_ind)
+        rf_and_drc(effective_s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0, drc_max)
+      } else {
+        drc_factors$new_s_act_factor
+      }
 
       # Apply final benefits
       wd <- wd %>% mutate(
@@ -301,11 +463,13 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
         spouse_ben = case_when(
           age < claim_age ~ 0,
           age < nra_ind ~ spouse_ben_reduced,
-          TRUE ~ floor(spouse_pia * drc_factors$new_s_act_factor)
+          # At/after NRA, use the DRC payback factor (accounting for spouse's RET withheld months)
+          TRUE ~ floor(spouse_pia * s_drc_payback_factor)
         ),
         ret_adj_factor = if_else(age >= nra_ind, drc_factors$new_act_factor, drc_factors$orig_act_factor),
-        ret_s_adj_factor = if_else(age >= nra_ind, drc_factors$new_s_act_factor, drc_factors$orig_s_act_factor),
-        cum_months_withheld_final = cum_months_at_nra
+        ret_s_adj_factor = if_else(age >= nra_ind, s_drc_payback_factor, drc_factors$orig_s_act_factor),
+        cum_months_withheld_final = cum_months_at_nra,
+        s_cum_months_withheld_final = s_cum_months_at_s_nra
       )
       wd
     }) %>%
@@ -314,9 +478,16 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
   # Select output columns
   if (debugg) {
     worker %>% left_join(
-      dataset %>% select(id, age, wrk_ben, spouse_ben, spouse_dep_ben, excess_earnings,
-                         ret_reduction, wrk_share, wrk_reduction, months_withheld,
-                         cum_months_withheld, ret_adj_factor, ret_s_adj_factor, cum_months_withheld_final),
+      dataset %>% select(id, age, wrk_ben, spouse_ben, spouse_dep_ben,
+                         # Spouse's RET effect on worker's spouse_ben (Step 0)
+                         s_excess_earnings, s_ret_reduction, s_own_ben,
+                         spouse_ret_to_spouse_ben, s_months_withheld, s_cum_months_withheld,
+                         # Worker's own RET (Steps 1-5)
+                         excess_earnings, ret_reduction, wrk_share, wrk_reduction,
+                         months_withheld, cum_months_withheld,
+                         # DRC payback factors
+                         ret_adj_factor, ret_s_adj_factor,
+                         cum_months_withheld_final, s_cum_months_withheld_final),
       by = c("id", "age"), suffix = c("_orig", "")
     ) %>% select(-wrk_ben_orig, -spouse_ben_orig)
   } else {
