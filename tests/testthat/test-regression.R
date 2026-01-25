@@ -14,6 +14,14 @@ compare_key_columns <- function(current, expected, tolerance = 1e-10) {
     key_cols <- c(key_cols, "spouse_pia")
   }
 
+  # Add survivor columns if present in expected
+  if ("survivor_ben" %in% names(expected)) {
+    key_cols <- c(key_cols, "survivor_ben")
+  }
+  if ("survivor_pia" %in% names(expected)) {
+    key_cols <- c(key_cols, "survivor_pia")
+  }
+
   # Filter to columns that exist in both datasets
   key_cols <- key_cols[key_cols %in% names(current) & key_cols %in% names(expected)]
 
@@ -195,4 +203,266 @@ test_that("Very low earner with high spouse (spouse RET effect) matches baseline
 
   # Verify spouse's RET was allocated to worker's spouse_ben
   expect_true(current$spouse_ret_to_spouse_ben[current$age == 62] > 0)
+})
+
+# =============================================================================
+# Edge Case Test Cases (added 2026-01-24)
+# =============================================================================
+# These test cases cover edge cases to catch regressions in future changes:
+# - Survivor benefit scenarios
+# - Birth cohort variations (NRA/DRC differences)
+# - Claiming age edge cases
+# - Extreme earnings scenarios
+# - Spousal timing edge cases
+
+# -----------------------------------------------------------------------------
+# SURVIVOR BENEFIT EDGE CASES
+# -----------------------------------------------------------------------------
+
+test_that("Spouse plans to claim at 70 (late claim with DRCs) matches baseline", {
+  # Tests survivor benefit when spouse claims late with maximum DRCs
+  # Spouse born 1960, male, claims at 70 (max DRCs)
+  # Spouse will die around age 83-84, so will have claimed before death
+  expected <- readRDS(test_path("fixtures", "spouse_dies_before_claiming.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 70,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify survivor benefit kicks in after spouse dies
+  death_age <- current$worker_age_at_spouse_death[1]
+  expect_true(current$survivor_ben[current$age == death_age] > 0)
+})
+
+test_that("Spouse claims at 70 with max DRCs (1965 cohort) matches baseline", {
+  # Tests survivor PIA when spouse received delayed retirement credits
+  # Survivor PIA should be based on spouse's higher DRC-enhanced benefit
+  expected <- readRDS(test_path("fixtures", "spouse_with_drcs.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1965, sex = "female", type = "low", age_claim = 65,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1965, spouse_age_claim = 70,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})
+
+test_that("Worker much younger than spouse (15 years) matches baseline", {
+  # Tests scenario where spouse dies earlier in worker's lifetime
+  # Spouse born 1960, worker born 1975 (15 years younger)
+  # Spouse dies around age 83 when worker is only 68
+  expected <- readRDS(test_path("fixtures", "worker_younger_than_spouse.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1975, sex = "female", type = "medium", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify worker receives survivor benefits for a long period
+  death_age <- current$worker_age_at_spouse_death[1]
+  expect_true(death_age < 75)  # Spouse should die when worker is relatively young
+
+  # Verify survivor benefits continue well past spouse death
+  expect_true(current$survivor_ben[current$age == death_age + 10] > 0)
+})
+
+# -----------------------------------------------------------------------------
+# BIRTH COHORT EDGE CASES
+# -----------------------------------------------------------------------------
+
+test_that("Older birth cohort (1943) with different NRA/DRC matches baseline", {
+  # Tests worker from 1943 birth cohort with NRA of 66 (not 67)
+  # DRC rate is also different (6.5% vs 8%)
+  expected <- readRDS(test_path("fixtures", "older_cohort_1943.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1943, sex = "male", type = "medium", age_claim = 66,
+    factors = sef2025, assumptions = tr2025,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify actuarial factor is 1.0 at NRA (which is 66 for this cohort)
+  expect_equal(current$act_factor[current$age == 66][1], 1.0)
+})
+
+test_that("NRA transition cohort (1955) with fractional NRA matches baseline", {
+  # Tests worker from 1955 birth cohort with NRA of 66+2 months
+  # This tests handling of fractional NRA values
+  expected <- readRDS(test_path("fixtures", "nra_transition_1955.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1955, sex = "female", type = "medium", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})
+
+# -----------------------------------------------------------------------------
+# CLAIMING AGE EDGE CASES
+# -----------------------------------------------------------------------------
+
+test_that("Claim exactly at NRA (factor = 1.0) matches baseline", {
+  # Tests that actuarial factor is exactly 1.0 when claiming at NRA
+  # No early retirement reduction, no delayed retirement credit
+  expected <- readRDS(test_path("fixtures", "claim_at_nra.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "male", type = "high", age_claim = 67,
+    factors = sef2025, assumptions = tr2025,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify actuarial factor is exactly 1.0
+  expect_equal(current$act_factor[current$age == 67][1], 1.0)
+
+  # Verify benefit equals COLA-adjusted PIA (no reduction or increase)
+  expect_equal(
+    current$wrk_ben[current$age == 67],
+    floor(current$cola_basic_pia[current$age == 67])
+  )
+})
+
+test_that("Maximum DRC (claim at 70) with spouse matches baseline", {
+  # Tests maximum delayed retirement credits (24% increase)
+  # Also tests DRC interaction with spousal benefits
+  expected <- readRDS(test_path("fixtures", "max_drc_with_spouse.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "male", type = "high", age_claim = 70,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "low", spouse_sex = "female",
+    spouse_birth_yr = 1962, spouse_age_claim = 65,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify actuarial factor is 1.24 (8% DRC * 3 years)
+  expect_equal(current$act_factor[current$age == 70][1], 1.24)
+})
+
+# -----------------------------------------------------------------------------
+# EXTREME EARNINGS EDGE CASES
+# -----------------------------------------------------------------------------
+
+test_that("Very low earner with max earner spouse (large spousal benefit) matches baseline", {
+  # Tests scenario where worker has minimal own benefit but large spousal/survivor
+  # Very low earner with max earner spouse
+  expected <- readRDS(test_path("fixtures", "zero_earnings_high_spouse.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "very_low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "max", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify spousal benefit is significant relative to own benefit
+  # At age 67 when spouse claims, spousal benefit should be substantial
+  own_ben_67 <- current$wrk_ben[current$age == 67]
+  spouse_ben_67 <- current$spouse_ben[current$age == 67]
+  expect_true(spouse_ben_67 > own_ben_67 * 0.5)  # Spousal > 50% of own
+})
+
+test_that("Both very low earners (minimal benefits) matches baseline", {
+  # Tests floor conditions with minimal earnings
+  # Both worker and spouse are very low earners
+  expected <- readRDS(test_path("fixtures", "very_low_both.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1970, sex = "male", type = "very_low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "very_low", spouse_sex = "female",
+    spouse_birth_yr = 1970, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify benefits are positive but modest
+  expect_true(current$ben[current$age == 67] > 0)
+  expect_true(current$ben[current$age == 67] < 2000)  # Should be modest
+})
+
+# -----------------------------------------------------------------------------
+# SPOUSAL TIMING EDGE CASES
+# -----------------------------------------------------------------------------
+
+test_that("Spouse much older (12 years) - early spouse death matches baseline", {
+  # Tests scenario where spouse is significantly older
+  # Spouse born 1960, worker born 1972 (12 years younger)
+  # Results in longer survivor benefit period
+  expected <- readRDS(test_path("fixtures", "spouse_much_older.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1972, sex = "female", type = "medium", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify spouse dies when worker is relatively young
+  death_age <- current$worker_age_at_spouse_death[1]
+  expect_true(death_age <= 75)
+
+  # Verify survivor benefits for extended period
+  expect_true(current$survivor_ben[current$age == 85] > 0)
+})
+
+test_that("Spouse much younger (10 years) - delayed spousal availability matches baseline", {
+  # Tests scenario where spouse is significantly younger
+  # Worker born 1960, spouse born 1970 (10 years younger)
+  # Spousal benefits delayed until younger spouse claims
+  expected <- readRDS(test_path("fixtures", "spouse_much_younger.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "male", type = "high", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "low", spouse_sex = "female",
+    spouse_birth_yr = 1970, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Spouse claims at age 62 (year 2032), worker is 72 at that point
+  # Worker receives no spousal benefit until spouse claims
+  # Note: This worker is high earner so may not receive spousal anyway
 })
