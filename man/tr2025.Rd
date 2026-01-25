@@ -38,6 +38,8 @@ A data frame with the following variables:
 \item{max_qc_per_year}{Maximum quarters of coverage that can be earned per year (4)}
 \item{drc_max_months}{Maximum months of delayed retirement credits (36)}
 \item{ret_phaseout_rate}{RET phaseout rate - reduction per dollar of excess earnings (0.5)}
+\item{le_m}{Male cohort life expectancy at age 65 (years remaining)}
+\item{le_f}{Female cohort life expectancy at age 65 (years remaining)}
 }
 }
 \source{
@@ -54,6 +56,14 @@ A dataset containing economic assumptions and program parameters from the
 This dataset includes historical values and projections for key economic
 variables and Social Security program parameters used in benefit calculations.
 }
+\section{TODO - Documentation}{
+
+The following items need documentation review:
+\itemize{
+\item Verify le_m and le_f data source citations
+}
+}
+
 \examples{
 # Load and view the data
 data(tr2025)

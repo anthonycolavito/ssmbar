@@ -7,7 +7,7 @@
 final_benefit(worker, debugg = FALSE)
 }
 \arguments{
-\item{worker}{Dataframe with a worker's retired worker and spousal benefit by age}
+\item{worker}{Dataframe with a worker's retired worker, spousal, and survivor benefit by age}
 
 \item{debugg}{Boolean value that directs function to output additional variables if set to true}
 }
@@ -16,5 +16,5 @@ worker Dataframe with a worker's final monthly benefit by age
 }
 \description{
 Function that calculates a worker's total retirement benefit combining
-retired worker and spousal benefits.
+retired worker, spousal, and survivor benefits.
 }

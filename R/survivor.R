@@ -1,22 +1,40 @@
+# =============================================================================
+# SURVIVOR (WIDOW/WIDOWER) BENEFIT CALCULATIONS
+# =============================================================================
+#
+# This file contains functions for calculating widow(er) Social Security benefits.
+# These functions handle:
+#   - Computing survivor PIA from deceased spouse's earnings record
+#   - Applying widow(er) actuarial adjustments
+#
+# Functions are called by calculate_benefits() in CL_benefit_calculator.R
+# after spousal benefit calculations and before RET.
+#
+# Reference: SSA Handbook Chapter 4 (Survivors Insurance)
+# https://www.ssa.gov/OP_Home/handbook/handbook.04/handbook-toc04.html
+#
+# =============================================================================
+
+
 # -----------------------------------------------------------------------------
 # 4.1 Widow(er) PIA Calculation
 # -----------------------------------------------------------------------------
 
 #' Widow(er) PIA Calculation
 #'
-#' Function for computing a worker's Widow(er) PIA based on their spouse's earnings record.
-#' Expects pre-generated spouse data from generate_spouse(), or generates it on-the-fly
-#' from spouse_spec if spouse_data is NULL.
+#' Function for computing a worker's survivor PIA based on their deceased spouse's
+#' earnings record. The survivor benefit is payable after the spouse dies, starting
+#' at the later of age 60 or the spouse's death.
 #'
 #' @param worker Dataframe with a worker's earnings and PIA by year and age
 #' @param spouse_data List of spouse data frames (keyed by spouse_spec), where each contains
-#'   year, s_age, s_birth_yr, s_claim_age, s_pia. NULL if no spouses or to generate on-the-fly.
+#'   year, s_age, s_birth_yr, s_claim_age, s_pia, s_death_age. NULL if no spouses or to generate on-the-fly.
 #' @param assumptions Dataframe with the Social Security Trustees assumptions
 #' @param factors Data frame for the Trustees' scaled earnings factors. Required if spouse_data
 #'   is NULL and workers have spouse_spec for on-the-fly generation.
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
-#' @return worker Dataframe with a worker's spousal PIA by age
+#' @return worker Dataframe with survivor_pia and worker_age_at_spouse_death by age
 #'
 #' @export
 widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, debugg = FALSE) {
@@ -147,7 +165,7 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
-#' @return worker Dataframe with a workjer's retired worker benefit by age
+#' @return worker Dataframe with a worker's survivor benefit by age
 #'
 #' @export
 widow_benefit <- function(worker, assumptions, debugg = FALSE) {
@@ -202,3 +220,25 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
   return(worker)
 
 }
+
+# =============================================================================
+# TODO - Documentation Review Needed
+# =============================================================================
+#
+# The following items need documentation updates or verification:
+#
+# 1. widow_pia():
+#    - Verify the 82.5% floor rule calculation (line ~127) against SSA POMS
+#    - Add more detailed explanation of prelim_survivor_pia calculation
+#    - Document edge cases: spouse dies before claiming, spouse receives DRCs
+#
+# 2. widow_benefit():
+#    - Add SSA Handbook citation for widow reduction factor formula (w_rf)
+#    - Verify widow eligibility age calculation (elig_age_retired - 2 = 60)
+#    - Document the effective_widow_claim_age logic more clearly
+#
+# 3. General:
+#    - Add examples to roxygen documentation
+#    - Consider adding a vignette for survivor benefits
+#
+# =============================================================================

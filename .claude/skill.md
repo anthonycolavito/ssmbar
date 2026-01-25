@@ -18,7 +18,8 @@ Anthony Colavito (colavito@crfb.org) - Committee for a Responsible Federal Budge
 
 ### Benefit Calculation Pipeline
 ```
-Earnings → AIME → PIA → COLA → Actuarial Adjustment → RET → Final Benefit
+Earnings → AIME → PIA → COLA → Worker Benefit → Spousal PIA → Spouse Benefit
+        → Widow PIA → Widow Benefit → RET → Final Benefit
 ```
 
 ### Key Functions
@@ -33,8 +34,10 @@ Earnings → AIME → PIA → COLA → Actuarial Adjustment → RET → Final Be
 | `cola()` | Cost-of-Living Adjustments |
 | `worker_benefit()` | Applies early retirement/delayed credits |
 | `spouse_benefit()` | Spousal benefit with actuarial adjustments |
+| `widow_pia()` | Survivor PIA from deceased spouse's record |
+| `widow_benefit()` | Survivor benefit with widow actuarial adjustment |
 | `ret()` | Retirement Earnings Test - reduces benefits if earnings > exempt amount |
-| `final_benefit()` | Combines worker + spousal benefits |
+| `final_benefit()` | Combines worker + max(spousal, survivor) benefits |
 
 ### Worker ID Format
 `{type}-{sex}-{birthyr}-{claimage}`
@@ -664,6 +667,36 @@ All 76 tests passing (13 actuarial + 63 regression).
 - Duplicate IDs fixed by adding numeric suffix rather than throwing error
 - Benchmark scripts kept in inst/benchmarks/ for future performance regression testing
 
+**Survivor Benefits Integration** - Completed 2026-01-24
+- Created `R/survivor.R` with widow(er) benefit functions:
+  - `widow_pia()`: Calculates survivor PIA based on deceased spouse's record
+  - `widow_benefit()`: Applies actuarial adjustment to survivor benefits
+- Integrated survivor functions into `calculate_benefits()` pipeline:
+  - Order: worker_benefit → spousal_pia → spouse_benefit → widow_pia → widow_benefit → ret → final_benefit
+- Updated `final_benefit()` to handle dual entitlement per SSA Handbook Sections 733-734:
+  - Worker receives: wrk_ben + max(spouse_ben, survivor_ben)
+  - Cannot receive both spousal AND survivor benefits simultaneously
+  - Spousal benefits stop when spouse dies; survivor benefits begin
+- Updated `generate_spouse()` in spousal.R to include `s_death_age` column
+- Updated `generate_single_worker()` in earnings.R to calculate `death_age` from life expectancy
+- Added life expectancy columns (`le_m`, `le_f`) to assumptions dataset
+- Added survivor-related global variables to ssmbar-package.R
+- Regenerated all 10 regression test baselines to include survivor benefits
+- All 158 tests passing
+- Commit: a078607 "Integrate survivor benefits into benefit calculation pipeline"
+
+**Key SSA Rules Implemented:**
+- Survivor eligibility: Age 60 (elig_age_retired - 2) per SSA Handbook Section 401
+- Survivor PIA: Per Section 202, uses 82.5% floor if spouse claimed early
+- Dual entitlement: Per Sections 733-734, worker gets own benefit plus EXCESS auxiliary benefit
+- Widow actuarial adjustment: w_rf = 0.285 / ((NRA - 60) * 12)
+
+**Technical Decisions:**
+- `death_age` calculated from cohort life expectancy at age 65 (rounded to integer)
+- Spouse data generated once at start and passed through pipeline (performance optimization preserved)
+- Column naming conflicts in widow_pia() resolved using `surv_*` prefix for temporary columns
+- `spouse_ben_adj` introduced in final_benefit() to zero out spousal benefits after spouse dies
+
 ---
 
 ### Notes for Claude Code
@@ -678,6 +711,7 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
 - `R/eligibility.R` (qc_comp, comp_period)
 - `R/benefit_calculations.R` (aime, pia, cola, worker_benefit, rf_and_drc, final_benefit)
 - `R/spousal.R` (spousal_pia, spouse_benefit, generate_spouse, calculate_spouse_dep_benefit)
+- `R/survivor.R` (widow_pia, widow_benefit)
 - `R/ret.R` (ret, calculate_excess_earnings, calculate_ret_reduction, allocate_ret_reduction, calculate_months_withheld, calculate_drc_payback)
 - `R/reform.R` (create_reform, apply_reform, compare_benefits, reform_impact_summary)
 
@@ -692,6 +726,7 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
    - **Worker benefit step**: wrk_ben, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor
    - **Spousal steps**: spouse_pia, s_pia, s_rf1_ind, s_rf2_ind, s_act_factor, spouse_ben
    - **RET step**: excess_earnings, ret_reduction, months_withheld, cum_months_withheld, ret_adj_factor
+   - **Survivor steps**: survivor_pia, survivor_ben, worker_age_at_spouse_death
    - **Final step**: ben, annual_ind
 3. If column names change, regenerate fixtures BUT first compare old vs new values to confirm calculations unchanged
 4. Do NOT commit until all regression tests pass and ALL intermediate values verified

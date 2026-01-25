@@ -5,11 +5,11 @@
 #
 # This file contains the core benefit calculation functions for the ssmbar package.
 # Functions are organized in the order they are called in the benefit calculation
-# pipeline (see calculate_benefits() in CL_benefit_calculator.R). Spousal benefit
-# functions are included in a separate file:
+# pipeline (see calculate_benefits() in CL_benefit_calculator.R). Spousal and survivor
+# benefit functions are in separate files (spousal.R, survivor.R):
 #
 #   earnings -> aime() -> pia() -> cola() -> worker_benefit() -> spousal_pia()
-#            -> spouse_benefit() -> ret() -> final_benefit()
+#            -> spouse_benefit() -> widow_pia() -> widow_benefit() -> ret() -> final_benefit()
 #
 # =============================================================================
 
@@ -356,7 +356,7 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
-#' @return worker Dataframe with a workjer's retired worker benefit by age
+#' @return worker Dataframe with a worker's retired worker benefit by age
 #'
 #' @export
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
