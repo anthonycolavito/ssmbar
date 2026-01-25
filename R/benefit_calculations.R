@@ -416,24 +416,53 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #' Final Benefit Calculation
 #'
 #' Function that calculates a worker's total retirement benefit combining
-#' retired worker and spousal benefits.
+#' retired worker, spousal, and survivor benefits.
 #'
-#' @param worker Dataframe with a worker's retired worker and spousal benefit by age
+#' @param worker Dataframe with a worker's retired worker, spousal, and survivor benefit by age
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
 #' @return worker Dataframe with a worker's final monthly benefit by age
 #'
 #' @export
 final_benefit <- function(worker, debugg = FALSE) {
+  #Section 733: Entitlement to More Than One Social Security Benefit at the Same Time
+  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0733.html
   #Section 734: Entitlement to Retirement or Disability Insurance Benefits and Another Benefit
   #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0734.html
-  #Individuals entitled to a retired worker benefit and another, higher benefit receive their
-  #full retired worker and the difference between that benefit and their other, higher benefit.
-  #In this calculator, spousal benefits are reduced prior to the final_benefit() call.
+  #
+  # Per Section 733.2: If entitled to multiple benefits, only the higher is payable,
+  # UNLESS one is a retirement/disability benefit (Section 734).
+  # Per Section 734: Worker receives their full retired worker benefit PLUS the
+  # difference between that and any higher auxiliary benefit.
+  #
+  # In this calculator:
+  # - wrk_ben: Worker's own retired worker benefit (always paid)
+  # - spouse_ben: EXCESS spousal benefit (spousal PIA - own PIA, with actuarial adjustment)
+  # - survivor_ben: EXCESS survivor benefit (survivor PIA - own PIA, with actuarial adjustment)
+  #
+  # Spousal benefits apply while spouse is alive; survivor benefits apply after spouse dies.
+  # Worker receives: wrk_ben + max(spouse_ben, survivor_ben)
+
+  # Handle case where survivor_ben column doesn't exist (backwards compatibility)
+  if (!"survivor_ben" %in% names(worker)) {
+    worker$survivor_ben <- 0
+  }
+
+  # Handle case where worker_age_at_spouse_death column doesn't exist (backwards compatibility)
+  if (!"worker_age_at_spouse_death" %in% names(worker)) {
+    worker$worker_age_at_spouse_death <- NA_real_
+  }
 
   dataset <- worker %>%
     mutate(
-      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben, 0, na.rm = TRUE)
+      # Zero out spousal benefit after spouse dies - survivor benefit takes over
+      # Spousal benefits require the spouse to be alive
+      spouse_ben_adj = if_else(
+        !is.na(worker_age_at_spouse_death) & age >= worker_age_at_spouse_death,
+        0,  # Spouse is dead, spousal benefit stops
+        spouse_ben
+      ),
+      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE)
     )
 
   if(debugg) {

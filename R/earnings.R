@@ -213,14 +213,16 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   claim_age <- age_claim #Age a worker claims benefits.
   elig_age <- age_elig #Age a worker is eligible for benefits.
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
+  # Calculate expected death age based on cohort life expectancy at age 65
+  # Round to nearest integer so it matches integer age values in benefit calculations
   death_age <- if(sex == "male") {
-    assumptions$le_m[which(year == birth_yr + 65)]
+    round(assumptions$le_m[which(assumptions$year == birth_yr + 65)])
   }
   else if (sex == "female") {
-    assumptions$le_f[which(year == birth_yr + 65)]
+    round(assumptions$le_f[which(assumptions$year == birth_yr + 65)])
   }
   else {
-    mean(assumptions$le_m[which(year == birth_yr + 65)], assumptions$le_f[which(year == birth_yr + 65)])
+    round(mean(assumptions$le_m[which(assumptions$year == birth_yr + 65)], assumptions$le_f[which(assumptions$year == birth_yr + 65)]))
   }
 
   worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age,

@@ -161,6 +161,8 @@ calculate_benefits <- function(birth_yr,
     worker_benefit(assumptions, debugg) %>%
     spousal_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
+    widow_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
+    widow_benefit(assumptions, debugg) %>%
     ret(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
     final_benefit(debugg)
 

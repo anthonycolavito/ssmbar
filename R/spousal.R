@@ -121,6 +121,7 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
       s_earnings = earnings,
       s_birth_yr = spec$birth_yr,
       s_claim_age = claim_age,
+      s_death_age = death_age,  # Spouse's expected death age from life expectancy
       s_pia = cola_basic_pia,  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
       s_wrk_ben = wrk_ben
     ) %>%

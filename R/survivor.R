@@ -67,25 +67,46 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
       elig_age_ret <- .x$elig_age_retired[1]
 
       if (is.na(spec) || is.null(spouse_data) || is.null(spouse_data[[spec]])) {
-        # No spouse - set spouse_pia to 0
+        # No spouse - set all survivor-related columns to NA/0 for consistency
         .x$s_pia <- NA_real_
+        .x$s_wrk_ben <- NA_real_
+        .x$s_claim_age <- NA_real_
+        .x$s_death_age <- NA_real_
+        .x$worker_age_at_spouse_death <- NA_real_
         .x$survivor_pia <- 0
       } else {
         # Get spouse data from cache
         spouse_df <- spouse_data[[spec]]
 
+        # Rename spouse columns for survivor calculations to avoid conflicts
+        # with s_pia from spousal_pia() (when debugg=TRUE)
+        spouse_survivor_df <- spouse_df %>%
+          select(year, s_age, s_pia, s_wrk_ben, s_death_age, s_claim_age) %>%
+          rename(
+            surv_s_pia = s_pia,
+            surv_s_wrk_ben = s_wrk_ben,
+            surv_s_death_age = s_death_age,
+            surv_s_claim_age = s_claim_age
+          )
+
         # Join spouse PIA by year
         .x <- .x %>%
-          left_join(spouse_df %>% select(year, s_age, s_pia, s_wrk_ben, s_death_age, s_claim_age), by = "year")
+          left_join(spouse_survivor_df, by = "year")
 
-        # Calculate spousal PIA
-        yr_s_death <- .x$year[which(.x$s_age == .x$s_death_age)]
+        # Calculate year of spouse's death and worker's age at that time
+        yr_s_death <- .x$year[which(.x$s_age == .x$surv_s_death_age)]
+        .x$worker_age_at_spouse_death <- .x$age[which(.x$s_age == .x$surv_s_death_age)]
+
+        # Copy back to standard column names for output (needed for debug mode)
+        .x$s_death_age <- .x$surv_s_death_age
+        .x$s_wrk_ben <- .x$surv_s_wrk_ben
+        .x$s_claim_age <- .x$surv_s_claim_age
 
         #https://www.ssa.gov/OP_Home/ssact/title02/0202.htm
         .x$prelim_survivor_pia <- case_when(
-          .x$s_death_age < .x$s_claim_age ~ .x$s_pia, #If deceased spouse died before claiming age
-          .x$s_wrk_ben > .x$s_pia ~ .x$s_wrk_ben, #If deceased spouse received DRCs
-          TRUE ~ pmax(.x$s_wrk_ben, .825 * .x$s_pia) #If deceased spouse claimed at FRA or earlier
+          .x$surv_s_death_age < .x$surv_s_claim_age ~ .x$surv_s_pia, #If deceased spouse died before claiming age
+          .x$surv_s_wrk_ben > .x$surv_s_pia ~ .x$surv_s_wrk_ben, #If deceased spouse received DRCs
+          TRUE ~ pmax(.x$surv_s_wrk_ben, .825 * .x$surv_s_pia) #If deceased spouse claimed at FRA or earlier
         )
 
         .x$survivor_pia <- if_else(
@@ -93,16 +114,21 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
           pmax(.x$prelim_survivor_pia - pmax(.x$cola_basic_pia, 0, na.rm = TRUE), 0, na.rm = TRUE),
           0
         )
+
+        # Clean up temporary columns
+        .x <- .x %>% select(-starts_with("surv_"))
       }
       .x %>% select(-elig_age_retired)
     }) %>%
     ungroup()
 
+  # Output worker_age_at_spouse_death (needed by widow_benefit() and final_benefit())
+  # s_death_age is already in spouse_data - no need to duplicate it here
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, s_wrk_ben, s_claim_age, s_death_age, survivor_pia),
+    worker <- worker %>% left_join(dataset %>% select(id, year, s_wrk_ben, s_claim_age, s_death_age, worker_age_at_spouse_death, survivor_pia),
                                    by = c("id", "year"))
   } else {
-    worker <- worker %>% left_join(dataset %>% select(id, year, survivor_pia),
+    worker <- worker %>% left_join(dataset %>% select(id, year, worker_age_at_spouse_death, survivor_pia),
                                    by = c("id", "year"))
   }
 
@@ -150,14 +176,22 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
       nra_ind = nra[which(year == yr_62)], #NRA for age 62 cohort
       w_elig_age_ind = elig_age_retired[which(year==yr_62)] - 2,
       w_rf = .285/((nra_ind - w_elig_age_ind)*12),
-      w_act_factor = rf_and_drc(claim_age, nra_ind, w_rf, w_rf, 0), #Function that computes actuarial adjustment based on NRA, claiming age, and RFs and DRC levels
+      # Widow claim age is the later of: (1) worker's claim_age and (2) worker's age when spouse dies
+      # If no spouse (worker_age_at_spouse_death is NA), use claim_age
+      effective_widow_claim_age = if_else(
+        is.na(worker_age_at_spouse_death),
+        claim_age,
+        pmax(claim_age, worker_age_at_spouse_death)
+      ),
+      # Actuarial adjustment based on when widow benefits actually start
+      w_act_factor = rf_and_drc(effective_widow_claim_age, nra_ind, w_rf, w_rf, 0),
       survivor_ben = case_when(
-        age >= claim_age ~ floor(survivor_pia * w_act_factor), #Computees retired worker benefit with retired worker COLA'd PIA and the actuarial adjustment
+        age >= effective_widow_claim_age & survivor_pia > 0 ~ floor(survivor_pia * w_act_factor),
         TRUE ~ 0
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, w_rf, w_act_factor, survivor_ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, effective_widow_claim_age, w_rf, w_act_factor, survivor_ben),
                                    by = c("id","age") ) #Left joins variable for debugging
   }
   else {

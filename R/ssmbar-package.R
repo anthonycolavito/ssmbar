@@ -55,6 +55,11 @@ utils::globalVariables(c(
   "spouse_ret_to_spouse_ben", "s_months_withheld", "s_cum_months_withheld",
   "s_cum_months_withheld_final", "s_nra_ind", "s_drc_payback_factor",
 
+  # Survivor (widow/widower) benefit variables
+  "death_age", "s_death_age", "s_wrk_ben", "worker_age_at_spouse_death",
+  "survivor_pia", "prelim_survivor_pia", "survivor_ben",
+  "effective_widow_claim_age", "w_elig_age_ind", "w_rf", "w_act_factor",
+
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",
 
