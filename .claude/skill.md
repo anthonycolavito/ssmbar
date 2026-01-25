@@ -85,6 +85,15 @@ multiple <- calculate_benefits(
   age_claim = c(62, 67, 70),
   factors = sef2025, assumptions = tr2025
 )
+
+# Disabled worker (disabled at age 45)
+disabled <- calculate_benefits(
+  birth_yr = 1970, sex = "male", type = "medium",
+  age_claim = 45, disabled_age = 45,  # Both set to disability age
+  factors = sef2025, assumptions = tr2025
+)
+# Note: Disabled workers get act_factor = 1.0 (no reduction)
+# Earnings stop at disability age, benefits start at disability age
 ```
 
 ## Development Notes
@@ -696,6 +705,39 @@ All 76 tests passing (13 actuarial + 63 regression).
 - Spouse data generated once at start and passed through pipeline (performance optimization preserved)
 - Column naming conflicts in widow_pia() resolved using `surv_*` prefix for temporary columns
 - `spouse_ben_adj` introduced in final_benefit() to zero out spousal benefits after spouse dies
+
+**Disability Benefits Implementation** - Completed 2026-01-25
+- Added `disabled_age` parameter to `calculate_benefits()` and `earnings_generator()`
+- When `disabled_age` is provided:
+  - Worker's `elig_age` and `claim_age` are set to disability age
+  - Disabled workers receive 100% of PIA (actuarial factor = 1.0) at all ages
+  - Earnings stop at disability age
+  - PIA bend points determined at year of disability (birth_yr + disabled_age)
+  - COLA indexing starts from year of disability
+  - At NRA, benefits seamlessly convert to retired worker benefits (no amount change)
+- Fixed bugs in initial implementation from user's commit:
+  - Fixed function signature mismatch (`age_elig` → `disabled_age`)
+  - Fixed `if_else(is.null())` issue (use standard `if()` for scalar check)
+  - Fixed scope issue with `elig_age_ret` variable lookup
+- Updated `ret()` to preserve actuarial factor = 1.0 for disabled workers at NRA
+- Updated `generate_spouse()` to call `join_all_assumptions()` before pipeline
+- All 289 tests passing
+- Commit: 58ff227 "Implement disability benefits for worker beneficiaries"
+
+**Key SSA Rules for Disability (Disabled Worker Benefits):**
+- Disabled worker receives 100% of PIA - no actuarial adjustment
+- AIME computation period: From age 22 to year of disability (handled by `comp_period()`)
+- PIA bend points: Determined at year worker becomes disabled (not age 62)
+- Earnings: Stop at disability age (no earnings after becoming disabled)
+- Conversion at NRA: Disability benefits seamlessly convert to retirement benefits (same amount)
+- **Important constraint**: Worker cannot claim disability benefits at or after NRA
+
+**Disability Rules for Auxiliary Benefits (to be implemented):**
+- **Spousal benefits on disabled worker's record**: Spouse can claim dependent benefits, but must meet standard eligibility (age 62+ AND disabled worker has already claimed)
+- **Disabled worker receiving spousal benefits**: Can receive spousal benefits if eligible (age 62+ AND spouse has claimed), with actuarial adjustment on spousal portion
+- **Survivor benefits**: Standard survivor rules apply (special rules deferred to later)
+  - If disabled worker dies: Standard survivor benefits for surviving spouse
+  - If disabled worker's spouse dies: Disabled worker can receive survivor benefits if eligible (age 60+ AND spouse died)
 
 ---
 
