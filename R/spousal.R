@@ -315,22 +315,23 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
           s_claim_age <- parsed$age_claim
         }
 
-        # Calculate spouse's age and when they claim
+        # Calculate when spouse claims - must be done before mutate to work correctly
+        # yr_s_claim is the year when spouse's age equals their claim age
+        yr_s_claim <- s_birth_yr + s_claim_age
+
+        # Calculate spousal benefits
+        # Note: Spousal benefits require worker to be age 62+ (elig_age_ret), even for disabled workers
         .x <- .x %>%
           mutate(
-            s_age = year - s_birth_yr,
-            s_claim_age_val = s_claim_age,
             nra_ind = nra_ind,
             s_rf1_ind = s_rf1_ind,
             s_rf2_ind = s_rf2_ind,
             s_act_factor = s_act_factor,
-            yr_s_claim = year[s_age == s_claim_age_val],
             spouse_ben = case_when(
-              age >= claim_age & year >= yr_s_claim & age >= elig_age ~ floor(spouse_pia * s_act_factor),
+              age >= claim_age & year >= yr_s_claim & age >= elig_age_ret ~ floor(spouse_pia * s_act_factor),
               TRUE ~ 0
             )
-          ) %>%
-          select(-s_age, -s_claim_age_val, -yr_s_claim)
+          )
       }
       .x %>% select(-elig_age_retired)
     }) %>%
