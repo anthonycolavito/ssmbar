@@ -169,10 +169,14 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
 #'
 #' @export
 widow_benefit <- function(worker, assumptions, debugg = FALSE) {
-  #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
+  # TODO: Documentation needs verification - the citations below are for retired worker
+
+  # benefits (Sections 720, 723, 724), not widow benefits. Need to add proper citations
+  # for widow reduction factors. See POMS RS 00615.301 for widow benefit reductions.
+  #
+  # Current citations (for reference, but apply to retired workers not widows):
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
-  #Delayed retirement credits are described in Section 720
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
 
   # Skip join if columns already present (from join_all_assumptions)
@@ -193,6 +197,7 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
       yr_62 = year - age + 62, #RF/DRC amounts and NRA are based on year turning age 62 in assumptions.
       nra_ind = nra[which(year == yr_62)], #NRA for age 62 cohort
       w_elig_age_ind = elig_age_retired[which(year==yr_62)] - 2,
+      # TODO: Verify w_rf formula against POMS RS 00615.301 (widow reduction factor)
       w_rf = .285/((nra_ind - w_elig_age_ind)*12),
       # Widow claim age is the later of: (1) worker's claim_age and (2) worker's age when spouse dies
       # If no spouse (worker_age_at_spouse_death is NA), use claim_age
