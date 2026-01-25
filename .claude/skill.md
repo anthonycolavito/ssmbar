@@ -732,12 +732,26 @@ All 76 tests passing (13 actuarial + 63 regression).
 - Conversion at NRA: Disability benefits seamlessly convert to retirement benefits (same amount)
 - **Important constraint**: Worker cannot claim disability benefits at or after NRA
 
-**Disability Rules for Auxiliary Benefits (to be implemented):**
+**Disability Rules for Auxiliary Benefits (implemented 2026-01-25):**
 - **Spousal benefits on disabled worker's record**: Spouse can claim dependent benefits, but must meet standard eligibility (age 62+ AND disabled worker has already claimed)
 - **Disabled worker receiving spousal benefits**: Can receive spousal benefits if eligible (age 62+ AND spouse has claimed), with actuarial adjustment on spousal portion
 - **Survivor benefits**: Standard survivor rules apply (special rules deferred to later)
   - If disabled worker dies: Standard survivor benefits for surviving spouse
   - If disabled worker's spouse dies: Disabled worker can receive survivor benefits if eligible (age 60+ AND spouse died)
+- **Important constraint**: Worker cannot claim disability benefits at or after NRA
+
+**Auxiliary Benefits Fixes for Disability** - Completed 2026-01-25
+- Fixed `spouse_benefit()` to use `elig_age_ret` (age 62) instead of `elig_age` for eligibility
+- Fixed `yr_s_claim` calculation to use `s_birth_yr + s_claim_age` before mutate
+- Survivor benefits (`widow_pia()`, `widow_benefit()`) already correctly use `elig_age_ret - 2` (age 60)
+- Commit: 7a3d350 "Fix spousal benefit eligibility for disabled workers"
+
+**KNOWN ISSUE - Requires Future Investigation:**
+There appears to be a pre-existing issue where spousal benefits may not start at the exact year
+the spouse claims when the worker and spouse are the same age. The spousal_pia calculation shows
+spouse_pia > 0 at the claim year, but spouse_ben remains 0 for a few more years. This needs
+investigation in ret() function to determine if RET-related logic is incorrectly zeroing
+spouse_ben. This is NOT a disability-specific issue.
 
 ---
 
