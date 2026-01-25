@@ -746,12 +746,30 @@ All 76 tests passing (13 actuarial + 63 regression).
 - Survivor benefits (`widow_pia()`, `widow_benefit()`) already correctly use `elig_age_ret - 2` (age 60)
 - Commit: 7a3d350 "Fix spousal benefit eligibility for disabled workers"
 
-**KNOWN ISSUE - Requires Future Investigation:**
-There appears to be a pre-existing issue where spousal benefits may not start at the exact year
-the spouse claims when the worker and spouse are the same age. The spousal_pia calculation shows
-spouse_pia > 0 at the claim year, but spouse_ben remains 0 for a few more years. This needs
-investigation in ret() function to determine if RET-related logic is incorrectly zeroing
-spouse_ben. This is NOT a disability-specific issue.
+**Investigation Complete - Spousal Benefit Timing (2026-01-25):**
+
+The apparent "issue" where spouse_ben = 0 at early ages despite spouse_pia > 0 is **NOT a bug**.
+It is correct application of the spouse's Retirement Earnings Test (RET).
+
+**Root Cause:** When a worker receives spousal benefits (spouse_ben) based on the spouse's record,
+and the spouse continues working with earnings above the RET threshold, benefits on the spouse's
+record are reduced per SSA Handbook Section 1803. This includes the worker's spouse_ben.
+
+**Example:** High-earning spouse claims at 62 but continues working until 65:
+- Ages 62-64: Spouse has ~$128k earnings, triggering s_excess_earnings of ~$97k/year
+- Spouse's RET reduction (~$45k/year) is allocated 1/3 to worker's spouse_ben, 2/3 to spouse's own benefit
+- Worker's spouse_ben reduction (~$15k/year) exceeds the benefit amount (~$7.6k/year), zeroing it out
+- Age 65+: Spouse stops working, no RET, spouse_ben is restored to normal calculated value
+
+**Key insight:** Scaled earnings factors (high, medium, low) assume workers continue earning until
+approximately age 65, regardless of when they claim. This creates a realistic scenario where
+someone claims at 62 but continues working, triggering RET.
+
+**Verified correct behaviors:**
+- Disabled worker act_factor = 1.0 at all ages (no actuarial adjustment)
+- Disabled worker survivor benefits start correctly when spouse dies
+- Dual entitlement: worker receives wrk_ben + max(spouse_ben_adj, survivor_ben)
+- All 289 tests passing
 
 ---
 
