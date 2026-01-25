@@ -11,7 +11,7 @@
 #' @param age_claim Numeric value(s) for the age(s) at which the worker(s) claim benefits.
 #' @param factors Data frame containing the Trustees' scaled earnings factors.
 #' @param assumptions Data frame containing the prepared Trustees assumptions.
-#' @param age_elig Numeric value(s) for the age(s) at which the worker(s) become eligible for benefits. Default is 62.
+#' @param disabled_age Numeric value(s) for the age(s) at which the worker(s) become disabled. Default is NULL.
 #' @param custom_avg_earnings Numeric value(s) for real average earnings if type = "custom". Default is NULL.
 #' @param spouse_type Character value(s) specifying the spouse's earnings level. NULL if no spouse. Default is NULL.
 #' @param spouse_sex Character value(s) specifying the spouse's sex: "male", "female", or "all". Default is "all".
@@ -102,7 +102,7 @@ calculate_benefits <- function(birth_yr,
                                age_claim = 65,
                                factors,
                                assumptions,
-                               age_elig = 62,
+                               disabled_age = NULL,
                                custom_avg_earnings = NULL,
                                spouse_type = NULL,
                                spouse_sex = "all",
@@ -124,7 +124,7 @@ calculate_benefits <- function(birth_yr,
     sex = sex,
     type = type,
     age_claim = age_claim,
-    age_elig = age_elig,
+    disabled_age = disabled_age,
     factors = factors,
     assumptions = assumptions,
     custom_avg_earnings = custom_avg_earnings,

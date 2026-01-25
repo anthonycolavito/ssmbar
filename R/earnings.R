@@ -17,7 +17,7 @@ MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime
 #' @param sex Character value(s) specifying the sex of the worker(s): "male", "female", or "all" (gender-neutral).
 #' @param type Character value(s) specifying the earnings level of the worker(s).
 #' @param age_claim Numeric value(s) for the age(s) at which the worker(s) claim benefits.
-#' @param age_elig Numeric value(s) for the age(s) at which the worker(s) become eligible for benefits.
+#' @param disabled_age Numeric value(s) for the age(s) at which the worker(s) becomes disabled. Default is NULL
 #' @param factors Data frame for the Trustees' scaled earnings factors.
 #' @param assumptions Data frame of the pre-prepared Trustees assumptions.
 #' @param custom_avg_earnings Numeric value(s) for the real average earnings for worker(s), if type="custom" is selected.
@@ -55,7 +55,7 @@ MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange case_when if_else first row_number group_modify bind_rows
 #' @export
 
-earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim=65, age_elig=62, factors, assumptions,
+earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim=65, disabled_age=NULL, factors, assumptions,
                                custom_avg_earnings=NULL,
                                spouse_type=NULL, spouse_sex="all", spouse_birth_yr=NULL, spouse_age_claim=NULL,
                                spouse_custom_avg_earnings=NULL,
@@ -67,7 +67,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
     length(sex),
     length(type),
     length(age_claim),
-    length(age_elig),
+    length(disabled_age),
     length(custom_avg_earnings),
     length(spouse_type),
     length(spouse_sex),
@@ -93,7 +93,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   sex_vec <- recycle_param(sex, n_workers)
   type_vec <- recycle_param(type, n_workers)
   age_claim_vec <- recycle_param(age_claim, n_workers)
-  age_elig_vec <- recycle_param(age_elig, n_workers)
+  disabled_age_vec <- recycle_param(disabled_age, n_workers)
   custom_avg_earnings_vec <- recycle_param(custom_avg_earnings, n_workers, allow_null = TRUE)
   spouse_type_vec <- recycle_param(spouse_type, n_workers, allow_null = TRUE)
   spouse_sex_vec <- recycle_param(spouse_sex, n_workers)
@@ -108,7 +108,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
       sex = sex_vec[i],
       type = type_vec[i],
       age_claim = age_claim_vec[i],
-      age_elig = age_elig_vec[i],
+      disabled_age = disabled_age_vec[i],
       factors = factors,
       assumptions = assumptions,
       custom_avg_earnings = if (is.na(custom_avg_earnings_vec[i])) NULL else custom_avg_earnings_vec[i],
@@ -210,8 +210,8 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   # ID format: type-sex-birthyr-claimage (e.g., "medium-male-1960-67")
   id <- paste0(worker_type, "-", sex, "-", birth_yr, "-", age_claim)
 
-  claim_age <- age_claim #Age a worker claims benefits.
-  elig_age <- age_elig #Age a worker is eligible for benefits.
+  claim_age <- if_else(is.null(disabled_age), age_claim, disabled_age) #Age a worker claims benefits.
+  elig_age <- if_else(is.null(disabled_age), assumptions$elig_age_retired[which(year == birth_yr + 62)], disabled_age) #Age a worker is eligible for benefits.
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
   # Calculate expected death age based on cohort life expectancy at age 65
   # Round to nearest integer so it matches integer age values in benefit calculations
@@ -239,7 +239,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
     worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
-        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age -- earnings past age eligiblity age set to 0 if not a retired beneficiary (elig_age < 62)
+        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < assumptions$elig_age_retired[which(year == birth_yr + 62)], 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age -- earnings past age eligiblity age set to 0 if not a retired beneficiary (elig_age < 62)
       )
 
   } # End of type conditional
@@ -248,7 +248,8 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
                                    by = "year") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
         earnings =  case_when(
-          age >= 21 & age <= 64 ~ taxmax,
+          age >= 21 & age < assumptions$elig_age_retired[which(year == birth_yr + 62)] ~ taxmax,
+          elig_age >= assumptions$elig_age_retired[which(year == birth_yr + 62)] & age <= 64 ~ taxmax,
           TRUE ~ 0
         ) #Creates earnings at each age
       ) %>% select(!taxmax) #Removing taxmax var to prevent errors with debugger
@@ -276,7 +277,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
 
     worker <- worker %>% mutate(
       adj_real_earn = real_earn * scalar, #Adjusted real earnings using the scalar previously calculated
-      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < 62, 0, 1)), 0, na.rm = TRUE) #Final nominal earnings
+      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < assumptions$elig_age_retired[which(year == birth_yr + 62)], 0, 1)), 0, na.rm = TRUE) #Final nominal earnings
     )
   }
 
