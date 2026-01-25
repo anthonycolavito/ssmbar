@@ -9,7 +9,7 @@ generate_single_worker(
   sex,
   type,
   age_claim,
-  age_elig,
+  disabled_age,
   factors,
   assumptions,
   custom_avg_earnings = NULL,
@@ -30,7 +30,7 @@ generate_single_worker(
 
 \item{age_claim}{Numeric value(s) for the age(s) at which the worker(s) claim benefits.}
 
-\item{age_elig}{Numeric value(s) for the age(s) at which the worker(s) become eligible for benefits.}
+\item{disabled_age}{Numeric value(s) for the age(s) at which the worker(s) becomes disabled. Default is NULL}
 
 \item{factors}{Data frame for the Trustees' scaled earnings factors.}
 

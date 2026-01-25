@@ -261,12 +261,12 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
-      elig_age_ret = first(elig_age_retired), # Retirement eligibility age from assumptions
-      bp1_elig = bp1[which(age == elig_age_ret)], # First PIA bend point at eligibility age
-      bp2_elig = bp2[which(age == elig_age_ret)], # Second PIA bend point at eligibility age
-      fact1_elig = fact1[which(age == elig_age_ret)], # First replacement factor (90%)
-      fact2_elig = fact2[which(age == elig_age_ret)], # Second replacement factor (32%)
-      fact3_elig = fact3[which(age == elig_age_ret)], # Third replacement factor (15%)
+      # Use worker's elig_age for bend points (disability age for disabled workers, 62 for retired workers)
+      bp1_elig = bp1[which(age == first(elig_age))], # First PIA bend point at worker's eligibility age
+      bp2_elig = bp2[which(age == first(elig_age))], # Second PIA bend point at worker's eligibility age
+      fact1_elig = fact1[which(age == first(elig_age))], # First replacement factor (90%)
+      fact2_elig = fact2[which(age == first(elig_age))], # Second replacement factor (32%)
+      fact3_elig = fact3[which(age == first(elig_age))], # Third replacement factor (15%)
       basic_pia = case_when(
       age >= elig_age ~ floor(case_when( # PIA Calculation -- only occurs in and after a worker's eligibility age
                         aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
@@ -324,8 +324,8 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   }
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
-    elig_age_ret = first(elig_age_retired), # Retirement eligibility age from assumptions
-    cpi_elig = cpi_w[which(age == elig_age_ret)], # CPI-W at eligibility age, used for indexing COLAs
+    # Use worker's elig_age for COLA indexing (disability age for disabled workers, 62 for retired workers)
+    cpi_elig = cpi_w[which(age == first(elig_age))], # CPI-W at worker's eligibility age, used for indexing COLAs
     cpi_index_factor = pmax(cummax(cpi_w) / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
     cola_basic_pia = floor(basic_pia * cpi_index_factor) # COLA'd PIA at each age, rounded down to the nearest dollar
   ) %>% select(-elig_age_retired) %>% ungroup()
@@ -388,9 +388,16 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
       rf2_ind = rf2[which(year == yr_62)], #Second reduction factor
       drc_ind = drc[which(year == yr_62)], #Third reduction factor
       nra_ind = nra[which(year == yr_62)], #NRA for age 62 cohort
-      act_factor = rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind), #Function that computes actuarial adjustment based on NRA, claiming age, and RFs and DRC levels
+      elig_age_ret = first(elig_age_retired), # Retirement eligibility age from assumptions
+      # Disabled workers (elig_age < elig_age_ret) get no actuarial adjustment - their benefit = 100% of PIA
+      # Retired workers get actuarial adjustment based on claiming age relative to NRA
+      act_factor = if_else(
+        elig_age < elig_age_ret,
+        1.0,  # Disabled workers: no actuarial reduction or credits
+        rf_and_drc(claim_age, nra_ind, rf1_ind, rf2_ind, drc_ind)  # Retired workers: apply actuarial adjustment
+      ),
       wrk_ben = case_when(
-        age >= claim_age ~ floor(cola_basic_pia * act_factor), #Computees retired worker benefit with retired worker COLA'd PIA and the actuarial adjustment
+        age >= claim_age ~ floor(cola_basic_pia * act_factor), #Computes worker benefit with COLA'd PIA and the actuarial adjustment
         TRUE ~ 0
       )) %>% select(-claim_age) %>% ungroup()
 

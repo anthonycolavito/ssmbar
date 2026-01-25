@@ -7,7 +7,7 @@ utils::globalVariables(c(
 
   # Common variables
   "id", "age", "year", "sex", "earnings", "claim_age", "elig_age",
-  "spouse_spec", "ben",
+  "spouse_spec", "ben", "disabled_age", "is_disabled",
 
 
   # Assumptions variables (including parameterized program rules)

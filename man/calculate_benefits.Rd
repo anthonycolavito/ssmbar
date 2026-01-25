@@ -11,7 +11,7 @@ calculate_benefits(
   age_claim = 65,
   factors,
   assumptions,
-  age_elig = 62,
+  disabled_age = NULL,
   custom_avg_earnings = NULL,
   spouse_type = NULL,
   spouse_sex = "all",
@@ -36,7 +36,7 @@ Options: "very_low", "low", "medium", "high", "max", or "custom".}
 
 \item{assumptions}{Data frame containing the prepared Trustees assumptions.}
 
-\item{age_elig}{Numeric value(s) for the age(s) at which the worker(s) become eligible for benefits. Default is 62.}
+\item{disabled_age}{Numeric value(s) for the age(s) at which the worker(s) become disabled. Default is NULL.}
 
 \item{custom_avg_earnings}{Numeric value(s) for real average earnings if type = "custom". Default is NULL.}
 

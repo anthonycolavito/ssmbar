@@ -438,6 +438,10 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       cum_months_at_nra <- max(wd$cum_months_withheld[wd$age < nra_ind], 0, na.rm = TRUE)
 
       # Step 5: Calculate DRC payback factors for worker's own benefits
+      # Note: Disabled workers (elig_age < elig_age_ret) don't get actuarial adjustments
+      # or DRC payback - their benefit equals 100% of their PIA at all ages
+      is_disabled <- wd$elig_age[1] < elig_age_ret
+
       drc_factors <- calculate_drc_payback(claim_age_val, cum_months_at_nra, nra_ind,
                                             rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, drc_max)
 
@@ -454,11 +458,14 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       }
 
       # Apply final benefits
+      # For disabled workers: act_factor = 1.0 always (no DRC payback)
+      # For retired workers: recalculate at NRA with DRC payback
       wd <- wd %>% mutate(
         wrk_ben = case_when(
           age < claim_age ~ 0,
+          is_disabled ~ floor(cola_basic_pia * 1.0),  # Disabled: no actuarial adjustment
           age < nra_ind ~ wrk_ben_reduced,
-          TRUE ~ floor(cola_basic_pia * drc_factors$new_act_factor)
+          TRUE ~ floor(cola_basic_pia * drc_factors$new_act_factor)  # Retired: DRC payback at NRA
         ),
         spouse_ben = case_when(
           age < claim_age ~ 0,

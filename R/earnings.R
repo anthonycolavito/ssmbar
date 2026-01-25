@@ -155,7 +155,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
 #' @return worker Data frame with the earnings of a single worker.
 #' @keywords internal
 
-generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, factors, assumptions,
+generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age, factors, assumptions,
                                    custom_avg_earnings = NULL,
                                    spouse_type = NULL, spouse_sex = "all", spouse_birth_yr = NULL,
                                    spouse_age_claim = NULL, spouse_custom_avg_earnings = NULL,
@@ -210,8 +210,19 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
   # ID format: type-sex-birthyr-claimage (e.g., "medium-male-1960-67")
   id <- paste0(worker_type, "-", sex, "-", birth_yr, "-", age_claim)
 
-  claim_age <- if_else(is.null(disabled_age), age_claim, disabled_age) #Age a worker claims benefits.
-  elig_age <- if_else(is.null(disabled_age), assumptions$elig_age_retired[which(year == birth_yr + 62)], disabled_age) #Age a worker is eligible for benefits.
+  # Get the default retirement eligibility age from assumptions
+  # Use birth_yr + 62 to find the year the worker turns 62
+  elig_age_ret <- assumptions$elig_age_retired[assumptions$year == birth_yr + 62]
+
+  # For disabled workers, claim_age and elig_age are both the disability age
+  # For retired workers, claim_age is when they choose to claim, elig_age is 62 (EEA)
+  if (is.null(disabled_age) || is.na(disabled_age)) {
+    claim_age <- age_claim
+    elig_age <- elig_age_ret
+  } else {
+    claim_age <- disabled_age  # Disabled workers claim when they become disabled
+    elig_age <- disabled_age   # Eligibility age is disability age
+  }
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
   # Calculate expected death age based on cohort life expectancy at age 65
   # Round to nearest integer so it matches integer age values in benefit calculations
@@ -239,7 +250,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
     worker <- worker %>% left_join(factors %>% filter(.data$worker == type) %>% select(age, factor),
                                    by = "age") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
-        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < assumptions$elig_age_retired[which(year == birth_yr + 62)], 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age -- earnings past age eligiblity age set to 0 if not a retired beneficiary (elig_age < 62)
+        earnings =  pmax(awi * factor * if_else(age < elig_age, 1, if_else(elig_age < elig_age_ret, 0, 1)), 0, na.rm = TRUE), #Creates earnings at each age -- earnings past eligibility age set to 0 if disabled worker (elig_age < elig_age_ret)
       )
 
   } # End of type conditional
@@ -248,8 +259,8 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
                                    by = "year") %>% #Left joins scaled earnings factors for the type of worker selected.
       mutate(
         earnings =  case_when(
-          age >= 21 & age < assumptions$elig_age_retired[which(year == birth_yr + 62)] ~ taxmax,
-          elig_age >= assumptions$elig_age_retired[which(year == birth_yr + 62)] & age <= 64 ~ taxmax,
+          elig_age < elig_age_ret & age >= 21 & age < elig_age ~ taxmax, # Disabled max earner: earnings until disability
+          elig_age >= elig_age_ret & age >= 21 & age <= 64 ~ taxmax,     # Retired max earner: earnings until age 64
           TRUE ~ 0
         ) #Creates earnings at each age
       ) %>% select(!taxmax) #Removing taxmax var to prevent errors with debugger
@@ -277,7 +288,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, age_elig, fac
 
     worker <- worker %>% mutate(
       adj_real_earn = real_earn * scalar, #Adjusted real earnings using the scalar previously calculated
-      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < assumptions$elig_age_retired[which(year == birth_yr + 62)], 0, 1)), 0, na.rm = TRUE) #Final nominal earnings
+      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < elig_age_ret, 0, 1)), 0, na.rm = TRUE) #Final nominal earnings -- earnings past eligibility age set to 0 if disabled worker
     )
   }
 

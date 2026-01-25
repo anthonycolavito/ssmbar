@@ -90,21 +90,22 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
     return(NULL)
   }
 
-  # Get eligibility age from assumptions
-  elig_age_ret <- assumptions$elig_age_retired[1]
-
   # Generate spouse earnings using internal function from earnings.R
+  # Spouses are always retired workers (not disabled), so disabled_age = NULL
   spouse <- generate_single_worker(
     birth_yr = spec$birth_yr,
     sex = spec$sex,
     type = spec$type,
     age_claim = spec$age_claim,
-    age_elig = elig_age_ret,  # Retirement eligibility age from assumptions
+    disabled_age = NULL,  # Spouses are retired workers, not disabled
     factors = factors,
     assumptions = assumptions,
     custom_avg_earnings = spec$custom_avg_earnings,
     debugg = FALSE
   )
+
+  # Join all assumption columns before running through benefit calculation pipeline
+  spouse <- join_all_assumptions(spouse, assumptions)
 
   # Calculate spouse's AIME and PIA
   spouse <- spouse %>%
