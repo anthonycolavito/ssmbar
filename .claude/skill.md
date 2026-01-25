@@ -123,7 +123,6 @@ cd /c/Users/AnthonyColavito/ssmbar
 ```
 
 ### Known Issues
-- `legacy/worker_builder.R` is broken legacy code (moved out of R/ directory)
 - Rtools not installed on work computer (CRFB)
 
 ### R CMD Check Status
@@ -770,6 +769,33 @@ someone claims at 62 but continues working, triggering RET.
 - Disabled worker survivor benefits start correctly when spouse dies
 - Dual entitlement: worker receives wrk_ben + max(spouse_ben_adj, survivor_ben)
 - All 289 tests passing
+
+**Benefit Class (bc) Column Implementation** - Completed 2026-01-25
+
+Added Composite Benefit Class (`bc`) column to `final_benefit()` following the SSA BEPUF classification system.
+
+**Supported benefit classes:**
+| Code | Description |
+|------|-------------|
+| AR | Retired Worker (not dually entitled) |
+| ARB | Retired Worker dually entitled to Spouse benefit |
+| ARD | Retired Worker dually entitled to Widow(er) benefit |
+| AD | Disabled Worker (not dually entitled) |
+| ADB | Disabled Worker dually entitled to Spouse benefit |
+| ADD | Disabled Worker dually entitled to Widow(er) benefit |
+| D | Widow(er) only (no own worker benefit) |
+
+**Implementation details:**
+- `bc` column added to `final_benefit()` output
+- Classification logic uses `elig_age` vs `elig_age_retired` to distinguish disabled vs retired
+- Dual entitlement determined by `spouse_ben_adj > 0` (spousal) or `survivor_ben > 0` (widow/widower)
+- NA when not yet receiving benefits (wrk_ben <= 0 AND survivor_ben <= 0)
+- Added `bc` to globalVariables in ssmbar-package.R
+- Documentation updated with BEPUF reference and supported classes
+
+**Not yet implemented:** BR, BD (Spouse of Worker), E, F (other Survivor-only), CR, CD, CS (Child benefits)
+
+**Commit:** 3ef82ce "Add benefit class (bc) column to final_benefit()"
 
 ---
 
