@@ -423,12 +423,31 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #' Final Benefit Calculation
 #'
 #' Function that calculates a worker's total retirement benefit combining
-#' retired worker, spousal, and survivor benefits.
+#' retired worker, spousal, and survivor benefits. Also assigns the Composite
+#' Benefit Class (bc) indicator following the SSA BEPUF classification.
 #'
 #' @param worker Dataframe with a worker's retired worker, spousal, and survivor benefit by age
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
-#' @return worker Dataframe with a worker's final monthly benefit by age
+#' @return worker Dataframe with a worker's final monthly benefit by age and benefit class (bc)
+#'
+#' @details
+#' The Composite Benefit Class (bc) follows the SSA Benefits and Earnings Public-Use File
+#' (BEPUF) classification system. Currently supported benefit classes are:
+#' \itemize{
+#'   \item \strong{AR}: Retired Worker (not dually entitled)
+#'   \item \strong{ARB}: Retired Worker dually entitled to a Spouse benefit
+#'   \item \strong{ARD}: Retired Worker dually entitled to a Widow(er) benefit
+#'   \item \strong{AD}: Disabled Worker (not dually entitled)
+#'   \item \strong{ADB}: Disabled Worker dually entitled to a Spouse benefit
+#'   \item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
+#'   \item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
+#' }
+#'
+#' Benefit classes not currently implemented in ssmbar include: BR, BD (Spouse of Worker),
+#' E, F (other Survivor-only), and CR, CD, CS (Child benefits).
+#'
+#' @seealso SSA BEPUF User Guide for complete benefit class definitions
 #'
 #' @export
 final_benefit <- function(worker, debugg = FALSE) {
@@ -460,6 +479,12 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker$worker_age_at_spouse_death <- NA_real_
   }
 
+  # Handle case where elig_age_retired column doesn't exist (backwards compatibility)
+  # Default to 62 if not present
+  if (!"elig_age_retired" %in% names(worker)) {
+    worker$elig_age_retired <- 62
+  }
+
   dataset <- worker %>%
     mutate(
       # Zero out spousal benefit after spouse dies - survivor benefit takes over
@@ -469,19 +494,46 @@ final_benefit <- function(worker, debugg = FALSE) {
         0,  # Spouse is dead, spousal benefit stops
         spouse_ben
       ),
-      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE)
+      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE),
+
+      # Composite Benefit Class (bc) indicator
+      # Following SSA BEPUF classification system
+      # See: SSA Benefits and Earnings Public-Use File User Guide
+      #
+      # Logic:
+      # - Disabled worker: elig_age < elig_age_retired (claimed before age 62)
+      # - Retired worker: elig_age >= elig_age_retired
+      # - Dually entitled to Spouse: spouse_ben_adj > 0 (and > survivor_ben)
+      # - Dually entitled to Widow(er): survivor_ben > 0 (and survivor_ben >= spouse_ben_adj)
+      bc = case_when(
+        # Not yet receiving any benefits
+        wrk_ben <= 0 & survivor_ben <= 0 ~ NA_character_,
+
+        # Widow(er) only - no own worker benefit but receiving survivor benefit
+        wrk_ben <= 0 & survivor_ben > 0 ~ "D",
+
+        # Disabled worker benefit classes (AD*)
+        elig_age < elig_age_retired & spouse_ben_adj > 0 & spouse_ben_adj >= survivor_ben ~ "ADB",
+        elig_age < elig_age_retired & survivor_ben > 0 ~ "ADD",
+        elig_age < elig_age_retired ~ "AD",
+
+        # Retired worker benefit classes (AR*)
+        elig_age >= elig_age_retired & spouse_ben_adj > 0 & spouse_ben_adj >= survivor_ben ~ "ARB",
+        elig_age >= elig_age_retired & survivor_ben > 0 ~ "ARD",
+        TRUE ~ "AR"
+      )
     )
 
   if(debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, ben),
+    worker <- worker %>% left_join(dataset %>% select(id, age, ben, bc),
                                    by=c("id","age"))
   } else {
-    # Join ben first, then select output columns
+    # Join ben and bc, then select output columns
     worker <- worker %>%
-      left_join(dataset %>% select(id, age, ben), by=c("id","age"))
+      left_join(dataset %>% select(id, age, ben, bc), by=c("id","age"))
 
-    # Select core output columns, including sex and spouse_spec if they exist
-    output_cols <- c("id", "sex", "year", "age", "spouse_spec", "earnings", "ben")
+    # Select core output columns, including sex, spouse_spec, and bc if they exist
+    output_cols <- c("id", "sex", "year", "age", "spouse_spec", "earnings", "ben", "bc")
     available_cols <- intersect(output_cols, names(worker))
 
     worker <- worker %>% select(all_of(available_cols))
