@@ -948,3 +948,128 @@ Any major code changes (refactoring, parameterization, bug fixes) to the followi
 - Add `int_rate` (or `discount_rate`) column to tr2025
 - Source from Trustees Report intermediate assumptions
 - Used for PV calculations
+
+---
+
+## Future: Microdataset Optimization Roadmap
+
+This section outlines the changes needed to process large microdatasets (100k-1M+ workers) efficiently.
+
+### Current Architecture Assessment
+
+**Designed for:** Hypothetical worker analysis (10s-100s of workers)
+**Current scaling:** ~1.7 sec for 100 workers (~0.017 sec/worker, sub-linear exponent 0.68)
+**Memory:** ~55GB peak for 1M workers (estimate based on ~55KB per worker × 99 ages)
+
+### Critical Bottlenecks
+
+#### 1. AIME Per-Row Sorting Loop (CRITICAL - 50-100× speedup potential)
+**File:** `R/benefit_calculations.R`, `aime()` function
+**Problem:** For each worker, sorts full 35-year earnings array inside a row-wise loop
+**Current complexity:** O(n × 35 log 35) where n = worker-years
+**Solution:** Pre-sort earnings once per worker using data.table/dplyr group operations
+```r
+# Current (slow):
+for (i in 1:nrow(worker)) {
+  sort(indexed_earn[1:35], decreasing=TRUE, partial=35)
+}
+
+# Optimized:
+worker %>% group_by(id) %>%
+  mutate(aime = compute_aime_vectorized(indexed_earn, ...))
+```
+
+#### 2. Spousal group_modify Loops (SECONDARY - 10-20× speedup)
+**Files:** `R/spousal.R`, `R/survivor.R`
+**Problem:** `group_modify()` processes one worker at a time
+**Functions affected:** `spousal_pia()`, `spouse_benefit()`, `widow_pia()`, `widow_benefit()`
+**Solution:** Vectorize using grouped mutate operations or batch processing
+
+### Memory Optimization
+
+**Current peak:** ~55GB for 1M workers
+**Target:** 10-13GB (80% reduction)
+
+**Strategies:**
+- [ ] Process in batches of 10k-50k workers
+- [ ] Drop intermediate columns immediately after use
+- [ ] Use single-precision floats for non-monetary values
+- [ ] Implement streaming output (write results as computed)
+
+### Input Architecture Changes
+
+#### 1. Real Earnings Loader (NEW FUNCTION NEEDED)
+**File:** Create `R/earnings_loader.R`
+**Purpose:** Accept real earnings data instead of generating from scaled factors
+**Required inputs:**
+- Worker ID (SSN or anonymized)
+- Year
+- Earnings (already capped at taxmax or raw)
+- Birth year
+- Sex (for life expectancy)
+- Claim age
+- Optional: spouse linkage ID
+
+```r
+load_earnings <- function(earnings_data, assumptions, spouse_linkage = NULL) {
+  # Validate required columns
+  # Join assumptions
+  # Handle missing years (fill with 0)
+  # Return worker data frame compatible with pipeline
+}
+```
+
+#### 2. Spouse ID Linkage System
+**Problem:** Current `spouse_spec` string encoding is designed for hypothetical workers
+**Solution:** Add `spouse_id` column that links to another worker's record
+```r
+# Current (hypothetical workers):
+spouse_spec = "low-female-1962-65"  # Generates spouse on-the-fly
+
+# New (microdataset):
+spouse_id = "W123456"  # Links to actual worker record in dataset
+```
+
+### Implementation Phases
+
+#### Phase A: Vectorize AIME (Highest Impact)
+- [ ] Rewrite `aime()` to use grouped mutate instead of row loop
+- [ ] Pre-sort earnings once per worker
+- [ ] Benchmark: Target <5 sec for 10k workers
+
+#### Phase B: Batch Spouse Loading
+- [ ] Create `load_spouse_data()` for batch processing
+- [ ] Generate all spouse PIAs in one pass
+- [ ] Use hash-based lookup instead of on-the-fly generation
+
+#### Phase C: Memory-Efficient Pipeline
+- [ ] Add `batch_calculate_benefits()` wrapper
+- [ ] Process workers in chunks
+- [ ] Implement progress reporting
+- [ ] Add optional disk-based output streaming
+
+#### Phase D: Real Earnings Input
+- [ ] Create `load_earnings()` function
+- [ ] Add spouse linkage support
+- [ ] Validate against existing hypothetical worker outputs
+
+#### Phase E: Backend Optimization (Optional)
+- [ ] Evaluate data.table backend for 2-5× speedup
+- [ ] Consider Rcpp for AIME calculation
+- [ ] Implement parallel processing (future/furrr)
+
+### Scaling Targets
+
+| Workers | Current (est.) | Target |
+|---------|----------------|--------|
+| 1,000 | 17 sec | <5 sec |
+| 10,000 | 170 sec | <30 sec |
+| 100,000 | ~28 min | <5 min |
+| 1,000,000 | ~4.7 hours | <30 min |
+
+### Compatibility Notes
+
+- Existing hypothetical worker API (`calculate_benefits()`) must remain unchanged
+- New functions should be additive, not replacements
+- Regression tests must pass after all changes
+- Document performance characteristics in function help
