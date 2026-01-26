@@ -266,6 +266,7 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
       nra_ind = nra[which(year == yr_62)], #NRA for age 62 cohort
       w_elig_age_ind = elig_age_retired[which(year==yr_62)] - 2,  # Standard widow eligibility age (60)
       # TODO: Verify w_rf formula against POMS RS 00615.301 (widow reduction factor)
+      # TODO: Document - explain derivation of 0.285 constant (28.5% maximum reduction)
       w_rf = .285/((nra_ind - w_elig_age_ind)*12),
 
       # Widow claim age is the later of: (1) worker's claim_age and (2) worker's age when spouse dies

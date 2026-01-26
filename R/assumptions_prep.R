@@ -15,6 +15,7 @@
 
 prep_assumptions <- function(dataset) {
 
+  # TODO: Document - add specific handbook section citations for each parameter projection formula
   #Rules for Updating Parameters: https://www.ssa.gov/OP_Home/comp2/G-APP-A.html
   # Tax max: Indexed forward from 1994 (1992 AWI) and rounded to the nearest $300
   # Bend points: Indexed forward from 1979 (1977 AWI) and rounded to the nearest dollar

@@ -104,6 +104,13 @@ calculate_taxes <- function(worker, assumptions) {
 # Replacement Rate Functions
 # =============================================================================
 
+# TODO: Document - rep_rates() needs full roxygen documentation:
+#   - Function description explaining replacement rate concept
+#   - Parameter documentation for worker and assumptions
+#   - Return value documentation (pivoted data frame with multiple RR types)
+#   - Explanation of different replacement rate methods (pv_rr, real_all, wage_all, high-N, last-N)
+#   - SSA handbook citations for indexing methodology
+#   - Examples showing typical usage
 rep_rates <- function(worker, assumptions) {
 
   #Error Prevention

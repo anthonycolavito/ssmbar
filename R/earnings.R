@@ -234,6 +234,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
     claim_age <- disabled_age  # Disabled workers claim when they become disabled
     elig_age <- disabled_age   # Eligibility age is disability age
   }
+  # TODO: Document - explain how sex affects benefit calculations (life expectancy lookup)
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
   # Calculate expected death age based on cohort life expectancy at age 65
   # Round to nearest integer so it matches integer age values in benefit calculations
@@ -278,6 +279,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   }
   else {
   #Condition for when a worker is specified as custom.
+  # TODO: Document - add citation to Trustees Report methodology for scaled earnings factors
   #Earnings are generated using the raw scaled earnings factors provided by the trustee in five (5) steps
   #1. The raw scaled earnings factors are multiplied by the AWI at each age to produce earnings by age in nominal dollars
   #2. These earnings are inflated/deflated to be in terms of today's dollars.

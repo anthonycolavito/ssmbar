@@ -49,6 +49,7 @@ parse_spouse_spec <- function(spouse_spec) {
   disabled_age <- if (length(parts) == 5) as.numeric(parts[5]) else NULL
 
   # Check if type is custom (starts with "custom" followed by earnings amount)
+  # TODO: Document - explain custom earnings parsing regex pattern (e.g., "custom50000" -> 50000)
   if (grepl("^custom", type_part)) {
     type <- "custom"
     custom_avg_earnings <- as.numeric(gsub("^custom", "", type_part))
