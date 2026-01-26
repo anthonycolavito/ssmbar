@@ -444,15 +444,17 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'   \item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
 #'   \item \strong{ADF}: Disabled Worker dually entitled to a Disabled Widow(er) benefit
 #'   \item \strong{BR}: Spouse of Retired Worker (no own worker benefit, only spousal benefit)
+#'   \item \strong{BD}: Spouse of Disabled Worker (no own worker benefit, spouse is disabled and before NRA)
 #'   \item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
 #'   \item \strong{F}: Disabled Widow(er) only (not dually entitled to own worker benefit)
 #' }
 #'
 #' Note: Disabled workers (AD*) transition to retired workers (AR*) at Normal Retirement Age.
-#' This affects only the benefit class code, not the benefit amount.
+#' This affects only the benefit class code, not the benefit amount. Similarly, workers receiving
+#' BD benefits transition to BR when their disabled spouse reaches NRA.
 #'
-#' Benefit classes not currently implemented in ssmbar include: BD (Spouse of Disabled Worker -
-#' requires supporting disabled spouses), E (other Survivor-only), and CR, CD, CS (Child benefits).
+#' Benefit classes not currently implemented in ssmbar include: E (other Survivor-only),
+#' and CR, CD, CS (Child benefits).
 #'
 #' @seealso SSA BEPUF User Guide for complete benefit class definitions
 #'
@@ -503,12 +505,28 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker$nra <- 67
   }
 
+  # Handle case where s_elig_age column doesn't exist (backwards compatibility)
+  # Default to elig_age_retired (62) meaning spouse is retired, not disabled
+  if (!"s_elig_age" %in% names(worker)) {
+    worker$s_elig_age <- worker$elig_age_retired
+  }
+
+  # Handle case where s_age column doesn't exist (backwards compatibility)
+  # Default to NA (no spouse)
+  if (!"s_age" %in% names(worker)) {
+    worker$s_age <- NA_real_
+  }
+
   dataset <- worker %>%
     group_by(id) %>%
     mutate(
       # Get worker's individual NRA (based on birth cohort)
       yr_62 = year - age + 62,
-      nra_ind = nra[which(year == yr_62)][1]
+      nra_ind = nra[which(year == yr_62)][1],
+      # Get spouse's NRA based on spouse's birth cohort (derived from s_age)
+      # s_birth_yr = year - s_age, so spouse's yr_62 = (year - s_age) + 62
+      s_yr_62 = if_else(!is.na(s_age), year - s_age + 62, NA_real_),
+      s_nra_ind = if_else(!is.na(s_yr_62), nra[which(year == s_yr_62)][1], NA_real_)
     ) %>%
     ungroup() %>%
     mutate(
@@ -542,14 +560,22 @@ final_benefit <- function(worker, debugg = FALSE) {
       is_originally_disabled = elig_age < elig_age_retired,
       is_currently_disabled = is_originally_disabled & age < nra_ind,
 
+      # Determine if SPOUSE is currently classified as disabled or retired
+      # Used for BD (Spouse of Disabled Worker) vs BR (Spouse of Retired Worker) codes
+      # Spouse is originally disabled if s_elig_age < elig_age_retired
+      # Spouse is currently disabled if originally disabled AND s_age < s_nra_ind
+      s_is_originally_disabled = !is.na(s_elig_age) & s_elig_age < elig_age_retired,
+      s_is_currently_disabled = s_is_originally_disabled & !is.na(s_age) & !is.na(s_nra_ind) & s_age < s_nra_ind,
+
       bc = case_when(
         # Not yet receiving any benefits (no own, spousal, or survivor benefit)
         wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben <= 0 ~ NA_character_,
 
         # Spouse-only benefit classes (no own worker benefit, only spousal benefit)
-        # BR = Spouse of Retired Worker
-        # BD = Spouse of Disabled Worker (not yet implemented - spouses are always retired in ssmbar)
+        # BD = Spouse of Disabled Worker (spouse is currently disabled, before their NRA)
+        # BR = Spouse of Retired Worker (spouse is retired or has reached their NRA)
         # Note: This occurs when worker has no earnings but receives spousal benefits from spouse's record
+        wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0 & s_is_currently_disabled ~ "BD",
         wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0 ~ "BR",
 
         # Survivor-only benefit classes (no own worker benefit)

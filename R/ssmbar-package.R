@@ -60,10 +60,17 @@ utils::globalVariables(c(
   "survivor_pia", "prelim_survivor_pia", "survivor_ben",
   "effective_widow_claim_age", "actual_widow_claim_age", "w_elig_age_ind", "w_rf", "w_act_factor",
   "spouse_ben_adj", "bc",
+  "surv_s_age", "surv_s_pia", "surv_s_wrk_ben", "surv_s_death_age", "surv_s_claim_age",
 
   # Disabled widow(er) benefit variables
   "is_disabled_widow", "disabled_widow_claim_age", "benefit_start_age",
   "is_originally_disabled", "is_currently_disabled",
+
+  # Spouse disability status variables (for BD/BR benefit class determination)
+  "s_elig_age", "s_is_originally_disabled", "s_is_currently_disabled", "s_yr_62",
+
+  # Tax calculation variables
+  "oasi_tr", "di_tr", "ss_taxable_earn", "oasi_tax", "di_tax", "ss_tax",
 
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",

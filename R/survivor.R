@@ -110,10 +110,11 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
         spouse_df <- spouse_data[[spec]]
 
         # Rename spouse columns for survivor calculations to avoid conflicts
-        # with s_pia from spousal_pia() (when debugg=TRUE)
+        # with s_pia and s_age from spousal_pia()
         spouse_survivor_df <- spouse_df %>%
           select(year, s_age, s_pia, s_wrk_ben, s_death_age, s_claim_age) %>%
           rename(
+            surv_s_age = s_age,
             surv_s_pia = s_pia,
             surv_s_wrk_ben = s_wrk_ben,
             surv_s_death_age = s_death_age,
@@ -125,8 +126,8 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
           left_join(spouse_survivor_df, by = "year")
 
         # Calculate year of spouse's death and worker's age at that time
-        yr_s_death <- .x$year[which(.x$s_age == .x$surv_s_death_age)]
-        .x$worker_age_at_spouse_death <- .x$age[which(.x$s_age == .x$surv_s_death_age)]
+        yr_s_death <- .x$year[which(.x$surv_s_age == .x$surv_s_death_age)]
+        .x$worker_age_at_spouse_death <- .x$age[which(.x$surv_s_age == .x$surv_s_death_age)]
 
         # Copy back to standard column names for output (needed for debug mode)
         .x$s_death_age <- .x$surv_s_death_age

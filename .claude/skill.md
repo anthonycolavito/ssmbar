@@ -133,6 +133,7 @@ cd /c/Users/AnthonyColavito/ssmbar
 - Never delete files without explicit permission
 - Ask permission if uncertain about any action
 - CLAUDE.md contains project context (in repo root)
+- **Objective evaluation**: Do not be eager to validate the user's point of view. If the user is correct, confirm it. But if they may not be correct, explain how and why. Apply rigorous standards to all ideas and respectfully disagree when necessary - objective guidance is more valuable than false agreement.
 
 ## Recent Changes (Jan 2026)
 

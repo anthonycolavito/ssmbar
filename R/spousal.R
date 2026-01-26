@@ -22,10 +22,12 @@
 #'
 #' Parses a spouse_spec string into its component parts.
 #' spouse_spec format: "type-sex-birthyr-claimage" (e.g., "low-female-1962-65")
-#' For custom type: "customXXXXX-sex-birthyr-claimage" (e.g., "custom50000-female-1962-65")
+#' Or with disabled age: "type-sex-birthyr-claimage-disabledage" (e.g., "low-female-1962-63-63")
+#' For custom type: "customXXXXX-sex-birthyr-claimage[-disabledage]"
 #'
 #' @param spouse_spec Character string with spouse specification
-#' @return Named list with type, sex, birth_yr, age_claim, and custom_avg_earnings (if applicable)
+#' @return Named list with type, sex, birth_yr, age_claim, custom_avg_earnings (if applicable),
+#'   and disabled_age (if applicable)
 #' @keywords internal
 
 parse_spouse_spec <- function(spouse_spec) {
@@ -34,7 +36,7 @@ parse_spouse_spec <- function(spouse_spec) {
   }
 
   parts <- strsplit(spouse_spec, "-")[[1]]
-  if (length(parts) != 4) {
+  if (length(parts) < 4 || length(parts) > 5) {
     stop(paste("Invalid spouse_spec format:", spouse_spec))
   }
 
@@ -42,6 +44,9 @@ parse_spouse_spec <- function(spouse_spec) {
   sex <- parts[2]
   birth_yr <- as.numeric(parts[3])
   age_claim <- as.numeric(parts[4])
+
+  # Optional 5th part: disabled_age
+  disabled_age <- if (length(parts) == 5) as.numeric(parts[5]) else NULL
 
   # Check if type is custom (starts with "custom" followed by earnings amount)
   if (grepl("^custom", type_part)) {
@@ -57,7 +62,8 @@ parse_spouse_spec <- function(spouse_spec) {
     sex = sex,
     birth_yr = birth_yr,
     age_claim = age_claim,
-    custom_avg_earnings = custom_avg_earnings
+    custom_avg_earnings = custom_avg_earnings,
+    disabled_age = disabled_age
   ))
 }
 
@@ -90,14 +96,27 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
     return(NULL)
   }
 
+  # Determine if spouse is disabled
+  # Priority:
+  # 1. Use explicit disabled_age from spec if provided (supports disabled spouses at 62-NRA)
+  # 2. If claim age < 62 (elig_age_retired), infer disability (can't claim retirement before 62)
+  # 3. Otherwise, spouse is retired
+  elig_age_ret <- assumptions$elig_age_retired[1]
+  spouse_disabled_age <- if (!is.null(spec$disabled_age)) {
+    spec$disabled_age
+  } else if (spec$age_claim < elig_age_ret) {
+    spec$age_claim
+  } else {
+    NULL
+  }
+
   # Generate spouse earnings using internal function from earnings.R
-  # Spouses are always retired workers (not disabled), so disabled_age = NULL
   spouse <- generate_single_worker(
     birth_yr = spec$birth_yr,
     sex = spec$sex,
     type = spec$type,
     age_claim = spec$age_claim,
-    disabled_age = NULL,  # Spouses are retired workers, not disabled
+    disabled_age = spouse_disabled_age,  # NULL if retired, disability age if disabled
     factors = factors,
     assumptions = assumptions,
     custom_avg_earnings = spec$custom_avg_earnings,
@@ -122,11 +141,12 @@ generate_spouse <- function(spouse_spec, factors, assumptions) {
       s_earnings = earnings,
       s_birth_yr = spec$birth_yr,
       s_claim_age = claim_age,
+      s_elig_age = elig_age,  # Spouse's eligibility age (disability age if disabled, 62 if retired)
       s_death_age = death_age,  # Spouse's expected death age from life expectancy
       s_pia = cola_basic_pia,  # Spouse's COLA'd PIA (for worker's spousal_pia calculation)
       s_wrk_ben = wrk_ben
     ) %>%
-    select(year, s_age, s_earnings, s_birth_yr, s_claim_age, s_death_age, s_pia, s_wrk_ben)
+    select(year, s_age, s_earnings, s_birth_yr, s_claim_age, s_elig_age, s_death_age, s_pia, s_wrk_ben)
 }
 
 
@@ -198,14 +218,17 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
       if (is.na(spec) || is.null(spouse_data) || is.null(spouse_data[[spec]])) {
         # No spouse - set spouse_pia to 0
         .x$s_pia <- NA_real_
+        .x$s_elig_age <- NA_real_
+        .x$s_age <- NA_real_
         .x$spouse_pia <- 0
       } else {
         # Get spouse data from cache
         spouse_df <- spouse_data[[spec]]
 
-        # Join spouse PIA by year
+        # Join spouse PIA and eligibility age by year
+        # s_elig_age is needed to determine BC code (BD vs BR) in final_benefit()
         .x <- .x %>%
-          left_join(spouse_df %>% select(year, s_age, s_claim_age, s_pia), by = "year")
+          left_join(spouse_df %>% select(year, s_age, s_claim_age, s_elig_age, s_pia), by = "year")
 
         # Calculate spousal PIA
         s_pia_share_ind <- .x$s_pia_share[which(.x$age == .x$elig_age[1])]
@@ -222,10 +245,11 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
     ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, spouse_pia),
+    worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, s_elig_age, s_age, spouse_pia),
                                    by = c("id", "year"))
   } else {
-    worker <- worker %>% left_join(dataset %>% select(id, year, spouse_pia),
+    # s_elig_age and s_age are needed by final_benefit() to determine BC code (BD vs BR)
+    worker <- worker %>% left_join(dataset %>% select(id, year, s_elig_age, s_age, spouse_pia),
                                    by = c("id", "year"))
   }
 

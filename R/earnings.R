@@ -26,6 +26,8 @@ MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime
 #' @param spouse_birth_yr Numeric value(s) for the spouse's birth year. Default is NULL.
 #' @param spouse_age_claim Numeric value(s) for the age(s) at which the spouse claims benefits. Default is NULL.
 #' @param spouse_custom_avg_earnings Numeric value(s) for spouse's real average earnings if spouse_type = "custom". Default is NULL.
+#' @param spouse_disabled_age Numeric value(s) for the age(s) at which the spouse becomes disabled. Default is NULL.
+#'   Use this for spouses who become disabled at age 62 or later (up to NRA).
 #' @param debugg Boolean variable used to output additional variables for debugging.
 #'
 #' @return worker Data frame with the earnings of the worker(s), including spouse_spec if spouse is specified.
@@ -58,7 +60,7 @@ MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime
 earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_claim=65, disabled_age=NULL, factors, assumptions,
                                custom_avg_earnings=NULL,
                                spouse_type=NULL, spouse_sex="all", spouse_birth_yr=NULL, spouse_age_claim=NULL,
-                               spouse_custom_avg_earnings=NULL,
+                               spouse_custom_avg_earnings=NULL, spouse_disabled_age=NULL,
                                debugg = FALSE) {
 
   # Determine the number of workers from the longest input vector
@@ -73,7 +75,8 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
     length(spouse_sex),
     length(spouse_birth_yr),
     length(spouse_age_claim),
-    length(spouse_custom_avg_earnings)
+    length(spouse_custom_avg_earnings),
+    length(spouse_disabled_age)
   )
 
   # Helper function to recycle parameters to n_workers length
@@ -100,6 +103,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   spouse_birth_yr_vec <- recycle_param(spouse_birth_yr, n_workers, allow_null = TRUE)
   spouse_age_claim_vec <- recycle_param(spouse_age_claim, n_workers, allow_null = TRUE)
   spouse_custom_avg_earnings_vec <- recycle_param(spouse_custom_avg_earnings, n_workers, allow_null = TRUE)
+  spouse_disabled_age_vec <- recycle_param(spouse_disabled_age, n_workers, allow_null = TRUE)
 
   # Generate each worker and combine
   workers_list <- lapply(seq_len(n_workers), function(i) {
@@ -117,6 +121,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
       spouse_birth_yr = if (is.na(spouse_birth_yr_vec[i])) NULL else spouse_birth_yr_vec[i],
       spouse_age_claim = if (is.na(spouse_age_claim_vec[i])) NULL else spouse_age_claim_vec[i],
       spouse_custom_avg_earnings = if (is.na(spouse_custom_avg_earnings_vec[i])) NULL else spouse_custom_avg_earnings_vec[i],
+      spouse_disabled_age = if (is.na(spouse_disabled_age_vec[i])) NULL else spouse_disabled_age_vec[i],
       debugg = debugg
     )
   })
@@ -159,6 +164,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
                                    custom_avg_earnings = NULL,
                                    spouse_type = NULL, spouse_sex = "all", spouse_birth_yr = NULL,
                                    spouse_age_claim = NULL, spouse_custom_avg_earnings = NULL,
+                                   spouse_disabled_age = NULL,
                                    debugg = FALSE) {
 
   # Validate sex parameter
@@ -168,7 +174,8 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   }
 
   # Validate and construct spouse_spec
-  # spouse_spec encodes spouse info in format: "type-sex-birthyr-claimage" (e.g., "low-female-1962-65")
+  # spouse_spec encodes spouse info in format: "type-sex-birthyr-claimage[-disabledage]"
+  # Examples: "low-female-1962-65" or "low-female-1962-63-63" (disabled at 63)
   # This single variable travels with worker data and is used for on-the-fly spousal PIA calculation
   valid_types <- c("very_low", "low", "medium", "high", "max", "custom")
 
@@ -195,6 +202,10 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
                                   paste0("custom", spouse_custom_avg_earnings),
                                   spouse_type)
     spouse_spec <- paste0(spouse_type_label, "-", spouse_sex, "-", spouse_birth_yr, "-", spouse_age_claim)
+    # Add disabled_age if specified (for disabled spouses claiming at 62-NRA)
+    if (!is.null(spouse_disabled_age) && !is.na(spouse_disabled_age)) {
+      spouse_spec <- paste0(spouse_spec, "-", spouse_disabled_age)
+    }
   } else {
     spouse_spec <- NA_character_
   }
