@@ -328,8 +328,11 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
     # Use worker's elig_age for COLA indexing (disability age for disabled workers, 62 for retired workers)
-    cpi_elig = cpi_w[which(age == first(elig_age))], # CPI-W at worker's eligibility age, used for indexing COLAs
-    cpi_index_factor = pmax(cummax(cpi_w) / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
+    cpi_elig = cpi_w[which(age == first(elig_age) - 1)], # CPI-W at year before worker's eligibility age, used for indexing COLAs
+    cpi_index_factor = pmax(lag(cummax(cpi_w)) / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
+    #COLA's are based on the change in the CPI-W up until the previous year.
+    # For example if you claim in June of 2025. The COLA payable in December of that year will be based
+    # on the percent change in the CPI-W from Q32024 to Q32025.
     cola_basic_pia = floor(basic_pia * cpi_index_factor) # COLA'd PIA at each age, rounded down to the nearest dollar
   ) %>% select(-elig_age_retired) %>% ungroup()
 
