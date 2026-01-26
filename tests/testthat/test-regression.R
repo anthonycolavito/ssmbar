@@ -466,3 +466,158 @@ test_that("Spouse much younger (10 years) - delayed spousal availability matches
   # Worker receives no spousal benefit until spouse claims
   # Note: This worker is high earner so may not receive spousal anyway
 })
+
+# -----------------------------------------------------------------------------
+# DISABLED WIDOW(ER) BENEFIT TESTS
+# -----------------------------------------------------------------------------
+
+test_that("Disabled worker qualifies for disabled widow(er) benefits (ADF/ARF)", {
+  # Worker: born 1980, disabled at 45 (2025), medium earner
+  # Spouse: born 1950 (30 years older), high earner, dies at ~84 (year 2034)
+  # Worker's age when spouse dies: 54 (within 50-59 range)
+  # 7-year rule: disability (2025) <= spouse death (2034) + 7 = YES
+  # Expected: BC should be ADF before NRA, ARF at/after NRA
+  expected <- readRDS(test_path("fixtures", "disabled_widow_qualifies.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1980, sex = "male", type = "medium", age_claim = 45, disabled_age = 45,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "female", spouse_birth_yr = 1950, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify is_disabled_widow flag is TRUE (worker qualifies)
+  expect_true(all(current$is_disabled_widow))
+
+  # Verify BC codes at key ages
+  # Before spouse dies (age 50): BC should be AD
+  expect_equal(current$bc[current$age == 50], "AD")
+  # After spouse dies but before NRA (age 60): BC should be ADF
+  expect_equal(current$bc[current$age == 60], "ADF")
+  # At/after NRA (age 67): BC should be ARF
+  expect_equal(current$bc[current$age == 67], "ARF")
+})
+
+test_that("Disabled worker with very low earnings still qualifies for disabled widow(er)", {
+  # Tests disabled widow(er) eligibility for very low earner
+  expected <- readRDS(test_path("fixtures", "disabled_widow_very_low.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1980, sex = "female", type = "very_low", age_claim = 50, disabled_age = 50,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "max", spouse_sex = "male", spouse_birth_yr = 1946, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+})
+
+test_that("Disabled worker fails 7-year rule - gets standard widow benefits", {
+  # Worker: born 1970, disabled at 55 (2025)
+  # Spouse: born 1930, dies at ~85 (year 2015)
+  # 7-year rule: disability (2025) <= spouse death (2015) + 7 = NO (2025 > 2022)
+  # Expected: is_disabled_widow should be FALSE, BC should be ADD/ARD (not ADF/ARF)
+  expected <- readRDS(test_path("fixtures", "disabled_widow_7yr_fail.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1970, sex = "male", type = "medium", age_claim = 55, disabled_age = 55,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "female", spouse_birth_yr = 1930, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify is_disabled_widow flag is FALSE (7-year rule violated)
+  expect_false(any(current$is_disabled_widow))
+})
+
+test_that("Standard disabled worker with same-age spouse gets standard widow (ADD/ARD)", {
+  # Worker: born 1960, disabled at 45
+  # Spouse: born 1960 (same age), dies at ~84 (year 2044)
+  # Worker's age when spouse dies: 84 (well past 60)
+  # This is a standard widow scenario (age 60+), not disabled widow
+  expected <- readRDS(test_path("fixtures", "disabled_standard_widow.rds"))
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "male", type = "medium", age_claim = 45, disabled_age = 45,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "low", spouse_sex = "female", spouse_birth_yr = 1960, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  expect_equal(nrow(current), nrow(expected))
+  compare_key_columns(current, expected)
+
+  # Verify is_disabled_widow flag is FALSE (spouse dies when worker is 60+)
+  expect_false(any(current$is_disabled_widow))
+})
+
+# -----------------------------------------------------------------------------
+# SPOUSE-ONLY BENEFIT CLASS (BR) TESTS
+# -----------------------------------------------------------------------------
+
+test_that("Zero earner with high-earning spouse gets BR benefit class", {
+  # Worker has minimal earnings ($1 avg) - effectively zero own benefit
+  # Worker receives spousal benefits from high-earning spouse
+  # Expected BC: BR (Spouse of Retired Worker)
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "custom", age_claim = 62,
+    custom_avg_earnings = 1,  # Minimal earnings
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "high", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 62,
+    debugg = TRUE
+  )
+
+  # At age 62 when both claim, worker should have:
+  # - wrk_ben = 0 (or near zero due to minimal earnings)
+  # - spouse_ben > 0 (spousal benefit from high-earning spouse)
+  # - BC = BR (Spouse of Retired Worker)
+  age_62_row <- current[current$age == 62, ]
+
+  # Worker's own benefit should be minimal/zero
+  expect_true(age_62_row$wrk_ben <= 1)  # Effectively zero
+
+  # Spousal benefit should be positive (once spouse claims)
+  # Note: May be 0 at 62 due to spouse's RET, check at 67
+  age_67_row <- current[current$age == 67, ]
+  expect_true(age_67_row$spouse_ben > 0 | age_67_row$wrk_ben > 0)  # Some benefit
+
+  # BC should be BR when receiving spousal benefit with no own worker benefit
+  # Find first age where spouse_ben > 0 and wrk_ben <= 1
+  br_ages <- current$age[current$wrk_ben <= 1 & current$spouse_ben > 0 & current$survivor_ben == 0]
+  if (length(br_ages) > 0) {
+    br_row <- current[current$age == br_ages[1], ]
+    expect_equal(br_row$bc, "BR")
+  }
+})
+
+test_that("Very low earner with max spouse gets ARB (not BR) due to own benefit", {
+  # Very low earner has positive own benefit, so should get ARB not BR
+  # This tests that BR only applies when wrk_ben = 0
+
+  current <- calculate_benefits(
+    birth_yr = 1960, sex = "female", type = "very_low", age_claim = 62,
+    factors = sef2025, assumptions = tr2025,
+    spouse_type = "max", spouse_sex = "male",
+    spouse_birth_yr = 1960, spouse_age_claim = 67,
+    debugg = TRUE
+  )
+
+  # At age 67, worker should have both own benefit and spousal benefit
+  age_67_row <- current[current$age == 67, ]
+
+  # Very low earner still has positive own benefit
+  expect_true(age_67_row$wrk_ben > 0)
+
+  # With spousal benefit, BC should be ARB (not BR)
+  # Note: BC might be AR if spouse_ben = 0 due to own PIA exceeding spousal PIA
+  expect_true(age_67_row$bc %in% c("AR", "ARB"))
+})

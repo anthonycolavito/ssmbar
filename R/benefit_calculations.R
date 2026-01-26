@@ -443,6 +443,7 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'   \item \strong{ADB}: Disabled Worker dually entitled to a Spouse benefit
 #'   \item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
 #'   \item \strong{ADF}: Disabled Worker dually entitled to a Disabled Widow(er) benefit
+#'   \item \strong{BR}: Spouse of Retired Worker (no own worker benefit, only spousal benefit)
 #'   \item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
 #'   \item \strong{F}: Disabled Widow(er) only (not dually entitled to own worker benefit)
 #' }
@@ -450,8 +451,8 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #' Note: Disabled workers (AD*) transition to retired workers (AR*) at Normal Retirement Age.
 #' This affects only the benefit class code, not the benefit amount.
 #'
-#' Benefit classes not currently implemented in ssmbar include: BR, BD (Spouse of Worker),
-#' E (other Survivor-only), and CR, CD, CS (Child benefits).
+#' Benefit classes not currently implemented in ssmbar include: BD (Spouse of Disabled Worker -
+#' requires supporting disabled spouses), E (other Survivor-only), and CR, CD, CS (Child benefits).
 #'
 #' @seealso SSA BEPUF User Guide for complete benefit class definitions
 #'
@@ -542,8 +543,14 @@ final_benefit <- function(worker, debugg = FALSE) {
       is_currently_disabled = is_originally_disabled & age < nra_ind,
 
       bc = case_when(
-        # Not yet receiving any benefits
-        wrk_ben <= 0 & survivor_ben <= 0 ~ NA_character_,
+        # Not yet receiving any benefits (no own, spousal, or survivor benefit)
+        wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben <= 0 ~ NA_character_,
+
+        # Spouse-only benefit classes (no own worker benefit, only spousal benefit)
+        # BR = Spouse of Retired Worker
+        # BD = Spouse of Disabled Worker (not yet implemented - spouses are always retired in ssmbar)
+        # Note: This occurs when worker has no earnings but receives spousal benefits from spouse's record
+        wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0 ~ "BR",
 
         # Survivor-only benefit classes (no own worker benefit)
         # F = Disabled Widow(er) only

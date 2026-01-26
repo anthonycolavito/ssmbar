@@ -785,6 +785,7 @@ Added Composite Benefit Class (`bc`) column to `final_benefit()` following the S
 | ADB | Disabled Worker dually entitled to Spouse benefit |
 | ADD | Disabled Worker dually entitled to Widow(er) benefit |
 | ADF | Disabled Worker dually entitled to Disabled Widow(er) benefit |
+| BR | Spouse of Retired Worker (no own worker benefit, only spousal benefit) |
 | D | Widow(er) only (no own worker benefit) |
 | F | Disabled Widow(er) only (no own worker benefit) |
 
@@ -798,7 +799,7 @@ Added Composite Benefit Class (`bc`) column to `final_benefit()` following the S
 - Added `bc` to globalVariables in ssmbar-package.R
 - Documentation updated with BEPUF reference and supported classes
 
-**Not yet implemented:** BR, BD (Spouse of Worker), E (other Survivor-only), CR, CD, CS (Child benefits)
+**Not yet implemented:** BD (Spouse of Disabled Worker - requires disabled spouse support), E (other Survivor-only), CR, CD, CS (Child benefits)
 
 **Commit:** 3ef82ce "Add benefit class (bc) column to final_benefit()"
 
@@ -848,7 +849,25 @@ Added disabled widow(er) benefits (BC codes F, ADF, ARF) following SSA rules.
 - SSA Handbook Section 401.1: Disabled widow(er) eligibility
 - POMS RS 00615.301: Widow(er) benefit reductions
 
-**Tests:** All 289 tests passing
+**Tests:** All 331 tests passing (42 new disabled widow(er) tests added)
+
+**BR (Spouse of Retired Worker) Benefit Class Fix** - Completed 2026-01-25
+
+Fixed bug where workers with no own earnings but receiving spousal benefits were
+incorrectly assigned BC = NA instead of BR.
+
+**Issue:** The BC logic checked `wrk_ben <= 0 & survivor_ben <= 0` for NA, but didn't
+check `spouse_ben_adj`. Workers with `wrk_ben = 0`, `survivor_ben = 0`, `spouse_ben_adj > 0`
+were incorrectly classified as NA instead of BR.
+
+**Fix:**
+- Changed NA condition to: `wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben <= 0`
+- Added BR for: `wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0`
+
+**Note:** BD (Spouse of Disabled Worker) is not yet implemented because spouses in
+ssmbar are always retired workers (`disabled_age = NULL` in `generate_spouse()`).
+
+**Tests:** All 336 tests passing (5 new BR tests added)
 
 ---
 

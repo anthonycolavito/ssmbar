@@ -102,4 +102,23 @@ baseline_medium_early_both <- calculate_benefits(
 saveRDS(baseline_medium_early_both, "tests/testthat/fixtures/medium_early_62_medium_spouse_62.rds")
 cat("Created medium_early_62_medium_spouse_62.rds\n")
 
-cat("\nAll 9 baseline test cases generated successfully!\n")
+# ============================================================================
+# BR (Spouse of Retired Worker) test case (added 2026-01-25)
+# This tests the scenario where a worker has no own earnings but receives
+# spousal benefits based on their spouse's record.
+# ============================================================================
+
+# Test case 10: Zero earner with high-earning spouse (BR benefit class)
+# Worker has $1 average earnings (effectively zero) to test BR classification
+baseline_zero_with_spouse <- calculate_benefits(
+  birth_yr = 1960, sex = "female", type = "custom", age_claim = 62,
+  custom_avg_earnings = 1,  # Minimal earnings to avoid division by zero
+  factors = sef2025, assumptions = tr2025,
+  spouse_type = "high", spouse_sex = "male",
+  spouse_birth_yr = 1960, spouse_age_claim = 62,
+  debugg = TRUE
+)
+saveRDS(baseline_zero_with_spouse, "tests/testthat/fixtures/zero_earner_high_spouse_br.rds")
+cat("Created zero_earner_high_spouse_br.rds\n")
+
+cat("\nAll 10 baseline test cases generated successfully!\n")
