@@ -26,10 +26,20 @@ is NULL and workers have spouse_spec for on-the-fly generation.}
 \item{debugg}{Boolean value that directs function to output additional variables if set to true}
 }
 \value{
-worker Dataframe with survivor_pia and worker_age_at_spouse_death by age
+worker Dataframe with survivor_pia, worker_age_at_spouse_death, and
+is_disabled_widow (flag for disabled widow(er) status) by age
 }
 \description{
 Function for computing a worker's survivor PIA based on their deceased spouse's
 earnings record. The survivor benefit is payable after the spouse dies, starting
-at the later of age 60 or the spouse's death.
+at the later of age 60 or the spouse's death (or age 50 for disabled widow(er)s).
+}
+\details{
+Disabled widow(er) benefits are available to disabled workers who meet all criteria:
+\itemize{
+\item Worker is disabled (elig_age < elig_age_retired)
+\item Worker is between ages 50-59 (60+ qualifies for standard widow benefits)
+\item Spouse has died and had a PIA
+\item Disability occurred no more than 7 years after spouse's death
+}
 }

@@ -780,22 +780,75 @@ Added Composite Benefit Class (`bc`) column to `final_benefit()` following the S
 | AR | Retired Worker (not dually entitled) |
 | ARB | Retired Worker dually entitled to Spouse benefit |
 | ARD | Retired Worker dually entitled to Widow(er) benefit |
+| ARF | Retired Worker dually entitled to Disabled Widow(er) benefit |
 | AD | Disabled Worker (not dually entitled) |
 | ADB | Disabled Worker dually entitled to Spouse benefit |
 | ADD | Disabled Worker dually entitled to Widow(er) benefit |
+| ADF | Disabled Worker dually entitled to Disabled Widow(er) benefit |
 | D | Widow(er) only (no own worker benefit) |
+| F | Disabled Widow(er) only (no own worker benefit) |
 
 **Implementation details:**
 - `bc` column added to `final_benefit()` output
 - Classification logic uses `elig_age` vs `elig_age_retired` to distinguish disabled vs retired
+- Disabled workers (AD*) transition to retired workers (AR*) at NRA
 - Dual entitlement determined by `spouse_ben_adj > 0` (spousal) or `survivor_ben > 0` (widow/widower)
+- `is_disabled_widow` flag distinguishes disabled widow(er) from standard widow(er) benefits
 - NA when not yet receiving benefits (wrk_ben <= 0 AND survivor_ben <= 0)
 - Added `bc` to globalVariables in ssmbar-package.R
 - Documentation updated with BEPUF reference and supported classes
 
-**Not yet implemented:** BR, BD (Spouse of Worker), E, F (other Survivor-only), CR, CD, CS (Child benefits)
+**Not yet implemented:** BR, BD (Spouse of Worker), E (other Survivor-only), CR, CD, CS (Child benefits)
 
 **Commit:** 3ef82ce "Add benefit class (bc) column to final_benefit()"
+
+**Disabled Widow(er) Benefits Implementation** - Completed 2026-01-25
+
+Added disabled widow(er) benefits (BC codes F, ADF, ARF) following SSA rules.
+
+**Eligibility Requirements (ALL must be met):**
+1. Worker is disabled (`disabled_age` is NOT null, i.e., `elig_age < elig_age_retired`)
+2. Worker is between ages 50-59 at time of first claiming (60+ qualifies for standard widow benefits)
+3. Spouse has died and had a PIA
+4. Disability occurred no more than 7 years after spouse's death
+
+**Key Rules:**
+- Actuarial reduction calculated as if claiming at age 60, regardless of actual claim age (50-59)
+- All disabled widow(er)s receive the same reduction factor as a non-disabled widow claiming at 60
+- Benefit starts at the latest of: age 50, disability onset, spouse's death
+- BC code does NOT change at age 60 - once a disabled widow(er), always classified as such
+- Disabled workers transition from AD* to AR* at NRA (affects BC code only, not benefit amount)
+
+**Benefit Classes Added:**
+- `F`: Disabled Widow(er) only (no own worker benefit)
+- `ADF`: Disabled Worker dually entitled to Disabled Widow(er) benefit (before NRA)
+- `ARF`: Retired Worker dually entitled to Disabled Widow(er) benefit (at/after NRA)
+
+**Implementation Details:**
+- Modified `widow_pia()` in survivor.R:
+  - Added `is_disabled_widow` flag output (constant for all ages once qualified)
+  - Lowered eligibility age to 50 for qualifying disabled workers
+  - Added 7-year rule check: `(birth_yr + elig_age) <= yr_s_death + 7`
+- Modified `widow_benefit()` in survivor.R:
+  - Uses age 60 for actuarial factor calculation for disabled widow(er)s
+  - Benefit starts at `pmax(50, elig_age, worker_age_at_spouse_death)`
+  - Added `actual_widow_claim_age`, `effective_widow_claim_age`, `benefit_start_age` columns
+- Modified `final_benefit()` in benefit_calculations.R:
+  - Added `is_originally_disabled` and `is_currently_disabled` flags
+  - Disabled workers transition to retired at NRA: `age >= nra_ind`
+  - Added BC codes F, ADF, ARF for disabled widow(er) benefits
+- Added new globalVariables: `is_disabled_widow`, `disabled_widow_claim_age`, `benefit_start_age`,
+  `actual_widow_claim_age`, `is_originally_disabled`, `is_currently_disabled`
+
+**Scope Limitation (documented):**
+- Disabled workers are assumed to remain disabled for the remainder of their life
+- Disability recovery scenario is outside the current implementation scope
+
+**SSA References:**
+- SSA Handbook Section 401.1: Disabled widow(er) eligibility
+- POMS RS 00615.301: Widow(er) benefit reductions
+
+**Tests:** All 289 tests passing
 
 ---
 

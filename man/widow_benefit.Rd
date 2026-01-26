@@ -18,4 +18,6 @@ worker Dataframe with a worker's survivor benefit by age
 }
 \description{
 Function that calculates a widow's benefit based on the deceased spouse's earnings record.
+For disabled widow(er)s (age 50-59), the actuarial reduction is calculated as if they
+claimed at age 60, per SSA rules.
 }

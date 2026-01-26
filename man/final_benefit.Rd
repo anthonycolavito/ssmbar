@@ -12,9 +12,35 @@ final_benefit(worker, debugg = FALSE)
 \item{debugg}{Boolean value that directs function to output additional variables if set to true}
 }
 \value{
-worker Dataframe with a worker's final monthly benefit by age
+worker Dataframe with a worker's final monthly benefit by age and benefit class (bc)
 }
 \description{
 Function that calculates a worker's total retirement benefit combining
-retired worker, spousal, and survivor benefits.
+retired worker, spousal, and survivor benefits. Also assigns the Composite
+Benefit Class (bc) indicator following the SSA BEPUF classification.
+}
+\details{
+The Composite Benefit Class (bc) follows the SSA Benefits and Earnings Public-Use File
+(BEPUF) classification system. Currently supported benefit classes are:
+\itemize{
+\item \strong{AR}: Retired Worker (not dually entitled)
+\item \strong{ARB}: Retired Worker dually entitled to a Spouse benefit
+\item \strong{ARD}: Retired Worker dually entitled to a Widow(er) benefit
+\item \strong{ARF}: Retired Worker dually entitled to a Disabled Widow(er) benefit
+\item \strong{AD}: Disabled Worker (not dually entitled)
+\item \strong{ADB}: Disabled Worker dually entitled to a Spouse benefit
+\item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
+\item \strong{ADF}: Disabled Worker dually entitled to a Disabled Widow(er) benefit
+\item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
+\item \strong{F}: Disabled Widow(er) only (not dually entitled to own worker benefit)
+}
+
+Note: Disabled workers (AD*) transition to retired workers (AR*) at Normal Retirement Age.
+This affects only the benefit class code, not the benefit amount.
+
+Benefit classes not currently implemented in ssmbar include: BR, BD (Spouse of Worker),
+E (other Survivor-only), and CR, CD, CS (Child benefits).
+}
+\seealso{
+SSA BEPUF User Guide for complete benefit class definitions
 }

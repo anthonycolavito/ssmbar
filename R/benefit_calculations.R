@@ -438,14 +438,20 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'   \item \strong{AR}: Retired Worker (not dually entitled)
 #'   \item \strong{ARB}: Retired Worker dually entitled to a Spouse benefit
 #'   \item \strong{ARD}: Retired Worker dually entitled to a Widow(er) benefit
+#'   \item \strong{ARF}: Retired Worker dually entitled to a Disabled Widow(er) benefit
 #'   \item \strong{AD}: Disabled Worker (not dually entitled)
 #'   \item \strong{ADB}: Disabled Worker dually entitled to a Spouse benefit
 #'   \item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
+#'   \item \strong{ADF}: Disabled Worker dually entitled to a Disabled Widow(er) benefit
 #'   \item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
+#'   \item \strong{F}: Disabled Widow(er) only (not dually entitled to own worker benefit)
 #' }
 #'
+#' Note: Disabled workers (AD*) transition to retired workers (AR*) at Normal Retirement Age.
+#' This affects only the benefit class code, not the benefit amount.
+#'
 #' Benefit classes not currently implemented in ssmbar include: BR, BD (Spouse of Worker),
-#' E, F (other Survivor-only), and CR, CD, CS (Child benefits).
+#' E (other Survivor-only), and CR, CD, CS (Child benefits).
 #'
 #' @seealso SSA BEPUF User Guide for complete benefit class definitions
 #'
@@ -485,7 +491,25 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker$elig_age_retired <- 62
   }
 
+  # Handle case where is_disabled_widow column doesn't exist (backwards compatibility)
+  if (!"is_disabled_widow" %in% names(worker)) {
+    worker$is_disabled_widow <- FALSE
+  }
+
+  # Handle case where nra column doesn't exist (backwards compatibility)
+  # Default to 67 if not present
+  if (!"nra" %in% names(worker)) {
+    worker$nra <- 67
+  }
+
   dataset <- worker %>%
+    group_by(id) %>%
+    mutate(
+      # Get worker's individual NRA (based on birth cohort)
+      yr_62 = year - age + 62,
+      nra_ind = nra[which(year == yr_62)][1]
+    ) %>%
+    ungroup() %>%
     mutate(
       # Zero out spousal benefit after spouse dies - survivor benefit takes over
       # Spousal benefits require the spouse to be alive
@@ -501,25 +525,50 @@ final_benefit <- function(worker, debugg = FALSE) {
       # See: SSA Benefits and Earnings Public-Use File User Guide
       #
       # Logic:
-      # - Disabled worker: elig_age < elig_age_retired (claimed before age 62)
-      # - Retired worker: elig_age >= elig_age_retired
-      # - Dually entitled to Spouse: spouse_ben_adj > 0 (and > survivor_ben)
-      # - Dually entitled to Widow(er): survivor_ben > 0 (and survivor_ben >= spouse_ben_adj)
+      # - Originally disabled: elig_age < elig_age_retired
+      # - Currently disabled (before NRA): elig_age < elig_age_retired AND age < nra_ind
+      # - Now retired (at/after NRA): age >= nra_ind (regardless of original elig_age)
+      # - Disabled widow(er): is_disabled_widow = TRUE (survivor benefit claimed at 50-59)
+      # - Standard widow(er): survivor_ben > 0 AND is_disabled_widow = FALSE
+      # - Dually entitled to Spouse: spouse_ben_adj > 0 (and >= survivor_ben)
+      # - Dually entitled to Widow(er): survivor_ben > 0 (and > spouse_ben_adj)
+      #
+      # Note: Disabled workers transition to retired workers at NRA per SSA rules.
+      # This affects only the BC code, not the benefit amount.
+
+      # Determine if worker is currently classified as disabled or retired
+      # Originally disabled (elig_age < 62) but transitions to retired at NRA
+      is_originally_disabled = elig_age < elig_age_retired,
+      is_currently_disabled = is_originally_disabled & age < nra_ind,
+
       bc = case_when(
         # Not yet receiving any benefits
         wrk_ben <= 0 & survivor_ben <= 0 ~ NA_character_,
 
-        # Widow(er) only - no own worker benefit but receiving survivor benefit
+        # Survivor-only benefit classes (no own worker benefit)
+        # F = Disabled Widow(er) only
+        # D = Standard Widow(er) only
+        wrk_ben <= 0 & survivor_ben > 0 & is_disabled_widow ~ "F",
         wrk_ben <= 0 & survivor_ben > 0 ~ "D",
 
-        # Disabled worker benefit classes (AD*)
-        elig_age < elig_age_retired & spouse_ben_adj > 0 & spouse_ben_adj >= survivor_ben ~ "ADB",
-        elig_age < elig_age_retired & survivor_ben > 0 ~ "ADD",
-        elig_age < elig_age_retired ~ "AD",
+        # Disabled worker benefit classes (AD*) - before NRA
+        # ADF = Disabled Worker + Disabled Widow(er) benefit
+        # ADD = Disabled Worker + Standard Widow(er) benefit
+        # ADB = Disabled Worker + Spouse benefit
+        # AD  = Disabled Worker only
+        is_currently_disabled & survivor_ben > 0 & survivor_ben > spouse_ben_adj & is_disabled_widow ~ "ADF",
+        is_currently_disabled & survivor_ben > 0 & survivor_ben > spouse_ben_adj ~ "ADD",
+        is_currently_disabled & spouse_ben_adj > 0 ~ "ADB",
+        is_currently_disabled ~ "AD",
 
-        # Retired worker benefit classes (AR*)
-        elig_age >= elig_age_retired & spouse_ben_adj > 0 & spouse_ben_adj >= survivor_ben ~ "ARB",
-        elig_age >= elig_age_retired & survivor_ben > 0 ~ "ARD",
+        # Retired worker benefit classes (AR*) - at/after NRA or originally retired
+        # ARF = Retired Worker + Disabled Widow(er) benefit
+        # ARD = Retired Worker + Standard Widow(er) benefit
+        # ARB = Retired Worker + Spouse benefit
+        # AR  = Retired Worker only
+        survivor_ben > 0 & survivor_ben > spouse_ben_adj & is_disabled_widow ~ "ARF",
+        survivor_ben > 0 & survivor_ben > spouse_ben_adj ~ "ARD",
+        spouse_ben_adj > 0 ~ "ARB",
         TRUE ~ "AR"
       )
     )
