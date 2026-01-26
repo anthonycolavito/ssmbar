@@ -32,7 +32,6 @@
 #'
 #' @keywords internal
 join_all_assumptions <- function(worker, assumptions) {
-  # TODO: Document - explain performance optimization rationale for pre-joining all columns
   # All columns needed by the benefit calculation pipeline
   # - aime: awi, taxmax, qc_rec, qc_required, max_qc_per_year, max_dropout_years, min_comp_period, index_age_offset
   # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired
@@ -96,7 +95,6 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, drc_max_months = 36) {
   dist_from_nra <- (claim_age - nra) * 12 # Distance from Normal Retirement Age in months
 
   # Calculate reduction factors
-  # TODO: Document - add worked example showing RF calculation for specific claim ages
   rf_amt <- if_else(dist_from_nra >= 0, 0, # If claiming at or above NRA, no RFs
                    if_else(dist_from_nra <= -36, (-36*rf1) + (pmax(-24,(dist_from_nra + 36))*rf2), # If claiming more than three years before NRA
                           dist_from_nra * rf1)) # If claiming less than three years before NRA
@@ -190,7 +188,7 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       comp_period <- .x$comp_period # Worker's computation (or, averaging) period
       age_eligible <- .x$age >= .x$elig_age # Worker's eligibility age (age 62 for retirement, age of disability, or age of death of deceased spouse)
 
-      # TODO: Document - explain AIME loop optimization strategy and partial sort algorithm
+      #AIME is equal to the average monthly earnings of the hightest earnings years in the computation period (typically 35, as for retired worker beneficiaries)
       for (i in seq_len(n)) {
         if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) { #Only calculates AIME if worker has enough QCs and is at or past their eligiblity age.
           years_to_use <- min(i, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
@@ -573,7 +571,8 @@ final_benefit <- function(worker, debugg = FALSE) {
       s_is_originally_disabled = !is.na(s_elig_age) & s_elig_age < elig_age_retired,
       s_is_currently_disabled = s_is_originally_disabled & !is.na(s_age) & !is.na(s_nra_ind) & s_age < s_nra_ind,
 
-      # TODO: Document - add reference to SSA BEPUF User Guide for complete BC classification system
+      # Benefit Class indicator is defined so as to match the BC codes in SSA's 2020 BEPUF files
+      # https://www.ssa.gov/policy/docs/microdata/bepuf-2020/index.html
       bc = case_when(
         # Not yet receiving any benefits (no own, spousal, or survivor benefit)
         wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben <= 0 ~ NA_character_,
