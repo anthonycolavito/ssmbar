@@ -116,6 +116,15 @@ lifetime_server <- function(id, worker_data) {
       primary <- data$primary
       assumptions <- data$assumptions
 
+      # Debug: Check required columns
+      req_cols <- c("id", "year", "age", "annual_ind", "earnings", "claim_age", "death_age")
+      missing_cols <- req_cols[!req_cols %in% names(primary)]
+
+      if (length(missing_cols) > 0) {
+        message("Lifetime module - Missing columns: ", paste(missing_cols, collapse = ", "))
+        return(NULL)
+      }
+
       tryCatch({
         # Calculate PV of benefits
         pv_ben <- pv_lifetime_benefits(primary, assumptions, discount_to_age = 65)
@@ -145,6 +154,7 @@ lifetime_server <- function(id, worker_data) {
           pv_benefit_earnings_ratio = pv_benefit_earnings_ratio(pv_ben$pv_benefits[1], pv_earn$pv_earnings[1])
         )
       }, error = function(e) {
+        message("Lifetime module error: ", e$message)
         NULL
       })
     })
