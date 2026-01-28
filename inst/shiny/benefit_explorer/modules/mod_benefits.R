@@ -154,7 +154,7 @@ benefits_server <- function(id, worker_data) {
                                       color = scenario, group = scenario)) +
         geom_line(linewidth = 1.2) +
         geom_point(aes(shape = bc_label), size = 2.5, alpha = 0.8) +
-        scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0, 0.1))) +
+        scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0.05, 0.1))) +
         scale_color_manual(values = CHART_COLORS) +
         scale_shape_manual(
           values = c("AR" = 16, "ARB" = 17, "ARD" = 15, "ARF" = 18,
