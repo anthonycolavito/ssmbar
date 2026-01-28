@@ -85,9 +85,14 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
     stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
-  # Join df from assumptions
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, df), by = "year")
+
+  # Join df from assumptions if not already present
+  if (!"df" %in% names(worker)) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, df), by = "year")
+  } else {
+    dataset <- worker
+  }
 
   # Calculate PV of lifetime benefits
   # Only include benefits from claim_age to death_age (no benefits after death)
@@ -185,9 +190,13 @@ pv_lifetime_taxes <- function(worker, assumptions, discount_to_age = 65,
   # Calculate taxes using existing function
   worker_with_taxes <- calculate_taxes(worker, assumptions)
 
-  # Join df from assumptions
-  dataset <- worker_with_taxes %>%
-    left_join(assumptions %>% select(year, df), by = "year")
+  # Join df from assumptions if not already present
+  if (!"df" %in% names(worker_with_taxes)) {
+    dataset <- worker_with_taxes %>%
+      left_join(assumptions %>% select(year, df), by = "year")
+  } else {
+    dataset <- worker_with_taxes
+  }
 
   # Calculate PV of lifetime taxes (ages 21-64)
   result <- dataset %>%
@@ -479,9 +488,13 @@ real_lifetime_benefits <- function(worker, assumptions, base_year = 2025) {
     stop(paste("base_year", base_year, "not found in assumptions"))
   }
 
-  # Join gdp_pi from assumptions
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, gdp_pi), by = "year")
+  # Join gdp_pi from assumptions if not already present
+  if (!"gdp_pi" %in% names(worker)) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, gdp_pi), by = "year")
+  } else {
+    dataset <- worker
+  }
 
   # Calculate real lifetime benefits
   result <- dataset %>%
@@ -561,9 +574,13 @@ real_lifetime_earnings <- function(worker, assumptions, base_year = 2025) {
     stop(paste("base_year", base_year, "not found in assumptions"))
   }
 
-  # Join gdp_pi from assumptions
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, gdp_pi), by = "year")
+  # Join gdp_pi from assumptions if not already present
+  if (!"gdp_pi" %in% names(worker)) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, gdp_pi), by = "year")
+  } else {
+    dataset <- worker
+  }
 
   # Calculate real lifetime earnings
   result <- dataset %>%
@@ -639,9 +656,13 @@ pv_lifetime_earnings <- function(worker, assumptions, discount_to_age = 65) {
     stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
-  # Join df from assumptions
-  dataset <- worker %>%
-    left_join(assumptions %>% select(year, df), by = "year")
+  # Join df from assumptions if not already present
+  if (!"df" %in% names(worker)) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, df), by = "year")
+  } else {
+    dataset <- worker
+  }
 
   # Calculate PV of lifetime earnings (ages 21-64)
   result <- dataset %>%
