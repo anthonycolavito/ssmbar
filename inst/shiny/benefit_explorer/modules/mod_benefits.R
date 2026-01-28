@@ -66,8 +66,13 @@ benefits_server <- function(id, worker_data) {
       # Calculate real benefits (deflated to 2025 dollars using GDP price index)
       gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
 
+      # Join gdp_pi if not already present (may exist from join_all_assumptions)
+      if (!"gdp_pi" %in% names(primary)) {
+        primary <- primary %>%
+          left_join(assumptions %>% select(year, gdp_pi), by = "year")
+      }
+
       primary <- primary %>%
-        left_join(assumptions %>% select(year, gdp_pi), by = "year") %>%
         mutate(
           annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
           annual_nominal = annual_ind
@@ -75,8 +80,15 @@ benefits_server <- function(id, worker_data) {
 
       # Add comparison scenarios if available
       if (!is.null(data$comparisons)) {
-        comparisons <- data$comparisons %>%
-          left_join(assumptions %>% select(year, gdp_pi), by = "year") %>%
+        comparisons <- data$comparisons
+
+        # Join gdp_pi if not already present
+        if (!"gdp_pi" %in% names(comparisons)) {
+          comparisons <- comparisons %>%
+            left_join(assumptions %>% select(year, gdp_pi), by = "year")
+        }
+
+        comparisons <- comparisons %>%
           mutate(
             annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
             annual_nominal = annual_ind
