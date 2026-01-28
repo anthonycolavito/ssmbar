@@ -245,7 +245,9 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
     round(assumptions$le_f[which(assumptions$year == birth_yr + 65)])
   }
   else {
-    round(mean(assumptions$le_m[which(assumptions$year == birth_yr + 65)], assumptions$le_f[which(assumptions$year == birth_yr + 65)]))
+    # Average of male and female life expectancy for sex = "all"
+    round(mean(c(assumptions$le_m[which(assumptions$year == birth_yr + 65)],
+                 assumptions$le_f[which(assumptions$year == birth_yr + 65)])))
   }
 
   worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age,
