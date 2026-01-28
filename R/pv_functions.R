@@ -93,12 +93,15 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
   # Only include benefits from claim_age to death_age (no benefits after death)
   result <- dataset %>%
     group_by(id) %>%
-    filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
     mutate(
-      # Get discount factor at the normalization age
+      # Get discount factor at the normalization age BEFORE filtering
+      # (so we can access df at age 65 even when filtering to claim_age+)
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      df_norm = df[which(year == discount_year)][1],
+      df_norm = df[which(year == discount_year)][1]
+    ) %>%
+    filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
+    mutate(
       # Discount benefits to the normalization age
       # PV = benefit * (df_norm / df_year) since higher df = further future
       pv_factor = df_norm / df,
@@ -189,12 +192,15 @@ pv_lifetime_taxes <- function(worker, assumptions, discount_to_age = 65,
   # Calculate PV of lifetime taxes (ages 21-64)
   result <- dataset %>%
     group_by(id) %>%
-    filter(age >= 21 & age <= 64) %>%
     mutate(
-      # Get discount factor at the normalization age
+      # Get discount factor at the normalization age BEFORE filtering
+      # (so we can access df at age 65 even when filtering to ages 21-64)
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      df_norm = df[which(year == discount_year)][1],
+      df_norm = df[which(year == discount_year)][1]
+    ) %>%
+    filter(age >= 21 & age <= 64) %>%
+    mutate(
       # Discount taxes to the normalization age
       pv_factor = df_norm / df,
       # Apply employer multiplier if requested
