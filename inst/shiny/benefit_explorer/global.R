@@ -60,38 +60,69 @@ CRFB_PURPLE <- "#2A368A"
 CRFB_TEAL <- "#0A81A8"
 CRFB_GRAY <- "#666666"
 
-# Theme configuration
+# Dark mode colors
+DARK_BG <- "#1a1a2e"
+DARK_CARD <- "#16213e"
+DARK_TEXT <- "#e8e8e8"
+DARK_MUTED <- "#a0a0a0"
+
+# Theme configuration - Dark mode with CRFB accents
 app_theme <- bs_theme(
-  bootswatch = "flatly",
-  primary = CRFB_DARK_BLUE,
+  bg = DARK_BG,
+  fg = DARK_TEXT,
+  primary = CRFB_LIGHT_BLUE,
   secondary = CRFB_GRAY,
   success = CRFB_TEAL,
   info = CRFB_LIGHT_BLUE,
   warning = CRFB_ORANGE,
   danger = CRFB_RED,
+  base_font = font_google("Open Sans"),
   font_scale = 0.95,
   `enable-rounded` = TRUE
-)
+) |>
+  bs_add_rules("
+    .card { background-color: #16213e; border: 1px solid #2a3f5f; }
+    .card-header { background-color: #1f3460 !important; border-bottom: 1px solid #2a3f5f; }
+    .card-header.bg-primary { background-color: #003477 !important; }
+    .card-header.bg-success { background-color: #0A81A8 !important; }
+    .card-header.bg-danger { background-color: #EE3224 !important; }
+    .card-header.bg-info { background-color: #2A368A !important; }
+    .card-header.bg-secondary { background-color: #444444 !important; }
+    .form-control, .form-select { background-color: #1f3460; border-color: #2a3f5f; color: #e8e8e8; }
+    .form-control:focus, .form-select:focus { background-color: #1f3460; color: #e8e8e8; }
+    .btn-primary { background-color: #F36107; border-color: #F36107; }
+    .btn-primary:hover { background-color: #d45506; border-color: #d45506; }
+    .text-muted { color: #a0a0a0 !important; }
+    .nav-tabs .nav-link { color: #a0a0a0; }
+    .nav-tabs .nav-link.active { background-color: #16213e; color: #9ACDFF; border-color: #2a3f5f #2a3f5f #16213e; }
+  ")
 
-# Chart theme for ggplot
+# Chart theme for ggplot - Dark mode
 chart_theme <- theme_minimal(base_size = 12) +
   theme(
-    plot.title = element_text(face = "bold", size = 14, color = CRFB_DARK_BLUE),
-    plot.subtitle = element_text(color = CRFB_GRAY),
-    legend.position = "bottom",
+    plot.background = element_rect(fill = DARK_CARD, color = NA),
+    panel.background = element_rect(fill = DARK_CARD, color = NA),
+    plot.title = element_text(face = "bold", size = 14, color = CRFB_LIGHT_BLUE),
+    plot.subtitle = element_text(color = DARK_MUTED, size = 10),
+    legend.position = "right",
+    legend.background = element_rect(fill = DARK_CARD, color = NA),
+    legend.text = element_text(color = DARK_TEXT, size = 9),
+    legend.title = element_text(color = CRFB_LIGHT_BLUE, size = 10),
+    legend.key = element_rect(fill = DARK_CARD, color = NA),
+    panel.grid.major = element_line(color = "#2a3f5f", linewidth = 0.3),
     panel.grid.minor = element_blank(),
-    axis.title = element_text(size = 11, color = CRFB_GRAY),
-    axis.text = element_text(size = 10, color = CRFB_GRAY)
+    axis.title = element_text(size = 11, color = DARK_MUTED),
+    axis.text = element_text(size = 10, color = DARK_MUTED)
   )
 
-# Color palette for charts (CRFB brand colors)
+# Color palette for charts (bright colors for dark background)
 CHART_COLORS <- c(
-  CRFB_DARK_BLUE,  # Primary - CRFB Dark Blue
+  CRFB_LIGHT_BLUE, # Primary - Light Blue (visible on dark)
   CRFB_ORANGE,     # Secondary - Contrast Orange
   CRFB_TEAL,       # Third - Website Teal
   CRFB_RED,        # Fourth - FTD Red
-  CRFB_PURPLE,     # Fifth - SSDI Purple
-  CRFB_LIGHT_BLUE  # Sixth - CRFB Light Blue
+  "#9b7ed9",       # Fifth - Lighter purple (more visible)
+  "#50c878"        # Sixth - Emerald green
 )
 
 # Helper function to format currency

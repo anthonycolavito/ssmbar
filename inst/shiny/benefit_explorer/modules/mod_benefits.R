@@ -159,18 +159,27 @@ benefits_server <- function(id, worker_data) {
       y_axis_min <- max(0, floor((y_min - y_range * 0.1) / 5000) * 5000)
       y_axis_max <- ceiling((y_max + y_range * 0.1) / 5000) * 5000
 
+      # Check if we have multiple benefit classes (to decide whether to show shape legend)
+      unique_bc <- unique(data_filtered$bc_label)
+      show_bc_legend <- length(unique_bc) > 1
+
+      # Check if we have multiple scenarios
+      unique_scenarios <- unique(data_filtered$scenario)
+      show_scenario_legend <- length(unique_scenarios) > 1
+
       p <- ggplot(data_filtered, aes(x = age, y = .data[[y_var]],
                                       color = scenario, group = scenario)) +
         geom_line(linewidth = 1.2) +
         geom_point(aes(shape = bc_label), size = 2.5, alpha = 0.8) +
         scale_y_continuous(labels = dollar_format(), limits = c(y_axis_min, y_axis_max)) +
-        scale_color_manual(values = CHART_COLORS) +
+        scale_color_manual(values = CHART_COLORS, guide = if (show_scenario_legend) "legend" else "none") +
         scale_shape_manual(
           values = c("AR" = 16, "ARB" = 17, "ARD" = 15, "ARF" = 18,
                      "AD" = 1, "ADB" = 2, "ADD" = 0, "ADF" = 5,
                      "BR" = 3, "BD" = 4, "D" = 6, "F" = 8),
           labels = BC_LABELS,
-          name = "Benefit Class"
+          name = "Benefit Class",
+          guide = if (show_bc_legend) "legend" else "none"
         ) +
         labs(
           title = "Annual Social Security Benefits by Age",
@@ -181,10 +190,9 @@ benefits_server <- function(id, worker_data) {
           },
           x = "Age",
           y = y_label,
-          color = "Worker"
+          color = "Scenario"
         ) +
-        chart_theme +
-        theme(legend.box = "vertical")
+        chart_theme
 
       p
     })
