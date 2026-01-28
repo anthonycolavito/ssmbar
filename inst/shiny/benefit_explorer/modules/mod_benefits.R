@@ -111,9 +111,9 @@ benefits_server <- function(id, worker_data) {
                  theme_void())
       }
 
-      # Filter to benefit-receiving years
+      # Filter to benefit-receiving years up to death age
       data_filtered <- data %>%
-        filter(annual_ind > 0)
+        filter(annual_ind > 0 & age < death_age)
 
       if (nrow(data_filtered) == 0) {
         return(ggplot() +
@@ -227,9 +227,9 @@ benefits_server <- function(id, worker_data) {
       data <- chart_data()
       if (is.null(data)) return(NULL)
 
-      # Select and format relevant columns
+      # Select and format relevant columns (filter to death age)
       table_data <- data %>%
-        filter(annual_ind > 0) %>%
+        filter(annual_ind > 0 & age < death_age) %>%
         select(scenario, year, age, annual_nominal, annual_real) %>%
         mutate(
           annual_nominal = round(annual_nominal, 0),
@@ -264,7 +264,7 @@ benefits_server <- function(id, worker_data) {
         data <- chart_data()
         if (!is.null(data)) {
           export_data <- data %>%
-            filter(annual_ind > 0) %>%
+            filter(annual_ind > 0 & age < death_age) %>%
             select(scenario, id, year, age, earnings, annual_nominal, annual_real)
           write.csv(export_data, file, row.names = FALSE)
         }
