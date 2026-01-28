@@ -10,3 +10,4 @@
 ^ssmbar.*\.tar\.gz$
 ^legacy$
 ^\.claude$
+^scripts$

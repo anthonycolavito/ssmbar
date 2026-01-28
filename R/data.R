@@ -58,6 +58,20 @@
 #'   \item Verify le_m and le_f data source citations
 #' }
 #'
+#' @section Hypothetical Worker Birth Date Convention:
+#' SSA's hypothetical workers (scaled earners) are assumed to be born on
+#' \strong{January 2} of their birth year. This convention has important
+#' implications for wage indexing:
+#' \itemize{
+#'   \item A worker born January 2 "attains" each age on January 1 of the
+#'     following year (SSA uses the day before the birthday for age attainment)
+#'   \item The indexing year is the year the worker turns 60
+#'   \item For a 1960 birth cohort: indexing year = 2020 (turns 60 in 2020)
+#'   \item Earnings through age 59 are indexed to the 2020 AWI
+#'   \item Earnings at age 60+ are used at nominal value (no indexing)
+#' }
+#' This matches SSA's methodology in actuarial publications and Table V.C7.
+#'
 #' @source Social Security Administration, 2025 Trustees Report
 #' @seealso \code{\link{prep_assumptions}} for the function used to process this data
 #' @examples

@@ -17,5 +17,14 @@ RoxygenNote: 7.3.3
 Depends:
     R (>= 3.5.0)
 Imports:
-    dplyr
+    dplyr,
+    shiny (>= 1.7.0),
+    bslib,
+    ggplot2,
+    DT,
+    tidyr,
+    scales
+Suggests:
+    plotly,
+    testthat (>= 3.0.0)
 LazyData: true

@@ -6,3 +6,8 @@
 tester.R
 tmpclaude-*
 ssmbar.Rcheck/
+
+# Root-level CSV files (use inst/extdata/ versions)
+/2025TR_assumptions.csv
+/mortality_rates.csv
+/scaled_earnings_factors.csv
