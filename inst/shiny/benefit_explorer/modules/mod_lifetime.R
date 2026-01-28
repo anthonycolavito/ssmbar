@@ -32,7 +32,7 @@ lifetime_ui <- function(id) {
         checkboxInput(
           ns("include_employer"),
           "Include Employer Share of Taxes",
-          value = FALSE
+          value = TRUE
         ),
         uiOutput(ns("pv_taxes_display"))
       )
@@ -169,13 +169,26 @@ lifetime_server <- function(id, worker_data) {
       assumptions <- data$assumptions
 
       # Calculate taxes
-      primary_with_taxes <- calculate_taxes(primary, assumptions)
+      primary_with_taxes <- tryCatch({
+        calculate_taxes(primary, assumptions)
+      }, error = function(e) {
+        primary %>% mutate(ss_tax = 0)
+      })
 
-      # Prepare flow data
+      # Get death age for filtering
+      death_age <- unique(primary$death_age)[1]
+      if (is.null(death_age) || is.na(death_age)) death_age <- 85
+
+      # Prepare flow data - filter to working years (21-64) for taxes, claim to death for benefits
       flow <- primary_with_taxes %>%
+        filter(age >= 21 & age < death_age) %>%
         mutate(
-          tax_amount = if (input$include_employer) ss_tax * 2 else ss_tax,
-          benefit_amount = annual_ind
+          tax_amount = if (input$include_employer) {
+            ifelse(age <= 64, ss_tax * 2, 0)
+          } else {
+            ifelse(age <= 64, ss_tax, 0)
+          },
+          benefit_amount = ifelse(!is.na(annual_ind) & annual_ind > 0, annual_ind, 0)
         ) %>%
         select(year, age, earnings, tax_amount, benefit_amount) %>%
         mutate(
@@ -317,17 +330,30 @@ lifetime_server <- function(id, worker_data) {
     # Flow chart
     output$flow_chart <- renderPlot({
       flow <- flow_data()
-      if (is.null(flow)) {
+      if (is.null(flow) || nrow(flow) == 0) {
         return(ggplot() +
                  annotate("text", x = 0.5, y = 0.5,
                           label = "Click 'Calculate Benefits' to see cash flows",
-                          size = 6, color = "gray50") +
-                 theme_void())
+                          size = 6, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
       }
 
       if (input$flow_type == "annual") {
-        # Annual flow chart
-        flow_long <- flow %>%
+        # Annual flow chart - filter to ages with activity
+        flow_active <- flow %>%
+          filter(tax_amount > 0 | benefit_amount > 0)
+
+        if (nrow(flow_active) == 0) {
+          return(ggplot() +
+                   annotate("text", x = 0.5, y = 0.5,
+                            label = "No cash flow data available",
+                            size = 6, color = DARK_MUTED) +
+                   theme_void() +
+                   theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+        }
+
+        flow_long <- flow_active %>%
           select(age, tax_amount, benefit_amount) %>%
           pivot_longer(cols = c(tax_amount, benefit_amount),
                        names_to = "type",
@@ -340,11 +366,15 @@ lifetime_server <- function(id, worker_data) {
             amount = ifelse(type == "Taxes Paid", -amount, amount)
           )
 
+        # Calculate y-axis limits with padding
+        y_max <- max(abs(flow_long$amount), na.rm = TRUE) * 1.1
+
         p <- ggplot(flow_long, aes(x = age, y = amount, fill = type)) +
-          geom_col(position = "identity", alpha = 0.8) +
-          geom_hline(yintercept = 0, color = "gray30") +
-          scale_y_continuous(labels = dollar_format()) +
-          scale_fill_manual(values = c("Taxes Paid" = "#dc3545", "Benefits Received" = "#198754")) +
+          geom_col(position = "identity", alpha = 0.8, width = 0.8) +
+          geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
+          scale_y_continuous(labels = dollar_format(), limits = c(-y_max, y_max)) +
+          scale_x_continuous(breaks = seq(20, 100, by = 10)) +
+          scale_fill_manual(values = c("Taxes Paid" = CRFB_RED, "Benefits Received" = CRFB_TEAL)) +
           labs(
             title = "Annual Social Security Cash Flows",
             subtitle = "Taxes paid (negative) vs benefits received (positive)",
@@ -357,6 +387,7 @@ lifetime_server <- function(id, worker_data) {
       } else {
         # Cumulative chart
         flow_long <- flow %>%
+          filter(cum_taxes > 0 | cum_benefits > 0) %>%
           select(age, cum_taxes, cum_benefits) %>%
           pivot_longer(cols = c(cum_taxes, cum_benefits),
                        names_to = "type",
@@ -368,11 +399,21 @@ lifetime_server <- function(id, worker_data) {
             )
           )
 
+        if (nrow(flow_long) == 0) {
+          return(ggplot() +
+                   annotate("text", x = 0.5, y = 0.5,
+                            label = "No cumulative data available",
+                            size = 6, color = DARK_MUTED) +
+                   theme_void() +
+                   theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+        }
+
         p <- ggplot(flow_long, aes(x = age, y = amount, color = type)) +
           geom_line(linewidth = 1.2) +
           scale_y_continuous(labels = dollar_format()) +
-          scale_color_manual(values = c("Cumulative Taxes" = "#dc3545",
-                                         "Cumulative Benefits" = "#198754")) +
+          scale_x_continuous(breaks = seq(20, 100, by = 10)) +
+          scale_color_manual(values = c("Cumulative Taxes" = CRFB_RED,
+                                         "Cumulative Benefits" = CRFB_TEAL)) +
           labs(
             title = "Cumulative Social Security Cash Flows",
             subtitle = "Running total of taxes paid vs benefits received (undiscounted)",

@@ -20,7 +20,7 @@ ratios_ui <- function(id) {
         checkboxInput(
           ns("include_employer_ratio"),
           "Include Employer Share of Taxes in Calculation",
-          value = FALSE
+          value = TRUE
         ),
         uiOutput(ns("ratio_display"))
       )

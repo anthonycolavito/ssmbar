@@ -17,30 +17,60 @@ replacement_ui <- function(id) {
         "Replacement Rate Comparison"
       ),
       card_body(
-        checkboxGroupInput(
-          ns("rate_types"),
-          "Select Rate Types to Display:",
-          choices = c(
-            "PV Annuity" = "pv_rr",
-            "Real All Years" = "real_all",
-            "Wage-Indexed All Years" = "wage_all",
-            "Real High-35" = "real_h35",
-            "Wage High-35" = "wage_h35",
-            "Real High-10" = "real_h10",
-            "Wage High-10" = "wage_h10",
-            "Real High-5" = "real_h5",
-            "Wage High-5" = "wage_h5",
-            "Real Last-35" = "real_l35",
-            "Wage Last-35" = "wage_l35",
-            "Real Last-10" = "real_l10",
-            "Wage Last-10" = "wage_l10",
-            "Real Last-5" = "real_l5",
-            "Wage Last-5" = "wage_l5"
+        # Organized selection by category
+        tags$div(
+          class = "row mb-3",
+          # Present Value method
+          tags$div(
+            class = "col-md-4",
+            tags$strong(class = "d-block mb-2", "Present Value Method"),
+            checkboxGroupInput(
+              ns("rate_pv"),
+              NULL,
+              choices = c("PV Annuity" = "pv_rr"),
+              selected = "pv_rr"
+            )
           ),
-          selected = c("pv_rr", "real_h35", "wage_h35"),
-          inline = TRUE
+          # Real (inflation-adjusted) methods
+          tags$div(
+            class = "col-md-4",
+            tags$strong(class = "d-block mb-2", "Real (Inflation-Adjusted)"),
+            checkboxGroupInput(
+              ns("rate_real"),
+              NULL,
+              choices = c(
+                "All Years" = "real_all",
+                "Highest 35 Years" = "real_h35",
+                "Highest 10 Years" = "real_h10",
+                "Highest 5 Years" = "real_h5",
+                "Last 35 Years" = "real_l35",
+                "Last 10 Years" = "real_l10",
+                "Last 5 Years" = "real_l5"
+              ),
+              selected = "real_h35"
+            )
+          ),
+          # Wage-indexed methods
+          tags$div(
+            class = "col-md-4",
+            tags$strong(class = "d-block mb-2", "Wage-Indexed"),
+            checkboxGroupInput(
+              ns("rate_wage"),
+              NULL,
+              choices = c(
+                "All Years" = "wage_all",
+                "Highest 35 Years" = "wage_h35",
+                "Highest 10 Years" = "wage_h10",
+                "Highest 5 Years" = "wage_h5",
+                "Last 35 Years" = "wage_l35",
+                "Last 10 Years" = "wage_l10",
+                "Last 5 Years" = "wage_l5"
+              ),
+              selected = "wage_h35"
+            )
+          )
         ),
-        plotOutput(ns("rr_chart"), height = "400px")
+        plotOutput(ns("rr_chart"), height = "350px")
       )
     ),
 
@@ -49,20 +79,20 @@ replacement_ui <- function(id) {
       card_header("Understanding Replacement Rates"),
       card_body(
         tags$dl(
-          tags$dt("PV Annuity (pv_rr)"),
+          tags$dt("PV Annuity"),
           tags$dd("Initial benefit divided by a constant real payment with the same present value as career earnings. Most comprehensive measure."),
 
-          tags$dt("Real All Years"),
-          tags$dd("Initial benefit divided by average real (inflation-adjusted) earnings across all working years."),
+          tags$dt("Real (Inflation-Adjusted)"),
+          tags$dd("Compares benefit to earnings adjusted for inflation (purchasing power). Shows what percentage of real income is replaced."),
 
-          tags$dt("Wage-Indexed All Years"),
-          tags$dd("Initial benefit divided by average wage-indexed earnings across all working years."),
+          tags$dt("Wage-Indexed"),
+          tags$dd("Compares benefit to earnings adjusted for wage growth. This is the methodology used by SSA in official calculations."),
 
-          tags$dt("High-35 Rates"),
-          tags$dd("Uses only the highest 35 years of earnings (matches AIME calculation)."),
+          tags$dt("Highest N Years"),
+          tags$dd("Uses only the highest N years of earnings. High-35 matches the AIME calculation period."),
 
-          tags$dt("Last-10 Rates"),
-          tags$dd("Uses only the final 10 years of earnings (reflects pre-retirement income).")
+          tags$dt("Last N Years"),
+          tags$dd("Uses only the final N years of earnings before retirement. Reflects pre-retirement living standard.")
         )
       )
     ),
@@ -130,18 +160,20 @@ replacement_server <- function(id, worker_data) {
         return(ggplot() +
                  annotate("text", x = 0.5, y = 0.5,
                           label = "Click 'Calculate Benefits' to see replacement rates",
-                          size = 6, color = "gray50") +
-                 theme_void())
+                          size = 6, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
       }
 
-      # Filter to selected rate types
-      selected_types <- input$rate_types
+      # Combine selected rate types from all three checkbox groups
+      selected_types <- c(input$rate_pv, input$rate_real, input$rate_wage)
       if (length(selected_types) == 0) {
         return(ggplot() +
                  annotate("text", x = 0.5, y = 0.5,
                           label = "Select at least one rate type",
-                          size = 6, color = "gray50") +
-                 theme_void())
+                          size = 6, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
       }
 
       data_filtered <- data %>%

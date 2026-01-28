@@ -155,32 +155,58 @@ benefits_server <- function(id, worker_data) {
       y_min <- min(y_values, na.rm = TRUE)
       y_max <- max(y_values, na.rm = TRUE)
       y_range <- y_max - y_min
-      # Add 10% padding, but start axis at a round number near the minimum
-      y_axis_min <- max(0, floor((y_min - y_range * 0.1) / 5000) * 5000)
-      y_axis_max <- ceiling((y_max + y_range * 0.1) / 5000) * 5000
-
-      # Check if we have multiple benefit classes (to decide whether to show shape legend)
-      unique_bc <- unique(data_filtered$bc_label)
-      show_bc_legend <- length(unique_bc) > 1
+      # Add 15% padding at top for labels, reasonable padding at bottom
+      y_axis_min <- max(0, y_min - y_range * 0.05)
+      y_axis_max <- y_max + y_range * 0.15
 
       # Check if we have multiple scenarios
       unique_scenarios <- unique(data_filtered$scenario)
       show_scenario_legend <- length(unique_scenarios) > 1
 
+      # Find benefit class transitions for primary scenario (vertical dividers)
+      primary_data <- data_filtered %>% filter(scenario == "Primary" | scenario == unique_scenarios[1])
+      bc_transitions <- primary_data %>%
+        arrange(age) %>%
+        mutate(bc_change = bc_label != lag(bc_label, default = first(bc_label))) %>%
+        filter(bc_change | age == min(age))
+
+      # Create labels for each BC region
+      bc_regions <- primary_data %>%
+        arrange(age) %>%
+        group_by(bc_label) %>%
+        summarize(
+          start_age = min(age),
+          end_age = max(age),
+          mid_age = (min(age) + max(age)) / 2,
+          .groups = "drop"
+        )
+
       p <- ggplot(data_filtered, aes(x = age, y = .data[[y_var]],
                                       color = scenario, group = scenario)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(aes(shape = bc_label), size = 2.5, alpha = 0.8) +
-        scale_y_continuous(labels = dollar_format(), limits = c(y_axis_min, y_axis_max)) +
-        scale_color_manual(values = CHART_COLORS, guide = if (show_scenario_legend) "legend" else "none") +
-        scale_shape_manual(
-          values = c("AR" = 16, "ARB" = 17, "ARD" = 15, "ARF" = 18,
-                     "AD" = 1, "ADB" = 2, "ADD" = 0, "ADF" = 5,
-                     "BR" = 3, "BD" = 4, "D" = 6, "F" = 8),
-          labels = BC_LABELS,
-          name = "Benefit Class",
-          guide = if (show_bc_legend) "legend" else "none"
+        # Add vertical lines at BC transitions (except first)
+        geom_vline(
+          data = bc_transitions %>% filter(age > min(primary_data$age)),
+          aes(xintercept = age - 0.5),
+          linetype = "dashed",
+          color = DARK_MUTED,
+          alpha = 0.7
         ) +
+        # Add BC labels at top of chart
+        geom_label(
+          data = bc_regions,
+          aes(x = mid_age, y = y_axis_max - y_range * 0.03, label = bc_label),
+          inherit.aes = FALSE,
+          fill = DARK_CARD,
+          color = CRFB_LIGHT_BLUE,
+          size = 3,
+          label.padding = unit(0.15, "lines"),
+          label.size = 0
+        ) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2, alpha = 0.8) +
+        scale_y_continuous(labels = dollar_format(), limits = c(y_axis_min, y_axis_max)) +
+        scale_x_continuous(breaks = seq(60, 100, by = 5)) +
+        scale_color_manual(values = CHART_COLORS, guide = if (show_scenario_legend) "legend" else "none") +
         labs(
           title = "Annual Social Security Benefits by Age",
           subtitle = if (input$chart_type == "nominal") {
