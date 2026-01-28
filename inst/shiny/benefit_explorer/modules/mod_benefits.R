@@ -63,22 +63,22 @@ benefits_server <- function(id, worker_data) {
       primary <- data$primary
       assumptions <- data$assumptions
 
-      # Calculate real benefits (deflated to 2025 dollars)
-      cpi_2025 <- assumptions$cpi_w[assumptions$year == 2025]
+      # Calculate real benefits (deflated to 2025 dollars using GDP price index)
+      gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
 
       primary <- primary %>%
-        left_join(assumptions %>% select(year, cpi_w, gdp_pi), by = "year") %>%
+        left_join(assumptions %>% select(year, gdp_pi), by = "year") %>%
         mutate(
-          annual_real = annual_ind * (cpi_2025 / cpi_w),
+          annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
           annual_nominal = annual_ind
         )
 
       # Add comparison scenarios if available
       if (!is.null(data$comparisons)) {
         comparisons <- data$comparisons %>%
-          left_join(assumptions %>% select(year, cpi_w, gdp_pi), by = "year") %>%
+          left_join(assumptions %>% select(year, gdp_pi), by = "year") %>%
           mutate(
-            annual_real = annual_ind * (cpi_2025 / cpi_w),
+            annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
             annual_nominal = annual_ind
           )
 
@@ -129,7 +129,7 @@ benefits_server <- function(id, worker_data) {
           subtitle = if (input$chart_type == "nominal") {
             "Nominal dollars including COLA adjustments"
           } else {
-            "Real dollars (deflated to 2025 CPI-W)"
+            "Real dollars (deflated to 2025 using GDP price index)"
           },
           x = "Age",
           y = y_label,
@@ -169,11 +169,11 @@ benefits_server <- function(id, worker_data) {
       total_nominal <- sum(primary$annual_ind[primary$age >= claim_age &
                                                 primary$age <= death_age], na.rm = TRUE)
 
-      # Real benefit at claim
-      cpi_2025 <- assumptions$cpi_w[assumptions$year == 2025]
+      # Real benefit at claim (deflated using GDP price index)
+      gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
       claim_year <- primary$year[primary$age == claim_age]
-      cpi_claim <- assumptions$cpi_w[assumptions$year == claim_year]
-      ben_at_claim_real <- ben_at_claim * (cpi_2025 / cpi_claim)
+      gdp_pi_claim <- assumptions$gdp_pi[assumptions$year == claim_year]
+      ben_at_claim_real <- ben_at_claim * (gdp_pi_2025 / gdp_pi_claim)
 
       tags$div(
         class = "row",
@@ -188,7 +188,7 @@ benefits_server <- function(id, worker_data) {
                    tags$h4(format_currency(ben_at_claim))
           ),
           tags$div(class = "mb-3",
-                   tags$small(class = "text-muted", "Benefit at Claim (2025 $)"),
+                   tags$small(class = "text-muted", "Benefit at Claim (2025 Real $)"),
                    tags$h4(format_currency(ben_at_claim_real))
           )
         ),
@@ -196,7 +196,7 @@ benefits_server <- function(id, worker_data) {
           class = "col-6",
           tags$div(class = "mb-3",
                    tags$small(class = "text-muted", "Expected Death Age"),
-                   tags$h4(round(death_age + 65))
+                   tags$h4(round(death_age))
           ),
           tags$div(class = "mb-3",
                    tags$small(class = "text-muted", "Annual Benefit at 70"),
