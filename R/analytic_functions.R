@@ -113,84 +113,101 @@ calculate_taxes <- function(worker, assumptions) {
 #   - Examples showing typical usage
 rep_rates <- function(worker, assumptions) {
 
-  #Error Prevention
-  worker_cols_needed <- c("id","year","age","earnings","annual_ind")
-  if(!all(worker_cols_needed %in% names(worker))){
-      stop(paste("worker file must contain:", paste(worker_cols_needed, collapse = ", ")))
-    }
+  # Error Prevention
+  worker_cols_needed <- c("id", "year", "age", "earnings", "annual_ind", "claim_age")
+  if (!all(worker_cols_needed %in% names(worker))) {
+    stop(paste("worker file must contain:", paste(worker_cols_needed, collapse = ", ")))
+  }
 
-  assumption_cols_needed <- c("year","gdp_pi","awi","real_df")
-  if(!all(assumption_cols_needed %in% names(assumptions))) {
+  assumption_cols_needed <- c("year", "gdp_pi", "awi", "real_df")
+  if (!all(assumption_cols_needed %in% names(assumptions))) {
     stop(paste("assumptions file must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
-  dataset <- worker %>% left_join(assumptions %>% select(year, gdp_pi, awi, real_df),
-                                  by = "year") %>%
-    group_by(id) %>% arrange(id, age) %>%
+  # Join assumption columns if not already present
+  cols_to_join <- c("gdp_pi", "awi", "real_df")
+  cols_missing <- cols_to_join[!cols_to_join %in% names(worker)]
+  if (length(cols_missing) > 0) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  dataset <- dataset %>%
+    group_by(id) %>%
+    arrange(id, age) %>%
     mutate(
-           #Initial benefit (numerator in the replacement rate)
-           init_ben = annual_ind[which(age == 65)],
+      # Get claim age for this worker (use first non-NA value)
+      worker_claim_age = first(claim_age[!is.na(claim_age)]),
+      # Last working age is year before claiming
+      last_working_age = worker_claim_age - 1,
 
-           #Scalars
-           wage_scalar = awi[which(age == 65)] / awi,
-           price_scalar = gdp_pi[which(age == 65)] / gdp_pi,
+      # Initial benefit at claim age (numerator in the replacement rate)
+      init_ben = annual_ind[which(age == worker_claim_age)][1],
 
-           #Indexed Earnings
-           wage_earnings = earnings * wage_scalar,
-           real_earnings = earnings * price_scalar,
+      # Scalars indexed to last working year (year before claim)
+      wage_scalar = awi[which(age == last_working_age)][1] / awi,
+      price_scalar = gdp_pi[which(age == last_working_age)][1] / gdp_pi,
 
-          #Discount factors normalized to age 21
-          real_df_norm = real_df / real_df[which(age == 21)],
+      # Indexed Earnings
+      wage_earnings = earnings * wage_scalar,
+      real_earnings = earnings * price_scalar,
 
-          #Present value of real earnings at age 21
-          pv_real_earn = real_earnings / real_df_norm
+      # Discount factors normalized to age 21
+      real_df_norm = real_df / real_df[which(age == 21)][1],
 
-           ) %>% filter(age <= 64) %>%
-          summarise(
-            #Initial benefit
-            init_ben = first(init_ben),
+      # Present value of real earnings at age 21
+      pv_real_earn = real_earnings / real_df_norm
+    ) %>%
+    # Filter to working years (21 through year before claiming)
+    filter(age >= 21 & age <= last_working_age) %>%
+    summarise(
+      # Initial benefit
+      init_ben = first(init_ben),
+      claim_age = first(worker_claim_age),
 
-            #PV of earnings at age 21 (in real dollars)
-            pv_real_earnings = sum(pv_real_earn),
+      # PV of earnings at age 21 (in real dollars)
+      pv_real_earnings = sum(pv_real_earn, na.rm = TRUE),
 
-            #Constant real payment with same PV as career earnings
-            real_annuity = pv_real_earnings / sum(1 / real_df_norm),
+      # Constant real payment with same PV as career earnings
+      real_annuity = pv_real_earnings / sum(1 / real_df_norm, na.rm = TRUE),
 
-            #Replacement Rates -- All
-            pv_rr = init_ben / real_annuity,
-            real_all = init_ben / mean(real_earnings),
-            wage_all = init_ben / mean(wage_earnings),
+      # Replacement Rates -- All years
+      pv_rr = init_ben / real_annuity,
+      real_all = init_ben / mean(real_earnings, na.rm = TRUE),
+      wage_all = init_ben / mean(wage_earnings, na.rm = TRUE),
 
-             #High-N Year Replacement Rates
-            real_sorted = list(sort(real_earnings, decreasing = TRUE)),
-            wage_sorted = list(sort(wage_earnings, decreasing = TRUE)),
+      # High-N Year Replacement Rates
+      real_sorted = list(sort(real_earnings, decreasing = TRUE)),
+      wage_sorted = list(sort(wage_earnings, decreasing = TRUE)),
 
-            real_h35 = init_ben / mean(real_sorted[[1]][1:35]),
-            wage_h35 = init_ben / mean(wage_sorted[[1]][1:35]),
-            real_h10 = init_ben / mean(real_sorted[[1]][1:10]),
-            wage_h10 = init_ben / mean(wage_sorted[[1]][1:10]),
-            real_h5 = init_ben / mean(real_sorted[[1]][1:5]),
-            wage_h5 = init_ben / mean(wage_sorted[[1]][1:5]),
+      # Use pmin to handle cases with fewer than N years
+      n_years = n(),
+      real_h35 = init_ben / mean(real_sorted[[1]][1:pmin(35, n_years)]),
+      wage_h35 = init_ben / mean(wage_sorted[[1]][1:pmin(35, n_years)]),
+      real_h10 = init_ben / mean(real_sorted[[1]][1:pmin(10, n_years)]),
+      wage_h10 = init_ben / mean(wage_sorted[[1]][1:pmin(10, n_years)]),
+      real_h5 = init_ben / mean(real_sorted[[1]][1:pmin(5, n_years)]),
+      wage_h5 = init_ben / mean(wage_sorted[[1]][1:pmin(5, n_years)]),
 
-            #Last-N Years Replacement Rates
-            n_years = n(),
+      # Last-N Years Replacement Rates (with bounds checking)
+      real_l35 = init_ben / mean(real_earnings[max(1, n_years - 34):n_years]),
+      wage_l35 = init_ben / mean(wage_earnings[max(1, n_years - 34):n_years]),
+      real_l10 = init_ben / mean(real_earnings[max(1, n_years - 9):n_years]),
+      wage_l10 = init_ben / mean(wage_earnings[max(1, n_years - 9):n_years]),
+      real_l5 = init_ben / mean(real_earnings[max(1, n_years - 4):n_years]),
+      wage_l5 = init_ben / mean(wage_earnings[max(1, n_years - 4):n_years]),
 
-            real_l35 = init_ben / mean(real_earnings[(n_years - 34): n_years]),
-            wage_l35 = init_ben / mean(wage_earnings[(n_years - 34): n_years]),
-            real_l10 = init_ben / mean(real_earnings[(n_years - 9): n_years]),
-            wage_l10 = init_ben / mean(wage_earnings[(n_years - 9): n_years]),
-            real_l5 = init_ben / mean(real_earnings[(n_years - 4): n_years]),
-            wage_l5 = init_ben / mean(wage_earnings[(n_years - 4): n_years])
-
-           ) %>% select(id, pv_rr, real_all, wage_all,
-                        real_h35, wage_h35, real_h10, wage_h10, real_h5, wage_h5,
-                        real_l35, wage_l35, real_l10, wage_l10, real_l5, wage_l5) %>%
+      .groups = "drop"
+    ) %>%
+    select(id, pv_rr, real_all, wage_all,
+           real_h35, wage_h35, real_h10, wage_h10, real_h5, wage_h5,
+           real_l35, wage_l35, real_l10, wage_l10, real_l5, wage_l5) %>%
     pivot_longer(cols = !"id",
                  names_to = "type",
                  values_to = "rep_rate")
 
   return(dataset)
-
-
 }
 

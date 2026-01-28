@@ -131,11 +131,11 @@ replacement_server <- function(id, worker_data) {
         return(NULL)
       }
 
-      # Check if there's a benefit at age 65 (rep_rates uses age 65 benefit)
-      ben_at_65 <- primary$annual_ind[primary$age == 65]
-      if (length(ben_at_65) == 0 || is.na(ben_at_65) || ben_at_65 == 0) {
-        message("Replacement rate module - No benefit at age 65 (claim age may be later)")
-        # Return NULL - rep_rates won't work without age 65 benefit
+      # Check if there's a benefit at claim age
+      claim_age <- unique(primary$claim_age)[1]
+      ben_at_claim <- primary$annual_ind[primary$age == claim_age]
+      if (length(ben_at_claim) == 0 || is.na(ben_at_claim[1]) || ben_at_claim[1] == 0) {
+        message("Replacement rate module - No benefit at claim age ", claim_age)
         return(NULL)
       }
 
@@ -150,8 +150,9 @@ replacement_server <- function(id, worker_data) {
           for (sc_name in comparison_ids) {
             sc_data <- data$comparisons %>% filter(scenario == sc_name)
             if (nrow(sc_data) > 0 && "annual_ind" %in% names(sc_data)) {
-              sc_ben_65 <- sc_data$annual_ind[sc_data$age == 65]
-              if (length(sc_ben_65) > 0 && !is.na(sc_ben_65) && sc_ben_65 > 0) {
+              sc_claim_age <- unique(sc_data$claim_age)[1]
+              sc_ben_claim <- sc_data$annual_ind[sc_data$age == sc_claim_age]
+              if (length(sc_ben_claim) > 0 && !is.na(sc_ben_claim[1]) && sc_ben_claim[1] > 0) {
                 sc_rr <- ssmbar:::rep_rates(sc_data, assumptions)
                 sc_rr$scenario <- sc_name
                 rr <- bind_rows(rr, sc_rr)
@@ -170,21 +171,6 @@ replacement_server <- function(id, worker_data) {
     # Replacement rate chart
     output$rr_chart <- renderPlot({
       data <- rr_data()
-
-      # Check if we have worker_data but no rr_data (likely claim age issue)
-      wd <- worker_data()
-      if (is.null(data) && !is.null(wd) && !is.null(wd$primary)) {
-        claim_age <- unique(wd$primary$claim_age)[1]
-        if (!is.null(claim_age) && claim_age != 65) {
-          return(ggplot() +
-                   annotate("text", x = 0.5, y = 0.5,
-                            label = paste0("Replacement rates require claim age = 65\n",
-                                          "(Current claim age: ", claim_age, ")"),
-                            size = 5, color = DARK_MUTED) +
-                   theme_void() +
-                   theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
-        }
-      }
 
       if (is.null(data)) {
         return(ggplot() +
