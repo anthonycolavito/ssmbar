@@ -246,12 +246,20 @@ spousal_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL,
     ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, year, s_pia, s_elig_age, s_age, spouse_pia),
-                                   by = c("id", "year"))
+    cols_to_add <- c("s_pia", "s_elig_age", "s_age", "spouse_pia")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, year, all_of(cols_new)),
+                                     by = c("id", "year"))
+    }
   } else {
     # s_elig_age and s_age are needed by final_benefit() to determine BC code (BD vs BR)
-    worker <- worker %>% left_join(dataset %>% select(id, year, s_elig_age, s_age, spouse_pia),
-                                   by = c("id", "year"))
+    cols_to_add <- c("s_elig_age", "s_age", "spouse_pia")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, year, all_of(cols_new)),
+                                     by = c("id", "year"))
+    }
   }
 
   return(worker)
@@ -363,8 +371,12 @@ spouse_benefit <- function(worker, spouse_data = NULL, assumptions, debugg = FAL
     ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, s_rf1_ind, s_rf2_ind, s_act_factor, spouse_ben),
-                                   by = c("id", "age"))
+    cols_to_add <- c("nra_ind", "s_rf1_ind", "s_rf2_ind", "s_act_factor", "spouse_ben")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id", "age"))
+    }
   } else {
     worker <- worker %>% left_join(dataset %>% select(id, age, spouse_ben),
                                    by = c("id", "age"))

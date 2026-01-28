@@ -38,6 +38,9 @@ A data frame with the following variables:
 \item{max_qc_per_year}{Maximum quarters of coverage that can be earned per year (4)}
 \item{drc_max_months}{Maximum months of delayed retirement credits (36)}
 \item{ret_phaseout_rate}{RET phaseout rate - reduction per dollar of excess earnings (0.5)}
+\item{cola}{Cost-of-Living Adjustment percentage for the year (e.g., 2.8 for 2.8\\%).
+Historical values from SSA publications; projected values calculated from CPI-W ratios.
+The COLA announced in year Y applies to benefits starting in January Y+1.}
 \item{le_m}{Male cohort life expectancy at age 65 (years remaining)}
 \item{le_f}{Female cohort life expectancy at age 65 (years remaining)}
 }

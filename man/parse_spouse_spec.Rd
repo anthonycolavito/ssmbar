@@ -10,11 +10,13 @@ parse_spouse_spec(spouse_spec)
 \item{spouse_spec}{Character string with spouse specification}
 }
 \value{
-Named list with type, sex, birth_yr, age_claim, and custom_avg_earnings (if applicable)
+Named list with type, sex, birth_yr, age_claim, custom_avg_earnings (if applicable),
+and disabled_age (if applicable)
 }
 \description{
 Parses a spouse_spec string into its component parts.
 spouse_spec format: "type-sex-birthyr-claimage" (e.g., "low-female-1962-65")
-For custom type: "customXXXXX-sex-birthyr-claimage" (e.g., "custom50000-female-1962-65")
+Or with disabled age: "type-sex-birthyr-claimage-disabledage" (e.g., "low-female-1962-63-63")
+For custom type: "customXXXXX-sex-birthyr-claimage\link{-disabledage}"
 }
 \keyword{internal}

@@ -200,11 +200,19 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
   # Output worker_age_at_spouse_death and is_disabled_widow (needed by widow_benefit() and final_benefit())
   # s_death_age is already in spouse_data - no need to duplicate it here
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, year, s_wrk_ben, s_claim_age, s_death_age, worker_age_at_spouse_death, survivor_pia, is_disabled_widow),
-                                   by = c("id", "year"))
+    cols_to_add <- c("s_wrk_ben", "s_claim_age", "s_death_age", "worker_age_at_spouse_death", "survivor_pia", "is_disabled_widow")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, year, all_of(cols_new)),
+                                     by = c("id", "year"))
+    }
   } else {
-    worker <- worker %>% left_join(dataset %>% select(id, year, worker_age_at_spouse_death, survivor_pia, is_disabled_widow),
-                                   by = c("id", "year"))
+    cols_to_add <- c("worker_age_at_spouse_death", "survivor_pia", "is_disabled_widow")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, year, all_of(cols_new)),
+                                     by = c("id", "year"))
+    }
   }
 
   return(worker)
@@ -307,8 +315,12 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, actual_widow_claim_age, effective_widow_claim_age, benefit_start_age, w_rf, w_act_factor, survivor_ben),
-                                   by = c("id","age") ) #Left joins variable for debugging
+    cols_to_add <- c("actual_widow_claim_age", "effective_widow_claim_age", "benefit_start_age", "w_rf", "w_act_factor", "survivor_ben")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id","age"))
+    }
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, survivor_ben),

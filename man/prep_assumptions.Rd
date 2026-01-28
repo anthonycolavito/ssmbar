@@ -4,10 +4,14 @@
 \alias{prep_assumptions}
 \title{Prepare Program Assumptions}
 \usage{
-prep_assumptions(dataset)
+prep_assumptions(dataset, cola_file = NULL)
 }
 \arguments{
 \item{dataset}{Dataframe with the latest Social Security Trustees Report assumptions.}
+
+\item{cola_file}{Path to CSV file containing historical COLA data.
+If NULL, looks for cola.csv in inst/extdata/. Format: year,cola where
+cola is the percentage (e.g., 2.8 for 2.8\%).}
 }
 \value{
 assume Dataframe with TR assumptions and projected program parameters.

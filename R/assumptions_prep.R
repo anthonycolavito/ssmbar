@@ -4,6 +4,9 @@
 #' sets and projections Social Security's main parameters.
 #'
 #' @param dataset Dataframe with the latest Social Security Trustees Report assumptions.
+#' @param cola_file Path to CSV file containing historical COLA data.
+#'   If NULL, looks for cola.csv in inst/extdata/. Format: year,cola where
+#'   cola is the percentage (e.g., 2.8 for 2.8%).
 #'
 #' @return assume Dataframe with TR assumptions and projected program parameters.
 #' @examples
@@ -13,7 +16,7 @@
 #'
 #' @export
 
-prep_assumptions <- function(dataset) {
+prep_assumptions <- function(dataset, cola_file = NULL) {
 
   # TODO: Document - add specific handbook section citations for each parameter projection formula
   #Rules for Updating Parameters: https://www.ssa.gov/OP_Home/comp2/G-APP-A.html
@@ -158,6 +161,56 @@ prep_assumptions <- function(dataset) {
   # SSA Handbook Section 1803: https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1803.html
   # $1 withheld for every $2 of excess earnings = 0.5 rate
   assume$ret_phaseout_rate <- 0.5
+
+  # =============================================================================
+  # COLA (Cost-of-Living Adjustment)
+  # =============================================================================
+  # SSA Handbook Section 719: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0719.html
+  # COLA in year Y is applied to benefits in December of year Y (first full benefit in January Y+1).
+  # Historical COLAs are from SSA publications; projected COLAs are calculated from CPI-W ratios.
+  #
+  # For historical years (<=2025): Use actual COLA from cola.csv
+  # For projected years (>2025): Calculate from CPI-W ratio
+  #   cola_Y = (cpi_w_Y / cpi_w_(Y-1) - 1) * 100
+
+  assume$cola <- NA_real_
+
+  # Try to load historical COLA data
+  if (is.null(cola_file)) {
+    # Look for cola.csv in inst/extdata/
+    cola_file <- system.file("extdata", "cola.csv", package = "ssmbar")
+    if (cola_file == "") {
+      # Try relative path for development
+      if (file.exists("inst/extdata/cola.csv")) {
+        cola_file <- "inst/extdata/cola.csv"
+      }
+    }
+  }
+
+  if (!is.null(cola_file) && file.exists(cola_file)) {
+    cola_hist <- read.csv(cola_file)
+
+    # Merge historical COLAs by year
+    for (i in seq_len(nrow(assume))) {
+      yr <- assume$year[i]
+      hist_cola <- cola_hist$cola[cola_hist$year == yr]
+      if (length(hist_cola) == 1) {
+        assume$cola[i] <- hist_cola
+      }
+    }
+  }
+
+  # Calculate projected COLAs from CPI-W ratios for years without historical data
+  for (i in seq_len(nrow(assume))) {
+    if (is.na(assume$cola[i]) && i > 1) {
+      cpi_current <- assume$cpi_w[i]
+      cpi_prev <- assume$cpi_w[i - 1]
+      if (!is.na(cpi_current) && !is.na(cpi_prev) && cpi_prev > 0) {
+        # Negative COLAs are not payable under current law
+        assume$cola[i] <- pmax((cpi_current / cpi_prev - 1) * 100, 0)
+      }
+    }
+  }
 
   return(assume)
 

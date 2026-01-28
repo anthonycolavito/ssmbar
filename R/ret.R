@@ -484,19 +484,29 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
 
   # Select output columns
   if (debugg) {
-    worker %>% left_join(
-      dataset %>% select(id, age, wrk_ben, spouse_ben, spouse_dep_ben,
-                         # Spouse's RET effect on worker's spouse_ben (Step 0)
-                         s_excess_earnings, s_ret_reduction, s_own_ben,
-                         spouse_ret_to_spouse_ben, s_months_withheld, s_cum_months_withheld,
-                         # Worker's own RET (Steps 1-5)
-                         excess_earnings, ret_reduction, wrk_share, wrk_reduction,
-                         months_withheld, cum_months_withheld,
-                         # DRC payback factors
-                         ret_adj_factor, ret_s_adj_factor,
-                         cum_months_withheld_final, s_cum_months_withheld_final),
+    # wrk_ben and spouse_ben already exist and will be overwritten - handle with suffix
+    # Other debug columns need existence check
+    debug_cols <- c("spouse_dep_ben", "s_excess_earnings", "s_ret_reduction", "s_own_ben",
+                    "spouse_ret_to_spouse_ben", "s_months_withheld", "s_cum_months_withheld",
+                    "excess_earnings", "ret_reduction", "wrk_share", "wrk_reduction",
+                    "months_withheld", "cum_months_withheld", "ret_adj_factor", "ret_s_adj_factor",
+                    "cum_months_withheld_final", "s_cum_months_withheld_final")
+    cols_new <- debug_cols[!debug_cols %in% names(worker)]
+
+    # First join wrk_ben and spouse_ben with suffix handling
+    result <- worker %>% left_join(
+      dataset %>% select(id, age, wrk_ben, spouse_ben),
       by = c("id", "age"), suffix = c("_orig", "")
     ) %>% select(-wrk_ben_orig, -spouse_ben_orig)
+
+    # Then join additional debug columns that don't already exist
+    if (length(cols_new) > 0) {
+      result <- result %>% left_join(
+        dataset %>% select(id, age, all_of(cols_new)),
+        by = c("id", "age")
+      )
+    }
+    result
   } else {
     worker %>% left_join(
       dataset %>% select(id, age, wrk_ben, spouse_ben),

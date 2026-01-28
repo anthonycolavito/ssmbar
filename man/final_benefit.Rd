@@ -31,15 +31,18 @@ The Composite Benefit Class (bc) follows the SSA Benefits and Earnings Public-Us
 \item \strong{ADB}: Disabled Worker dually entitled to a Spouse benefit
 \item \strong{ADD}: Disabled Worker dually entitled to a Widow(er) benefit
 \item \strong{ADF}: Disabled Worker dually entitled to a Disabled Widow(er) benefit
+\item \strong{BR}: Spouse of Retired Worker (no own worker benefit, only spousal benefit)
+\item \strong{BD}: Spouse of Disabled Worker (no own worker benefit, spouse is disabled and before NRA)
 \item \strong{D}: Widow(er) only (not dually entitled to own worker benefit)
 \item \strong{F}: Disabled Widow(er) only (not dually entitled to own worker benefit)
 }
 
 Note: Disabled workers (AD*) transition to retired workers (AR*) at Normal Retirement Age.
-This affects only the benefit class code, not the benefit amount.
+This affects only the benefit class code, not the benefit amount. Similarly, workers receiving
+BD benefits transition to BR when their disabled spouse reaches NRA.
 
-Benefit classes not currently implemented in ssmbar include: BR, BD (Spouse of Worker),
-E (other Survivor-only), and CR, CD, CS (Child benefits).
+Benefit classes not currently implemented in ssmbar include: E (other Survivor-only),
+and CR, CD, CS (Child benefits).
 }
 \seealso{
 SSA BEPUF User Guide for complete benefit class definitions

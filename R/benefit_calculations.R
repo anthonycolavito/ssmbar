@@ -35,7 +35,7 @@ join_all_assumptions <- function(worker, assumptions) {
   # All columns needed by the benefit calculation pipeline
   # - aime: awi, taxmax, qc_rec, qc_required, max_qc_per_year, max_dropout_years, min_comp_period, index_age_offset
   # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired
-  # - cola: cpi_w
+  # - cola: cola (year-by-year COLA percentage)
   # - worker_benefit: nra, rf1, rf2, drc, drc_max_months
   # - spousal_pia: s_pia_share
   # - spouse_benefit: s_rf1, s_rf2
@@ -44,7 +44,7 @@ join_all_assumptions <- function(worker, assumptions) {
   cols_needed <- c("year", "awi", "taxmax", "qc_rec", "qc_required", "max_qc_per_year",
                    "max_dropout_years", "min_comp_period", "index_age_offset",
                    "bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
-                   "cpi_w", "nra", "rf1", "rf2", "drc", "drc_max_months",
+                   "cola", "nra", "rf1", "rf2", "drc", "drc_max_months",
                    "s_pia_share", "s_rf1", "s_rf2", "ret1", "ret_phaseout_rate")
 
   # Only join columns that aren't already present
@@ -189,13 +189,16 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       age_eligible <- .x$age >= .x$elig_age # Worker's eligibility age (age 62 for retirement, age of disability, or age of death of deceased spouse)
 
       #AIME is equal to the average monthly earnings of the hightest earnings years in the computation period (typically 35, as for retired worker beneficiaries)
+      # For January 1 claims: AIME at age X uses earnings through age X-1 (last complete year before claim)
       for (i in seq_len(n)) {
         if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) { #Only calculates AIME if worker has enough QCs and is at or past their eligiblity age.
-          years_to_use <- min(i, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
-          # Optimized: use partial sort when years_to_use < i (O(n) vs O(n log n))
+          # Use earnings through age-1 (i-1 rows) since claim is on January 1 before current year's earnings
+          available_years <- i - 1
+          years_to_use <- min(available_years, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
+          # Optimized: use partial sort when years_to_use < available_years (O(n) vs O(n log n))
           # partial = k ensures elements 1:k are the k smallest, so we negate to get largest
-          earnings_subset <- indexed_earnings[1:i]
-          if (i > years_to_use) {
+          earnings_subset <- indexed_earnings[1:available_years]
+          if (available_years > years_to_use) {
             # Partial sort: get the years_to_use largest values efficiently
             top_earnings_sum <- sum(-sort(-earnings_subset, partial = 1:years_to_use)[1:years_to_use])
           } else {
@@ -212,8 +215,12 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
     ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, aime, qc_i, qc_tot, qc_rec, comp_period, elapsed_years, dropout_years, index_age, awi_index_age, index_factor, capped_earn, indexed_earn),
-                                   by = c("id", "age")) #Selects additional output if debugging
+    cols_to_add <- c("aime", "qc_i", "qc_tot", "qc_rec", "comp_period", "elapsed_years", "dropout_years", "index_age", "awi_index_age", "index_factor", "capped_earn", "indexed_earn")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id", "age"))
+    }
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, aime),
@@ -278,10 +285,13 @@ pia <- function(worker, assumptions, debugg = FALSE) {
     ) %>% select(-bp1, -bp2, -fact1, -fact2, -fact3, -elig_age_retired) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, basic_pia, bp1_elig, bp2_elig, fact1_elig, fact2_elig, fact3_elig),
-                                   by = c("id","age")) # Left joins vars for debugging
+    cols_to_add <- c("basic_pia", "bp1_elig", "bp2_elig", "fact1_elig", "fact2_elig", "fact3_elig")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id","age"))
+    }
   }
-
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, basic_pia),
                                    by = c("id","age")) #Left joins ony vars needed to continue benefit calculation
@@ -306,14 +316,24 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 #'
 #' @return worker Dataframe with a worker's COLA-adjusted retired worker and spousal PIA by age
 #'
+#' @importFrom dplyr lag
 #' @export
 cola <- function (worker, assumptions, debugg = FALSE) {
-  # COLA adjustments begin at eligibility age (elig_age_retired from assumptions)
-  # Negative COLAs are not payable under current law
+  # COLA adjustments apply year-by-year starting at eligibility age
   # SSA Handbook Section 719: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0719.html
+  #
+  # How COLA works:
+  # - At eligibility age (62): cola_basic_pia = basic_pia (no COLA applied yet)
+  # - At age 63: cola_basic_pia = basic_pia × (1 + COLA from eligibility year)
+  # - At age 64: cola_basic_pia = cola_pia_63 × (1 + COLA from age 63 year)
+  # - etc.
+  #
+  # The COLA announced in year Y (based on Q3 CPI-W change) is applied to
+  # benefits starting in January of year Y+1. So a worker reaching age 62
+  # in 2025 first receives a COLA'd benefit in 2026 (using the 2025 COLA).
 
   # Skip join if columns already present (from join_all_assumptions)
-  cols_needed <- c("cpi_w", "elig_age_retired")
+  cols_needed <- c("cola", "elig_age_retired")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -324,19 +344,60 @@ cola <- function (worker, assumptions, debugg = FALSE) {
     dataset <- worker
   }
 
-  dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>% mutate(
-    # Use worker's elig_age for COLA indexing (disability age for disabled workers, 62 for retired workers)
-    cpi_elig = cpi_w[which(age == first(elig_age) - 1)], # CPI-W at year before worker's eligibility age, used for indexing COLAs
-    cpi_index_factor = pmax(lag(cummax(cpi_w)) / cpi_elig, 1), # Indexing factor for COLAs. Negative COLAs are not payable under current law.
-    #COLA's are based on the change in the CPI-W up until the previous year.
-    # For example if you claim in June of 2025. The COLA payable in December of that year will be based
-    # on the percent change in the CPI-W from Q32024 to Q32025.
-    cola_basic_pia = floor(basic_pia * cpi_index_factor) # COLA'd PIA at each age, rounded down to the nearest dollar
-  ) %>% select(-elig_age_retired) %>% ungroup()
+  dataset <- dataset %>%
+    group_by(id) %>%
+    arrange(id, age) %>%
+    mutate(
+      # Calculate the COLA factor for each year
+      # At eligibility age: factor = 1 (no COLA yet)
+      # After eligibility age: factor = 1 + (previous year's COLA / 100)
+      # The lag() gives us the COLA from the previous year, which applies to current year's benefit
+      cola_factor = if_else(
+        age == elig_age,
+        1,
+        1 + pmax(lag(cola, default = 0), 0) / 100  # Negative COLAs not payable
+      ),
+      # Before eligibility age, factor is 1 (no effect)
+      cola_factor = if_else(age >= elig_age, cola_factor, 1)
+    ) %>%
+    # Apply COLA with year-by-year rounding (SSA method)
+    # Each year's COLA-adjusted PIA is the PREVIOUS year's rounded PIA times current COLA factor
+    # This matches how SSA actually calculates benefits
+    group_modify(~ {
+      n <- nrow(.x)
+      cola_basic_pia_vals <- numeric(n)
+      basic_pia <- .x$basic_pia
+      cola_factor <- .x$cola_factor
+      elig_age_val <- .x$elig_age[1]
+      ages <- .x$age
+
+      for (i in seq_len(n)) {
+        if (ages[i] < elig_age_val) {
+          cola_basic_pia_vals[i] <- 0
+        } else if (ages[i] == elig_age_val) {
+          # At eligibility age: no COLA yet, use basic_pia
+          cola_basic_pia_vals[i] <- basic_pia[i]
+        } else {
+          # After eligibility: multiply previous year's rounded PIA by current COLA factor
+          cola_basic_pia_vals[i] <- floor(cola_basic_pia_vals[i-1] * cola_factor[i])
+        }
+      }
+
+      .x$cola_basic_pia <- cola_basic_pia_vals
+      # Calculate cumulative factor for reference (informational only)
+      .x$cola_cum_factor <- cumprod(.x$cola_factor)
+      .x
+    }) %>%
+    select(-elig_age_retired) %>%
+    ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia, cpi_elig, cpi_index_factor),
-                                   by = c("id","age")) # Left joins full vars for debugging
+    cols_to_add <- c("cola_basic_pia", "cola_factor", "cola_cum_factor", "cola")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id","age"))
+    }
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, cola_basic_pia),
@@ -406,8 +467,12 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
-    worker <- worker %>% left_join(dataset %>% select(id, age, nra_ind, rf1_ind, rf2_ind, drc_ind, act_factor, wrk_ben),
-                                   by = c("id","age") ) #Left joins variable for debugging
+    cols_to_add <- c("nra_ind", "rf1_ind", "rf2_ind", "drc_ind", "act_factor", "wrk_ben")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+    if (length(cols_new) > 0) {
+      worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
+                                     by = c("id","age"))
+    }
   }
   else {
     worker <- worker %>% left_join(dataset %>% select(id, age, wrk_ben),

@@ -18,6 +18,7 @@ generate_single_worker(
   spouse_birth_yr = NULL,
   spouse_age_claim = NULL,
   spouse_custom_avg_earnings = NULL,
+  spouse_disabled_age = NULL,
   debugg = FALSE
 )
 }
@@ -47,6 +48,9 @@ generate_single_worker(
 \item{spouse_age_claim}{Numeric value(s) for the age(s) at which the spouse claims benefits. Default is NULL.}
 
 \item{spouse_custom_avg_earnings}{Numeric value(s) for spouse's real average earnings if spouse_type = "custom". Default is NULL.}
+
+\item{spouse_disabled_age}{Numeric value(s) for the age(s) at which the spouse becomes disabled. Default is NULL.
+Use this for spouses who become disabled at age 62 or later (up to NRA).}
 
 \item{debugg}{Boolean variable used to output additional variables for debugging.}
 }
