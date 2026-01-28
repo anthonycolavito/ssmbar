@@ -403,3 +403,365 @@ couple_measures <- function(worker, spouse = NULL, assumptions,
     ))
   }
 }
+
+
+#' Calculate Real Lifetime Benefits
+#'
+#' Calculates the sum of lifetime Social Security benefits in constant 2025
+#' dollars, deflated using the GDP price index from the Trustees Report assumptions.
+#'
+#' @param worker Data frame with calculated benefits. Must contain columns:
+#'   \code{id}, \code{year}, \code{age}, \code{annual_ind} (annual benefit),
+#'   \code{claim_age}, and \code{death_age}.
+#' @param assumptions Data frame with the prepared Trustees assumptions.
+#'   Must contain columns: \code{year} and \code{gdp_pi} (GDP price index).
+#' @param base_year Numeric value specifying the year to which benefits
+#'   are deflated. Default is 2025.
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{id}: Worker identifier
+#'     \item \code{real_benefits}: Sum of real lifetime benefits in base_year dollars
+#'   }
+#'
+#' @details
+#' Real benefits are calculated by deflating nominal benefits to constant
+#' dollars using the GDP price index. Benefits are normalized to the specified
+#' \code{base_year} (default 2025) for comparability across workers with
+#' different birth years.
+#'
+#' The formula for each year's real benefit is:
+#' \code{annual_benefit * (gdp_pi_base_year / gdp_pi_benefit_year)}
+#'
+#' Benefits are summed from the worker's claim age through their expected death age
+#' (based on cohort life expectancy). Benefits after death are excluded.
+#'
+#' @examples
+#' \dontrun{
+#' worker <- calculate_benefits(
+#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025
+#' )
+#' real_ben <- real_lifetime_benefits(worker, tr2025)
+#' }
+#'
+#' @importFrom dplyr %>% filter group_by summarise left_join first mutate
+#' @export
+real_lifetime_benefits <- function(worker, assumptions, base_year = 2025) {
+
+  # Validate required columns in worker data
+  worker_cols_needed <- c("id", "year", "age", "annual_ind")
+  if (!all(worker_cols_needed %in% names(worker))) {
+    stop(paste("worker data must contain:", paste(worker_cols_needed, collapse = ", ")))
+  }
+
+  # Get claim_age and death_age - may be in worker data or need to be derived
+  if (!"claim_age" %in% names(worker)) {
+    worker <- worker %>%
+      group_by(id) %>%
+      mutate(claim_age = min(age[annual_ind > 0], na.rm = TRUE)) %>%
+      ungroup()
+  }
+
+  if (!"death_age" %in% names(worker)) {
+    stop("worker data must contain 'death_age' column")
+  }
+
+  # Validate required columns in assumptions
+  assumption_cols_needed <- c("year", "gdp_pi")
+  if (!all(assumption_cols_needed %in% names(assumptions))) {
+    stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
+  }
+
+  # Get base year price index
+  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+  if (length(gdp_pi_base) == 0) {
+    stop(paste("base_year", base_year, "not found in assumptions"))
+  }
+
+  # Join gdp_pi from assumptions
+  dataset <- worker %>%
+    left_join(assumptions %>% select(year, gdp_pi), by = "year")
+
+  # Calculate real lifetime benefits
+  result <- dataset %>%
+    group_by(id) %>%
+    filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
+    mutate(
+      # Deflate benefits to base year constant dollars
+      price_scalar = gdp_pi_base / gdp_pi,
+      real_annual = annual_ind * price_scalar
+    ) %>%
+    summarise(
+      real_benefits = sum(real_annual, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  return(result)
+}
+
+
+#' Calculate Real Lifetime Earnings
+#'
+#' Calculates the sum of lifetime earnings in constant 2025 dollars,
+#' deflated using the GDP price index from the Trustees Report assumptions.
+#'
+#' @param worker Data frame with worker earnings. Must contain columns:
+#'   \code{id}, \code{year}, \code{age}, and \code{earnings}.
+#' @param assumptions Data frame with the prepared Trustees assumptions.
+#'   Must contain columns: \code{year} and \code{gdp_pi} (GDP price index).
+#' @param base_year Numeric value specifying the year to which earnings
+#'   are deflated. Default is 2025.
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{id}: Worker identifier
+#'     \item \code{real_earnings}: Sum of real lifetime earnings in base_year dollars
+#'   }
+#'
+#' @details
+#' Real earnings are calculated by deflating nominal earnings to constant
+#' dollars using the GDP price index. Earnings are normalized to the specified
+#' \code{base_year} (default 2025) for comparability across workers with
+#' different birth years.
+#'
+#' The formula for each year's real earnings is:
+#' \code{earnings * (gdp_pi_base_year / gdp_pi_earnings_year)}
+#'
+#' Earnings are summed from age 21 through age 64 (working years).
+#'
+#' @examples
+#' \dontrun{
+#' worker <- earnings_generator(
+#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025
+#' )
+#' real_earn <- real_lifetime_earnings(worker, tr2025)
+#' }
+#'
+#' @importFrom dplyr %>% filter group_by summarise left_join first mutate
+#' @export
+real_lifetime_earnings <- function(worker, assumptions, base_year = 2025) {
+
+  # Validate required columns in worker data
+  worker_cols_needed <- c("id", "year", "age", "earnings")
+  if (!all(worker_cols_needed %in% names(worker))) {
+    stop(paste("worker data must contain:", paste(worker_cols_needed, collapse = ", ")))
+  }
+
+  # Validate required columns in assumptions
+  assumption_cols_needed <- c("year", "gdp_pi")
+  if (!all(assumption_cols_needed %in% names(assumptions))) {
+    stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
+  }
+
+  # Get base year price index
+  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+  if (length(gdp_pi_base) == 0) {
+    stop(paste("base_year", base_year, "not found in assumptions"))
+  }
+
+  # Join gdp_pi from assumptions
+  dataset <- worker %>%
+    left_join(assumptions %>% select(year, gdp_pi), by = "year")
+
+  # Calculate real lifetime earnings
+  result <- dataset %>%
+    group_by(id) %>%
+    filter(age >= 21 & age <= 64) %>%
+    mutate(
+      # Deflate earnings to base year constant dollars
+      price_scalar = gdp_pi_base / gdp_pi,
+      real_annual = earnings * price_scalar
+    ) %>%
+    summarise(
+      real_earnings = sum(real_annual, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  return(result)
+}
+
+
+#' Calculate Present Value of Lifetime Earnings
+#'
+#' Calculates the present value of lifetime earnings from age 21 through
+#' age 64, discounted using the nominal effective discount factor from
+#' the Trustees Report assumptions.
+#'
+#' @param worker Data frame with worker earnings. Must contain columns:
+#'   \code{id}, \code{year}, \code{age}, and \code{earnings}.
+#' @param assumptions Data frame with the prepared Trustees assumptions.
+#'   Must contain columns: \code{year} and \code{df} (nominal discount factor).
+#' @param discount_to_age Numeric value specifying the age to which earnings
+#'   are discounted. Default is 65.
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{id}: Worker identifier
+#'     \item \code{pv_earnings}: Present value of lifetime earnings
+#'   }
+#'
+#' @details
+#' The present value calculation uses the nominal effective discount factor
+#' (\code{df}) from the Trustees Report assumptions. Since earnings amounts
+#' are in nominal dollars, the nominal discount factor is appropriate.
+#' Earnings are normalized to the specified \code{discount_to_age} (default 65)
+#' for comparability across workers.
+#'
+#' The formula for each year's discounted earnings is:
+#' \code{earnings * (df_at_discount_age / df_at_earnings_year)}
+#'
+#' Earnings are summed from age 21 through age 64 (working years).
+#'
+#' @examples
+#' \dontrun{
+#' worker <- earnings_generator(
+#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025
+#' )
+#' pv_earn <- pv_lifetime_earnings(worker, tr2025)
+#' }
+#'
+#' @importFrom dplyr %>% filter group_by summarise left_join first mutate
+#' @export
+pv_lifetime_earnings <- function(worker, assumptions, discount_to_age = 65) {
+
+  # Validate required columns in worker data
+  worker_cols_needed <- c("id", "year", "age", "earnings")
+  if (!all(worker_cols_needed %in% names(worker))) {
+    stop(paste("worker data must contain:", paste(worker_cols_needed, collapse = ", ")))
+  }
+
+  # Validate required columns in assumptions
+  assumption_cols_needed <- c("year", "df")
+  if (!all(assumption_cols_needed %in% names(assumptions))) {
+    stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
+  }
+
+  # Join df from assumptions
+  dataset <- worker %>%
+    left_join(assumptions %>% select(year, df), by = "year")
+
+  # Calculate PV of lifetime earnings (ages 21-64)
+  result <- dataset %>%
+    group_by(id) %>%
+    mutate(
+      # Get discount factor at the normalization age BEFORE filtering
+      birth_yr = first(year) - first(age),
+      discount_year = birth_yr + discount_to_age,
+      df_norm = df[which(year == discount_year)][1]
+    ) %>%
+    filter(age >= 21 & age <= 64) %>%
+    mutate(
+      # Discount earnings to the normalization age
+      pv_factor = df_norm / df,
+      pv_annual = earnings * pv_factor
+    ) %>%
+    summarise(
+      pv_earnings = sum(pv_annual, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  return(result)
+}
+
+
+#' Calculate Real Benefit-Earnings Ratio
+#'
+#' Calculates the ratio of real (price-deflated) lifetime benefits to
+#' real lifetime earnings.
+#'
+#' @param real_benefits Numeric vector of real lifetime benefits, or a
+#'   data frame with a \code{real_benefits} column.
+#' @param real_earnings Numeric vector of real lifetime earnings, or a
+#'   data frame with a \code{real_earnings} column.
+#'
+#' @return Numeric vector of real benefit-earnings ratios.
+#'
+#' @details
+#' The real benefit-earnings ratio indicates how many constant dollars of
+#' benefits are received for each constant dollar of earnings, both deflated
+#' to the same base year. A ratio greater than 1 indicates lifetime benefits
+#' exceed lifetime earnings in real terms.
+#'
+#' @examples
+#' \dontrun{
+#' real_ben <- real_lifetime_benefits(worker, tr2025)
+#' real_earn <- real_lifetime_earnings(worker, tr2025)
+#' ratio <- real_benefit_earnings_ratio(real_ben, real_earn)
+#' }
+#'
+#' @export
+real_benefit_earnings_ratio <- function(real_benefits, real_earnings) {
+
+  # Extract numeric values if data frames are provided
+  if (is.data.frame(real_benefits)) {
+    if (!"real_benefits" %in% names(real_benefits)) {
+      stop("real_benefits data frame must contain 'real_benefits' column")
+    }
+    real_benefits <- real_benefits$real_benefits
+  }
+
+  if (is.data.frame(real_earnings)) {
+    if (!"real_earnings" %in% names(real_earnings)) {
+      stop("real_earnings data frame must contain 'real_earnings' column")
+    }
+    real_earnings <- real_earnings$real_earnings
+  }
+
+  # Calculate ratio, handling division by zero
+  ratio <- ifelse(real_earnings == 0, NA_real_, real_benefits / real_earnings)
+
+  return(ratio)
+}
+
+
+#' Calculate PV Benefit-Earnings Ratio
+#'
+#' Calculates the ratio of present value of lifetime benefits to
+#' present value of lifetime earnings.
+#'
+#' @param pv_benefits Numeric vector of PV lifetime benefits, or a
+#'   data frame with a \code{pv_benefits} column.
+#' @param pv_earnings Numeric vector of PV lifetime earnings, or a
+#'   data frame with a \code{pv_earnings} column.
+#'
+#' @return Numeric vector of PV benefit-earnings ratios.
+#'
+#' @details
+#' The PV benefit-earnings ratio indicates how many present-value dollars of
+#' benefits are received for each present-value dollar of earnings, both
+#' discounted to the same base year. A ratio greater than 1 indicates PV of
+#' lifetime benefits exceeds PV of lifetime earnings.
+#'
+#' @examples
+#' \dontrun{
+#' pv_ben <- pv_lifetime_benefits(worker, tr2025)
+#' pv_earn <- pv_lifetime_earnings(worker, tr2025)
+#' ratio <- pv_benefit_earnings_ratio(pv_ben, pv_earn)
+#' }
+#'
+#' @export
+pv_benefit_earnings_ratio <- function(pv_benefits, pv_earnings) {
+
+  # Extract numeric values if data frames are provided
+  if (is.data.frame(pv_benefits)) {
+    if (!"pv_benefits" %in% names(pv_benefits)) {
+      stop("pv_benefits data frame must contain 'pv_benefits' column")
+    }
+    pv_benefits <- pv_benefits$pv_benefits
+  }
+
+  if (is.data.frame(pv_earnings)) {
+    if (!"pv_earnings" %in% names(pv_earnings)) {
+      stop("pv_earnings data frame must contain 'pv_earnings' column")
+    }
+    pv_earnings <- pv_earnings$pv_earnings
+  }
+
+  # Calculate ratio, handling division by zero
+  ratio <- ifelse(pv_earnings == 0, NA_real_, pv_benefits / pv_earnings)
+
+  return(ratio)
+}

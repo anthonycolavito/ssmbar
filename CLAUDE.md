@@ -127,6 +127,69 @@ Located in `scripts/`:
 
 ---
 
+---
+
+## Benefit Explorer Shiny App (January 2026)
+
+### Overview
+
+A Shiny visualization app for exploring Social Security benefit calculations, launched via `run_app()`.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `R/pv_functions.R` | Present value calculation functions |
+| `R/run_app.R` | App launcher function |
+| `inst/shiny/benefit_explorer/app.R` | Main app (ui + server) |
+| `inst/shiny/benefit_explorer/global.R` | Load packages and data |
+| `inst/shiny/benefit_explorer/modules/mod_worker_input.R` | Worker selection sidebar |
+| `inst/shiny/benefit_explorer/modules/mod_benefits.R` | Benefits over time charts |
+| `inst/shiny/benefit_explorer/modules/mod_replacement.R` | Replacement rate comparisons |
+| `inst/shiny/benefit_explorer/modules/mod_lifetime.R` | PV benefits/taxes display |
+| `inst/shiny/benefit_explorer/modules/mod_ratios.R` | Benefit-tax ratios |
+
+### PV Functions
+
+1. **`pv_lifetime_benefits()`** - Sum of discounted annual benefits from claim_age to death_age
+2. **`pv_lifetime_taxes()`** - Sum of discounted SS taxes from age 21-64
+3. **`benefit_tax_ratio()`** - Ratio of PV benefits to PV taxes
+4. **`couple_measures()`** - Combined worker + spouse calculations with 50/50 split option
+5. **`real_lifetime_benefits()`** - Sum of price-deflated benefits
+6. **`real_lifetime_earnings()`** - Sum of price-deflated earnings
+7. **`pv_lifetime_earnings()`** - Sum of discounted earnings
+
+### Critical Implementation Rules
+
+1. **Nominal discount factor for nominal cash flows**: PV calculations use `df` (nominal effective discount factor), not `real_df`, because benefits and taxes are in nominal dollars.
+
+2. **Discount factor lookup before filtering**: The `df_norm` lookup must happen BEFORE filtering rows, otherwise the discount year (e.g., age 65) may be excluded:
+   ```r
+   # CORRECT: Lookup df_norm in mutate before filter
+   mutate(df_norm = df[which(year == discount_year)][1]) %>%
+   filter(age >= claim_age & age < death_age)
+
+   # WRONG: Filtering first loses access to age 65 row
+   filter(age >= claim_age) %>%
+   mutate(df_norm = ...)  # Age 65 row already gone!
+   ```
+
+3. **Death age exclusion**: Use `age < death_age` (not `<=`) to exclude benefits in the year of death.
+
+4. **Real deflation normalization**: When deflating to real dollars, normalize to a consistent age (default 65) using `gdp_pi[age_65] / gdp_pi[year]`.
+
+5. **rep_rates() uses real_df**: The replacement rate PV annuity calculation uses `real_df` because it's computing a real annuity equivalent.
+
+### Test Results
+
+All 382 tests pass:
+- 256 regression tests
+- 67 reform tests
+- 46 PV function tests
+- 13 actuarial tests
+
+---
+
 ## Owner
 
 Anthony Colavito (colavito@crfb.org) - Committee for a Responsible Federal Budget
