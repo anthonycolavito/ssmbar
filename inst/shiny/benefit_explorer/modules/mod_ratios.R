@@ -43,9 +43,9 @@ ratios_ui <- function(id) {
         tags$hr(),
         tags$p(
           class = "text-muted small",
-          "Note: The ratio uses the real discount rate from the Trustees Report. ",
-          "Different assumptions about interest rates, mortality, or claiming behavior ",
-          "would change these results."
+          "Note: All values are in real 2025 dollars, discounted to age 65 using ",
+          "the real discount factor from the Trustees Report. Different assumptions ",
+          "about interest rates, mortality, or claiming behavior would change these results."
         )
       )
     ),

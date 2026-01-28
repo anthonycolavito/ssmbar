@@ -41,12 +41,12 @@ SEX_OPTIONS <- c(
 # Birth year range
 BIRTH_YEAR_MIN <- 1940
 BIRTH_YEAR_MAX <- 2010
-BIRTH_YEAR_DEFAULT <- 1970
+BIRTH_YEAR_DEFAULT <- 1960
 
 # Claim age range
 CLAIM_AGE_MIN <- 62
 CLAIM_AGE_MAX <- 70
-CLAIM_AGE_DEFAULT <- 67
+CLAIM_AGE_DEFAULT <- 65
 
 # Default custom earnings amount (in current dollars)
 CUSTOM_EARNINGS_DEFAULT <- 50000

@@ -80,19 +80,19 @@ replacement_ui <- function(id) {
       card_body(
         tags$dl(
           tags$dt("PV Annuity"),
-          tags$dd("Initial benefit divided by a constant real payment with the same present value as career earnings. Most comprehensive measure."),
+          tags$dd("Initial benefit at claim age divided by a constant real payment with the same present value as career earnings (ages 21 through year before claiming)."),
 
           tags$dt("Real (Inflation-Adjusted)"),
-          tags$dd("Compares benefit to earnings adjusted for inflation (purchasing power). Shows what percentage of real income is replaced."),
+          tags$dd("Compares benefit at claim age to earnings adjusted for inflation to the year before claiming. Shows what percentage of real income is replaced."),
 
           tags$dt("Wage-Indexed"),
-          tags$dd("Compares benefit to earnings adjusted for wage growth. This is the methodology used by SSA in official calculations."),
+          tags$dd("Compares benefit at claim age to earnings adjusted for wage growth to the year before claiming. This methodology matches SSA's official calculations."),
 
           tags$dt("Highest N Years"),
-          tags$dd("Uses only the highest N years of earnings. High-35 matches the AIME calculation period."),
+          tags$dd("Uses only the highest N years of earnings (from ages 21 through year before claiming). High-35 matches the AIME calculation period."),
 
           tags$dt("Last N Years"),
-          tags$dd("Uses only the final N years of earnings before retirement. Reflects pre-retirement living standard.")
+          tags$dd("Uses only the final N years of earnings before claiming. Reflects pre-claiming living standard.")
         )
       )
     ),

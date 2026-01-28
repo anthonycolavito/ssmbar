@@ -159,26 +159,78 @@ A Shiny visualization app for exploring Social Security benefit calculations, la
 6. **`real_lifetime_earnings()`** - Sum of price-deflated earnings
 7. **`pv_lifetime_earnings()`** - Sum of discounted earnings
 
+### Methodological Choices (January 2026)
+
+#### Present Value Calculations
+
+All PV calculations use **real 2025 dollars** to ensure comparability across time:
+
+1. **Two-step PV methodology**:
+   - Step 1: Convert nominal cash flows to real 2025 dollars using GDP price index: `real_value = nominal × (gdp_pi_2025 / gdp_pi_year)`
+   - Step 2: Discount real values using the real discount factor (real_df) from Trustees assumptions
+   - This ensures real sums and PV measures are directly comparable
+
+2. **Discount to age 65**: All PV calculations normalize to age 65 by default. The discount factor at age 65 becomes the reference point.
+
+3. **Death age exclusion**: Use `age < death_age` (not `<=`) to exclude benefits in the year of death.
+
+4. **Tax period**: Taxes calculated ages 21-64 (working years before typical retirement).
+
+5. **Benefit period**: Benefits calculated from claim_age to death_age - 1.
+
+6. **Employer taxes optional**: `include_employer = TRUE` doubles the employee tax to capture total payroll tax contribution.
+
+#### Replacement Rate Calculations
+
+1. **Numerator**: Always the **annual benefit at claim age** (not age 65).
+
+2. **Denominator**: Earnings through the **year before claiming** (not age 64).
+   - For claim age 67, uses earnings ages 21-66
+   - For claim age 62, uses earnings ages 21-61
+
+3. **Indexing reference year**: The year before claiming (not a fixed year).
+   - Wage-indexed earnings use AWI from year before claiming
+   - Real earnings use GDP PI from year before claiming
+
+4. **PV Annuity replacement rate**: Uses real discount factor to compute a constant real payment with the same present value as career earnings. Initial benefit divided by this annuity gives the PV replacement rate.
+
+5. **High-N vs Last-N**:
+   - High-N: Uses N highest earning years (sorted descending)
+   - Last-N: Uses final N years before claiming
+
+#### Couple Analysis
+
+1. **Shared measures**: For couple analysis, benefits and taxes are split 50/50 between spouses to represent household resource sharing.
+
+2. **Individual vs combined**: Both individual ratios and combined couple ratio are displayed.
+
+#### App Defaults
+
+- Default birth year: 1960 (validated against V.C7)
+- Default claim age: 65
+- Default worker type: Medium earner
+
 ### Critical Implementation Rules
 
-1. **Nominal discount factor for nominal cash flows**: PV calculations use `df` (nominal effective discount factor), not `real_df`, because benefits and taxes are in nominal dollars.
-
-2. **Discount factor lookup before filtering**: The `df_norm` lookup must happen BEFORE filtering rows, otherwise the discount year (e.g., age 65) may be excluded:
+1. **Discount factor lookup before filtering**: The `real_df_norm` lookup must happen BEFORE filtering rows, otherwise the discount year (age 65) may be excluded:
    ```r
-   # CORRECT: Lookup df_norm in mutate before filter
-   mutate(df_norm = df[which(year == discount_year)][1]) %>%
+   # CORRECT: Lookup in mutate before filter
+   mutate(real_df_norm = real_df[which(age == 65)][1]) %>%
    filter(age >= claim_age & age < death_age)
 
    # WRONG: Filtering first loses access to age 65 row
    filter(age >= claim_age) %>%
-   mutate(df_norm = ...)  # Age 65 row already gone!
+   mutate(real_df_norm = ...)  # Age 65 row already gone!
    ```
 
-3. **Death age exclusion**: Use `age < death_age` (not `<=`) to exclude benefits in the year of death.
+2. **Column join conflicts**: When joining assumption columns, always check if they already exist:
+   ```r
+   if (!"gdp_pi" %in% names(worker)) {
+     worker <- worker %>% left_join(assumptions %>% select(year, gdp_pi), by = "year")
+   }
+   ```
 
-4. **Real deflation normalization**: When deflating to real dollars, normalize to a consistent age (default 65) using `gdp_pi[age_65] / gdp_pi[year]`.
-
-5. **rep_rates() uses real_df**: The replacement rate PV annuity calculation uses `real_df` because it's computing a real annuity equivalent.
+3. **rep_rates() internal function**: Uses `ssmbar:::rep_rates()` in the app since it's not exported.
 
 ### Test Results
 
