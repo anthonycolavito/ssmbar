@@ -3,6 +3,22 @@
 # =============================================================================
 # Displays benefit amounts over time in real and nominal dollars
 
+# Beneficiary class labels for display
+BC_LABELS <- c(
+  "AR" = "Retired Worker",
+  "ARB" = "Retired + Spousal",
+  "ARD" = "Retired + Widow(er)",
+  "ARF" = "Retired + Disabled Widow(er)",
+  "AD" = "Disabled Worker",
+  "ADB" = "Disabled + Spousal",
+  "ADD" = "Disabled + Widow(er)",
+  "ADF" = "Disabled + Disabled Widow(er)",
+  "BR" = "Spouse Only (Retired)",
+  "BD" = "Spouse Only (Disabled)",
+  "D" = "Widow(er) Only",
+  "F" = "Disabled Widow(er) Only"
+)
+
 # Module UI
 benefits_ui <- function(id) {
   ns <- NS(id)
@@ -130,12 +146,23 @@ benefits_server <- function(id, worker_data) {
         "Annual Benefit (2025 $)"
       }
 
+      # Create BC label for display (use short codes for chart)
+      data_filtered <- data_filtered %>%
+        mutate(bc_label = if ("bc" %in% names(.)) bc else "AR")
+
       p <- ggplot(data_filtered, aes(x = age, y = .data[[y_var]],
                                       color = scenario, group = scenario)) +
         geom_line(linewidth = 1.2) +
-        geom_point(size = 2, alpha = 0.7) +
+        geom_point(aes(shape = bc_label), size = 2.5, alpha = 0.8) +
         scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0, 0.1))) +
         scale_color_manual(values = CHART_COLORS) +
+        scale_shape_manual(
+          values = c("AR" = 16, "ARB" = 17, "ARD" = 15, "ARF" = 18,
+                     "AD" = 1, "ADB" = 2, "ADD" = 0, "ADF" = 5,
+                     "BR" = 3, "BD" = 4, "D" = 6, "F" = 8),
+          labels = BC_LABELS,
+          name = "Benefit Class"
+        ) +
         labs(
           title = "Annual Social Security Benefits by Age",
           subtitle = if (input$chart_type == "nominal") {
@@ -147,7 +174,8 @@ benefits_server <- function(id, worker_data) {
           y = y_label,
           color = "Worker"
         ) +
-        chart_theme
+        chart_theme +
+        theme(legend.box = "vertical")
 
       p
     })
@@ -177,9 +205,10 @@ benefits_server <- function(id, worker_data) {
         primary$annual_ind[primary$age == 70]
       } else NA
 
-      # Total lifetime benefits (nominal)
-      total_nominal <- sum(primary$annual_ind[primary$age >= claim_age &
-                                                primary$age <= death_age], na.rm = TRUE)
+      # PV of lifetime benefits (discounted to age 65)
+      pv_ben <- tryCatch({
+        pv_lifetime_benefits(primary, assumptions, discount_to_age = 65)$pv_benefits[1]
+      }, error = function(e) NA_real_)
 
       # Real benefit at claim (deflated using GDP price index)
       gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
@@ -215,8 +244,8 @@ benefits_server <- function(id, worker_data) {
                    tags$h4(if (!is.na(ben_at_70)) format_currency(ben_at_70) else "N/A")
           ),
           tags$div(class = "mb-3",
-                   tags$small(class = "text-muted", "Total Lifetime Benefits"),
-                   tags$h4(format_currency(total_nominal))
+                   tags$small(class = "text-muted", "PV Lifetime Benefits (age 65)"),
+                   tags$h4(format_currency(pv_ben))
           )
         )
       )
@@ -228,17 +257,22 @@ benefits_server <- function(id, worker_data) {
       if (is.null(data)) return(NULL)
 
       # Select and format relevant columns (filter to death age)
+      # Include BC column with human-readable labels
       table_data <- data %>%
         filter(annual_ind > 0 & age < death_age) %>%
-        select(scenario, year, age, annual_nominal, annual_real) %>%
         mutate(
+          bc_display = if ("bc" %in% names(.)) {
+            ifelse(is.na(bc), "", BC_LABELS[bc])
+          } else "Retired Worker",
           annual_nominal = round(annual_nominal, 0),
           annual_real = round(annual_real, 0)
         ) %>%
+        select(scenario, year, age, bc_display, annual_nominal, annual_real) %>%
         rename(
           Scenario = scenario,
           Year = year,
           Age = age,
+          `Benefit Class` = bc_display,
           `Nominal ($)` = annual_nominal,
           `Real 2025 ($)` = annual_real
         )
@@ -265,7 +299,14 @@ benefits_server <- function(id, worker_data) {
         if (!is.null(data)) {
           export_data <- data %>%
             filter(annual_ind > 0 & age < death_age) %>%
-            select(scenario, id, year, age, earnings, annual_nominal, annual_real)
+            mutate(
+              bc_label = if ("bc" %in% names(.)) BC_LABELS[bc] else "Retired Worker"
+            )
+          # Select columns that exist
+          export_cols <- c("scenario", "id", "year", "age", "bc", "bc_label",
+                           "earnings", "annual_nominal", "annual_real")
+          export_cols <- intersect(export_cols, names(export_data))
+          export_data <- export_data %>% select(all_of(export_cols))
           write.csv(export_data, file, row.names = FALSE)
         }
       }
