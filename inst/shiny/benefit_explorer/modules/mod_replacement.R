@@ -192,49 +192,96 @@ replacement_server <- function(id, worker_data) {
                  theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
       }
 
+      # Count scenarios
+      n_scenarios <- length(unique(data$scenario))
+
+      # Warning for too many selections
+      if (length(selected_types) > 6 || n_scenarios > 4) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = paste0("Too many selections for clear display.\n",
+                                        "Selected: ", length(selected_types), " rate types, ",
+                                        n_scenarios, " scenarios.\n",
+                                        "Please select at most 6 rate types and 4 scenarios."),
+                          size = 5, color = CRFB_ORANGE, lineheight = 1.3) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
       data_filtered <- data %>%
         filter(type %in% selected_types)
 
       if (nrow(data_filtered) == 0) return(NULL)
 
-      # Create nice labels for rate types
+      # Create nice labels for rate types and assign categories
       type_labels <- c(
         "pv_rr" = "PV Annuity",
-        "real_all" = "Real All",
-        "wage_all" = "Wage All",
-        "real_h35" = "Real High-35",
-        "wage_h35" = "Wage High-35",
-        "real_h10" = "Real High-10",
-        "wage_h10" = "Wage High-10",
-        "real_h5" = "Real High-5",
-        "wage_h5" = "Wage High-5",
-        "real_l35" = "Real Last-35",
-        "wage_l35" = "Wage Last-35",
-        "real_l10" = "Real Last-10",
-        "wage_l10" = "Wage Last-10",
-        "real_l5" = "Real Last-5",
-        "wage_l5" = "Wage Last-5"
+        "real_all" = "All Years",
+        "wage_all" = "All Years",
+        "real_h35" = "High-35",
+        "wage_h35" = "High-35",
+        "real_h10" = "High-10",
+        "wage_h10" = "High-10",
+        "real_h5" = "High-5",
+        "wage_h5" = "High-5",
+        "real_l35" = "Last-35",
+        "wage_l35" = "Last-35",
+        "real_l10" = "Last-10",
+        "wage_l10" = "Last-10",
+        "real_l5" = "Last-5",
+        "wage_l5" = "Last-5"
+      )
+
+      # Category mapping for faceting
+      type_categories <- c(
+        "pv_rr" = "Present Value",
+        "real_all" = "Real (Inflation-Adj)",
+        "wage_all" = "Wage-Indexed",
+        "real_h35" = "Real (Inflation-Adj)",
+        "wage_h35" = "Wage-Indexed",
+        "real_h10" = "Real (Inflation-Adj)",
+        "wage_h10" = "Wage-Indexed",
+        "real_h5" = "Real (Inflation-Adj)",
+        "wage_h5" = "Wage-Indexed",
+        "real_l35" = "Real (Inflation-Adj)",
+        "wage_l35" = "Wage-Indexed",
+        "real_l10" = "Real (Inflation-Adj)",
+        "wage_l10" = "Wage-Indexed",
+        "real_l5" = "Real (Inflation-Adj)",
+        "wage_l5" = "Wage-Indexed"
       )
 
       data_filtered <- data_filtered %>%
-        mutate(type_label = type_labels[type])
+        mutate(
+          type_label = type_labels[type],
+          category = factor(type_categories[type],
+                           levels = c("Present Value", "Real (Inflation-Adj)", "Wage-Indexed"))
+        )
+
+      # Count active categories for faceting
+      active_categories <- unique(data_filtered$category)
 
       p <- ggplot(data_filtered, aes(x = type_label, y = rep_rate, fill = scenario)) +
         geom_col(position = position_dodge(width = 0.8), width = 0.7) +
         geom_text(aes(label = percent(rep_rate, accuracy = 0.1)),
                   position = position_dodge(width = 0.8),
-                  vjust = -0.5, size = 3.5) +
-        scale_y_continuous(labels = percent_format(), expand = expansion(mult = c(0, 0.15))) +
+                  vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = percent_format(), expand = expansion(mult = c(0, 0.2))) +
         scale_fill_manual(values = CHART_COLORS) +
         labs(
           title = "Social Security Replacement Rates",
           subtitle = "Initial annual benefit as percentage of prior earnings",
-          x = "Replacement Rate Measure",
+          x = NULL,
           y = "Replacement Rate",
           fill = "Worker"
         ) +
         chart_theme +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 9))
+
+      # Add faceting if multiple categories
+      if (length(active_categories) > 1) {
+        p <- p + facet_wrap(~ category, scales = "free_x", nrow = 1)
+      }
 
       p
     })
