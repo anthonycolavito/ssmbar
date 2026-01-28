@@ -51,38 +51,47 @@ CLAIM_AGE_DEFAULT <- 67
 # Default custom earnings amount (in current dollars)
 CUSTOM_EARNINGS_DEFAULT <- 50000
 
+# CRFB Color Palette
+CRFB_DARK_BLUE <- "#003477"
+CRFB_LIGHT_BLUE <- "#9ACDFF"
+CRFB_ORANGE <- "#F36107"
+CRFB_RED <- "#EE3224"
+CRFB_PURPLE <- "#2A368A"
+CRFB_TEAL <- "#0A81A8"
+CRFB_GRAY <- "#666666"
+
 # Theme configuration
 app_theme <- bs_theme(
-bootswatch = "flatly",
-primary = "#0d6efd",
-secondary = "#6c757d",
-success = "#198754",
-info = "#0dcaf0",
-warning = "#ffc107",
-danger = "#dc3545",
-font_scale = 0.95,
-`enable-rounded` = TRUE
+  bootswatch = "flatly",
+  primary = CRFB_DARK_BLUE,
+  secondary = CRFB_GRAY,
+  success = CRFB_TEAL,
+  info = CRFB_LIGHT_BLUE,
+  warning = CRFB_ORANGE,
+  danger = CRFB_RED,
+  font_scale = 0.95,
+  `enable-rounded` = TRUE
 )
 
 # Chart theme for ggplot
 chart_theme <- theme_minimal(base_size = 12) +
-theme(
-  plot.title = element_text(face = "bold", size = 14),
-  plot.subtitle = element_text(color = "gray50"),
-  legend.position = "bottom",
-  panel.grid.minor = element_blank(),
-  axis.title = element_text(size = 11),
-  axis.text = element_text(size = 10)
-)
+  theme(
+    plot.title = element_text(face = "bold", size = 14, color = CRFB_DARK_BLUE),
+    plot.subtitle = element_text(color = CRFB_GRAY),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(size = 11, color = CRFB_GRAY),
+    axis.text = element_text(size = 10, color = CRFB_GRAY)
+  )
 
-# Color palette for charts
+# Color palette for charts (CRFB brand colors)
 CHART_COLORS <- c(
-"#0d6efd",  # Primary blue
-"#198754",  # Success green
-"#dc3545",  # Danger red
-"#ffc107",  # Warning yellow
-"#6f42c1",  # Purple
-"#20c997"   # Teal
+  CRFB_DARK_BLUE,  # Primary - CRFB Dark Blue
+  CRFB_ORANGE,     # Secondary - Contrast Orange
+  CRFB_TEAL,       # Third - Website Teal
+  CRFB_RED,        # Fourth - FTD Red
+  CRFB_PURPLE,     # Fifth - SSDI Purple
+  CRFB_LIGHT_BLUE  # Sixth - CRFB Light Blue
 )
 
 # Helper function to format currency

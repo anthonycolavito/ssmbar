@@ -150,11 +150,20 @@ benefits_server <- function(id, worker_data) {
       data_filtered <- data_filtered %>%
         mutate(bc_label = if ("bc" %in% names(.)) bc else "AR")
 
+      # Calculate y-axis range with padding to show trajectory clearly
+      y_values <- data_filtered[[y_var]]
+      y_min <- min(y_values, na.rm = TRUE)
+      y_max <- max(y_values, na.rm = TRUE)
+      y_range <- y_max - y_min
+      # Add 10% padding, but start axis at a round number near the minimum
+      y_axis_min <- max(0, floor((y_min - y_range * 0.1) / 5000) * 5000)
+      y_axis_max <- ceiling((y_max + y_range * 0.1) / 5000) * 5000
+
       p <- ggplot(data_filtered, aes(x = age, y = .data[[y_var]],
                                       color = scenario, group = scenario)) +
         geom_line(linewidth = 1.2) +
         geom_point(aes(shape = bc_label), size = 2.5, alpha = 0.8) +
-        scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0.05, 0.1))) +
+        scale_y_continuous(labels = dollar_format(), limits = c(y_axis_min, y_axis_max)) +
         scale_color_manual(values = CHART_COLORS) +
         scale_shape_manual(
           values = c("AR" = 16, "ARB" = 17, "ARD" = 15, "ARF" = 18,
