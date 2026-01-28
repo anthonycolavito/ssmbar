@@ -117,6 +117,65 @@ This stems from cumulative small rounding differences in `scaled_factor × AWI` 
 
 4. **COLA timing**: Year-by-year COLA application with flooring at each step is implemented correctly
 
+---
+
+## Code Changes (January 27, 2026)
+
+### COLA Calculation Fix
+
+**File**: `R/benefit_calculations.R` - `cola()` function
+
+The COLA calculation was corrected to use year-by-year application with flooring at each step:
+
+```r
+# Previous (incorrect): Applied cumulative COLA factor
+benefit * cumulative_cola_factor
+
+# Current (correct): Apply each year's COLA sequentially with floor()
+for (each year from eligibility to current) {
+  benefit <- floor(benefit * (1 + cola_rate))
+}
+```
+
+**Key changes:**
+- Added `cola.csv` with historical COLA rates through 2025
+- Updated `tr2025` data to include `cola` column
+- COLA now applied year-by-year from age 62 (eligibility year) through current year
+- Each year's result is floored before applying next year's COLA
+- Matches SSA's actual benefit calculation methodology
+
+### Life Expectancy Calculation Fix
+
+**File**: `R/earnings.R` - `earnings_generator()` function
+
+Fixed the life expectancy calculation for gender-neutral ("all") option:
+
+```r
+# Previous (incorrect): mean() treats second argument as trim parameter
+death_age <- mean(male_life_exp, female_life_exp)
+
+# Current (correct): Combine into vector first
+death_age <- mean(c(male_life_exp, female_life_exp))
+```
+
+### rep_rates() Function Update
+
+**File**: `R/analytic_functions.R`
+
+Changed from hardcoded age 65 to use actual claim age:
+- Numerator: Benefit at actual claim age (not always 65)
+- Denominator: Earnings through year before claiming
+- Indexing year: Year before claiming (not year turning 64)
+
+### PV Functions Update
+
+**File**: `R/pv_functions.R`
+
+Changed methodology to use real 2025 dollars:
+1. Convert nominal cash flows to real 2025$ using GDP price index
+2. Discount real values using `real_df` (real discount factor)
+3. All PV measures now directly comparable to real (undiscounted) sums
+
 ### Validation Scripts
 
 Located in `scripts/`:
