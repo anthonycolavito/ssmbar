@@ -7,97 +7,90 @@
 lifetime_ui <- function(id) {
   ns <- NS(id)
 
-  layout_columns(
-    col_widths = c(6, 6, 6, 6, 4, 4, 4, 12),
-
-    # Row 1: Present Value measures
-    # Left - Benefits PV
-    card(
-      card_header(
-        class = "bg-success text-white",
-        "PV Lifetime Benefits"
-      ),
-      card_body(
-        uiOutput(ns("pv_benefits_display"))
-      )
-    ),
-
-    # Right - Taxes PV
-    card(
-      card_header(
-        class = "bg-danger text-white",
-        "PV Lifetime Taxes"
-      ),
-      card_body(
-        checkboxInput(
-          ns("include_employer"),
-          "Include Employer Share of Taxes",
-          value = TRUE
-        ),
-        uiOutput(ns("pv_taxes_display"))
-      )
-    ),
-
-    # Row 2: Real (price-deflated) measures
-    # Left - Real Benefits
-    card(
-      card_header(
-        class = "bg-info text-white",
-        "Real Lifetime Benefits"
-      ),
-      card_body(
-        uiOutput(ns("real_benefits_display"))
-      )
-    ),
-
-    # Right - Real Earnings and PV Earnings
-    card(
-      card_header(
-        class = "bg-secondary text-white",
-        "Lifetime Earnings"
-      ),
-      card_body(
-        uiOutput(ns("earnings_display"))
-      )
-    ),
-
-    # Row 3: Ratios
-    card(
-      card_header("Benefit-Tax Ratio"),
-      card_body(
-        uiOutput(ns("benefit_tax_ratio_display"))
-      )
-    ),
-
-    card(
-      card_header("Real Benefit-Earnings Ratio"),
-      card_body(
-        uiOutput(ns("real_ratio_display"))
-      )
-    ),
-
-    card(
-      card_header("PV Benefit-Earnings Ratio"),
-      card_body(
-        uiOutput(ns("pv_ratio_display"))
-      )
-    ),
-
-    # Bottom - Comparison chart
-    card(
-      card_header("Benefits vs Taxes Over Time"),
-      card_body(
-        radioButtons(
-          ns("flow_type"),
-          NULL,
-          choices = c(
-            "Annual Flow" = "annual",
-            "Cumulative (Undiscounted)" = "cumulative"
+  tagList(
+    # Top row - Chart (most prominent)
+    fluidRow(
+      column(12,
+        card(
+          card_header(
+            class = "bg-primary text-white",
+            "Benefits vs Taxes Over Time (Real 2025 $)"
           ),
-          selected = "annual",
-          inline = TRUE
-        ),
-        plotOutput(ns("flow_chart"), height = "350px")
+          card_body(
+            fluidRow(
+              column(6,
+                radioButtons(
+                  ns("flow_type"),
+                  NULL,
+                  choices = c(
+                    "Annual Flow" = "annual",
+                    "Cumulative" = "cumulative"
+                  ),
+                  selected = "annual",
+                  inline = TRUE
+                )
+              ),
+              column(6,
+                checkboxInput(
+                  ns("include_employer"),
+                  "Include Employer Share of Taxes",
+                  value = TRUE
+                )
+              )
+            ),
+            plotOutput(ns("flow_chart"), height = "300px")
+          )
+        )
+      )
+    ),
+
+    # Row 2: PV measures (all in real 2025 dollars)
+    fluidRow(
+      column(4,
+        card(
+          card_header(class = "bg-success text-white", "PV Benefits (2025$)"),
+          card_body(uiOutput(ns("pv_benefits_display")))
+        )
+      ),
+      column(4,
+        card(
+          card_header(class = "bg-danger text-white", "PV Taxes (2025$)"),
+          card_body(uiOutput(ns("pv_taxes_display")))
+        )
+      ),
+      column(4,
+        card(
+          card_header("Benefit-Tax Ratio"),
+          card_body(uiOutput(ns("benefit_tax_ratio_display")))
+        )
+      )
+    ),
+
+    # Row 3: Real (undiscounted) measures
+    fluidRow(
+      column(3,
+        card(
+          card_header(class = "bg-info text-white", "Real Benefits (2025$)"),
+          card_body(uiOutput(ns("real_benefits_display")))
+        )
+      ),
+      column(3,
+        card(
+          card_header(class = "bg-secondary text-white", "Real Earnings (2025$)"),
+          card_body(uiOutput(ns("real_earnings_display")))
+        )
+      ),
+      column(3,
+        card(
+          card_header(class = "bg-info text-white", "PV Earnings (2025$)"),
+          card_body(uiOutput(ns("pv_earnings_display")))
+        )
+      ),
+      column(3,
+        card(
+          card_header("Ratios"),
+          card_body(uiOutput(ns("ratios_display")))
+        )
       )
     )
   )
@@ -170,7 +163,7 @@ lifetime_server <- function(id, worker_data) {
       )
     })
 
-    # Flow data for chart
+    # Flow data for chart (in real 2025 dollars)
     flow_data <- reactive({
       data <- worker_data()
       if (is.null(data) || is.null(data$primary)) return(NULL)
@@ -189,18 +182,32 @@ lifetime_server <- function(id, worker_data) {
       death_age <- unique(primary$death_age)[1]
       if (is.null(death_age) || is.na(death_age)) death_age <- 85
 
-      # Prepare flow data - filter to working years (21-64) for taxes, claim to death for benefits
+      # Get GDP price index for 2025 to convert to real dollars
+      gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
+
+      # Join gdp_pi if not present
+      if (!"gdp_pi" %in% names(primary_with_taxes)) {
+        primary_with_taxes <- primary_with_taxes %>%
+          left_join(assumptions %>% select(year, gdp_pi), by = "year")
+      }
+
+      # Prepare flow data in real 2025 dollars
       flow <- primary_with_taxes %>%
         filter(age >= 21 & age < death_age) %>%
         mutate(
-          tax_amount = if (input$include_employer) {
+          # Convert to real 2025 dollars
+          price_deflator = gdp_pi_2025 / gdp_pi,
+          tax_nominal = if (input$include_employer) {
             ifelse(age <= 64, ss_tax * 2, 0)
           } else {
             ifelse(age <= 64, ss_tax, 0)
           },
-          benefit_amount = ifelse(!is.na(annual_ind) & annual_ind > 0, annual_ind, 0)
+          benefit_nominal = ifelse(!is.na(annual_ind) & annual_ind > 0, annual_ind, 0),
+          # Real values
+          tax_amount = tax_nominal * price_deflator,
+          benefit_amount = benefit_nominal * price_deflator
         ) %>%
-        select(year, age, earnings, tax_amount, benefit_amount) %>%
+        select(year, age, tax_amount, benefit_amount) %>%
         mutate(
           net_flow = benefit_amount - tax_amount
         )
@@ -219,73 +226,29 @@ lifetime_server <- function(id, worker_data) {
 
     # PV Benefits display
     output$pv_benefits_display <- renderUI({
-      pv <- pv_data()
-      if (is.null(pv)) {
-        return(helpText("Calculate benefits to see present values"))
+      measures <- lifetime_measures()
+      if (is.null(measures)) {
+        return(helpText("Click Calculate"))
       }
 
       tags$div(
-        tags$h2(class = "text-success mb-3",
-                format_currency(pv$pv_benefits)),
-        tags$p(class = "text-muted",
-               "Discounted to age 65 using nominal effective interest rate from Trustees Report")
+        tags$h3(class = "text-success mb-1", format_currency(measures$pv_benefits)),
+        tags$p(class = "text-muted small mb-0", "Discounted to age 65")
       )
     })
 
     # PV Taxes display
     output$pv_taxes_display <- renderUI({
-      pv <- pv_data()
-      if (is.null(pv)) {
-        return(helpText("Calculate benefits to see present values"))
-      }
-
-      employer_note <- if (input$include_employer) {
-        " (employee + employer share)"
-      } else {
-        " (employee share only)"
-      }
-
-      tags$div(
-        tags$h2(class = "text-danger mb-3",
-                format_currency(pv$pv_taxes)),
-        tags$p(class = "text-muted",
-               paste0("Discounted to age 65", employer_note))
-      )
-    })
-
-    # Real Benefits display
-    output$real_benefits_display <- renderUI({
       measures <- lifetime_measures()
       if (is.null(measures)) {
-        return(helpText("Calculate benefits to see real values"))
+        return(helpText("Click Calculate"))
       }
 
-      tags$div(
-        tags$h2(class = "text-info mb-3",
-                format_currency(measures$real_benefits)),
-        tags$p(class = "text-muted",
-               "Sum of benefits in constant 2025 dollars (GDP price index)")
-      )
-    })
-
-    # Earnings display (both real and PV)
-    output$earnings_display <- renderUI({
-      measures <- lifetime_measures()
-      if (is.null(measures)) {
-        return(helpText("Calculate benefits to see earnings values"))
-      }
+      employer_note <- if (input$include_employer) "(w/ employer)" else "(employee only)"
 
       tags$div(
-        tags$p(
-          tags$strong("Real Earnings (2025$): "),
-          format_currency(measures$real_earnings)
-        ),
-        tags$p(
-          tags$strong("PV Earnings: "),
-          format_currency(measures$pv_earnings)
-        ),
-        tags$p(class = "text-muted small",
-               "Ages 21-64 (PV discounted to age 65)")
+        tags$h3(class = "text-danger mb-1", format_currency(measures$pv_taxes)),
+        tags$p(class = "text-muted small mb-0", employer_note)
       )
     })
 
@@ -300,40 +263,66 @@ lifetime_server <- function(id, worker_data) {
       ratio_class <- if (!is.na(ratio) && ratio >= 1) "text-success" else "text-danger"
 
       tags$div(
-        tags$h3(class = paste(ratio_class, "mb-2"),
-                sprintf("%.2f", ratio)),
-        tags$p(class = "text-muted small",
-               "PV Benefits / PV Taxes")
+        tags$h3(class = paste(ratio_class, "mb-1"), sprintf("%.2f", ratio)),
+        tags$p(class = "text-muted small mb-0", "PV Benefits / PV Taxes")
       )
     })
 
-    # Real Benefit-Earnings Ratio display
-    output$real_ratio_display <- renderUI({
+    # Real Benefits display
+    output$real_benefits_display <- renderUI({
+      measures <- lifetime_measures()
+      if (is.null(measures)) {
+        return(helpText("Click Calculate"))
+      }
+
+      tags$div(
+        tags$h4(class = "text-info mb-1", format_currency(measures$real_benefits)),
+        tags$p(class = "text-muted small mb-0", "Undiscounted sum")
+      )
+    })
+
+    # Real Earnings display (separate)
+    output$real_earnings_display <- renderUI({
+      measures <- lifetime_measures()
+      if (is.null(measures)) {
+        return(helpText("Click Calculate"))
+      }
+
+      tags$div(
+        tags$h4(class = "mb-1", format_currency(measures$real_earnings)),
+        tags$p(class = "text-muted small mb-0", "Ages 21-64")
+      )
+    })
+
+    # PV Earnings display (separate)
+    output$pv_earnings_display <- renderUI({
+      measures <- lifetime_measures()
+      if (is.null(measures)) {
+        return(helpText("Click Calculate"))
+      }
+
+      tags$div(
+        tags$h4(class = "text-info mb-1", format_currency(measures$pv_earnings)),
+        tags$p(class = "text-muted small mb-0", "Discounted to age 65")
+      )
+    })
+
+    # Combined ratios display
+    output$ratios_display <- renderUI({
       measures <- lifetime_measures()
       if (is.null(measures)) {
         return(helpText("..."))
       }
 
       tags$div(
-        tags$h3(class = "text-primary mb-2",
-                sprintf("%.2f%%", measures$real_benefit_earnings_ratio * 100)),
-        tags$p(class = "text-muted small",
-               "Real Benefits / Real Earnings")
-      )
-    })
-
-    # PV Benefit-Earnings Ratio display
-    output$pv_ratio_display <- renderUI({
-      measures <- lifetime_measures()
-      if (is.null(measures)) {
-        return(helpText("..."))
-      }
-
-      tags$div(
-        tags$h3(class = "text-primary mb-2",
-                sprintf("%.2f%%", measures$pv_benefit_earnings_ratio * 100)),
-        tags$p(class = "text-muted small",
-               "PV Benefits / PV Earnings")
+        tags$p(class = "mb-1",
+          tags$strong("Real Ben/Earn: "),
+          sprintf("%.1f%%", measures$real_benefit_earnings_ratio * 100)
+        ),
+        tags$p(class = "mb-0",
+          tags$strong("PV Ben/Earn: "),
+          sprintf("%.1f%%", measures$pv_benefit_earnings_ratio * 100)
+        )
       )
     })
 
@@ -386,10 +375,10 @@ lifetime_server <- function(id, worker_data) {
           scale_x_continuous(breaks = seq(20, 100, by = 10)) +
           scale_fill_manual(values = c("Taxes Paid" = CRFB_RED, "Benefits Received" = CRFB_TEAL)) +
           labs(
-            title = "Annual Social Security Cash Flows",
+            title = "Annual Social Security Cash Flows (Real 2025$)",
             subtitle = "Taxes paid (negative) vs benefits received (positive)",
             x = "Age",
-            y = "Annual Amount",
+            y = "Amount (2025$)",
             fill = NULL
           ) +
           chart_theme
@@ -425,10 +414,10 @@ lifetime_server <- function(id, worker_data) {
           scale_color_manual(values = c("Cumulative Taxes" = CRFB_RED,
                                          "Cumulative Benefits" = CRFB_TEAL)) +
           labs(
-            title = "Cumulative Social Security Cash Flows",
-            subtitle = "Running total of taxes paid vs benefits received (undiscounted)",
+            title = "Cumulative Social Security Cash Flows (Real 2025$)",
+            subtitle = "Running total of taxes paid vs benefits received",
             x = "Age",
-            y = "Cumulative Amount",
+            y = "Cumulative Amount (2025$)",
             color = NULL
           ) +
           chart_theme

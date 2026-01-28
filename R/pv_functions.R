@@ -11,54 +11,53 @@
 # =============================================================================
 
 
-#' Calculate Present Value of Lifetime Benefits
+#' Calculate Present Value of Lifetime Benefits (Real 2025 Dollars)
 #'
 #' Calculates the present value of lifetime Social Security benefits from
-#' claim age to expected death age, discounted using the nominal effective
+#' claim age to expected death age. Benefits are first converted to real
+#' 2025 dollars using the GDP price index, then discounted using the real
 #' discount factor from the Trustees Report assumptions.
 #'
 #' @param worker Data frame with calculated benefits. Must contain columns:
 #'   \code{id}, \code{year}, \code{age}, \code{annual_ind} (annual benefit),
 #'   \code{claim_age}, and \code{death_age}.
 #' @param assumptions Data frame with the prepared Trustees assumptions.
-#'   Must contain columns: \code{year} and \code{df} (nominal discount factor).
+#'   Must contain columns: \code{year}, \code{gdp_pi} (GDP price index),
+#'   and \code{real_df} (real discount factor).
 #' @param discount_to_age Numeric value specifying the age to which benefits
 #'   are discounted. Default is 65.
+#' @param base_year Numeric value specifying the year for real dollar conversion.
+#'   Default is 2025.
 #'
 #' @return Data frame with columns:
 #'   \itemize{
 #'     \item \code{id}: Worker identifier
-#'     \item \code{pv_benefits}: Present value of lifetime benefits
+#'     \item \code{pv_benefits}: Present value of lifetime benefits in real 2025 dollars
 #'   }
 #'
 #' @details
-#' The present value calculation uses the nominal effective discount factor
-#' (\code{df}) from the Trustees Report assumptions. Since benefit amounts
-#' are in nominal dollars, the nominal discount factor is appropriate.
-#' Benefits are normalized to the specified \code{discount_to_age} (default 65)
-#' for comparability across workers with different birth years.
+#' The calculation proceeds in two steps:
+#' 1. Convert nominal benefits to real 2025 dollars using GDP price index
+#' 2. Discount real benefits using the real discount factor (real_df)
 #'
-#' The formula for each year's discounted benefit is:
-#' \code{annual_benefit * (df_at_discount_age / df_at_benefit_year)}
+#' This ensures the result is in real 2025 dollars, comparable to the
+#' undiscounted real_lifetime_benefits() output.
 #'
 #' Benefits are summed from the worker's claim age through their expected death age
 #' (based on cohort life expectancy). Benefits after death are excluded.
 #'
 #' @examples
 #' \dontrun{
-#' # Calculate benefits for a worker
 #' worker <- calculate_benefits(
 #'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
 #'   factors = sef2025, assumptions = tr2025
 #' )
-#'
-#' # Calculate PV of lifetime benefits
 #' pv_ben <- pv_lifetime_benefits(worker, tr2025)
 #' }
 #'
 #' @importFrom dplyr %>% filter group_by summarise left_join first
 #' @export
-pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
+pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65, base_year = 2025) {
 
   # Validate required columns in worker data
   worker_cols_needed <- c("id", "year", "age", "annual_ind")
@@ -68,7 +67,6 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
 
   # Get claim_age and death_age - may be in worker data or need to be derived
   if (!"claim_age" %in% names(worker)) {
-    # Derive claim_age as first age with positive benefits
     worker <- worker %>%
       group_by(id) %>%
       mutate(claim_age = min(age[annual_ind > 0], na.rm = TRUE)) %>%
@@ -80,37 +78,44 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
   }
 
   # Validate required columns in assumptions
-  assumption_cols_needed <- c("year", "df")
+  assumption_cols_needed <- c("year", "gdp_pi", "real_df")
   if (!all(assumption_cols_needed %in% names(assumptions))) {
     stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
+  # Get base year price index for real conversion
 
-  # Join df from assumptions if not already present
-  if (!"df" %in% names(worker)) {
+  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+  if (length(gdp_pi_base) == 0) {
+    stop(paste("base_year", base_year, "not found in assumptions"))
+  }
+
+  # Join gdp_pi and real_df from assumptions if not already present
+  cols_needed <- c("gdp_pi", "real_df")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+  if (length(cols_missing) > 0) {
     dataset <- worker %>%
-      left_join(assumptions %>% select(year, df), by = "year")
+      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
   } else {
     dataset <- worker
   }
 
-  # Calculate PV of lifetime benefits
-  # Only include benefits from claim_age to death_age (no benefits after death)
+  # Calculate PV of lifetime benefits in real 2025 dollars
   result <- dataset %>%
     group_by(id) %>%
     mutate(
       # Get discount factor at the normalization age BEFORE filtering
-      # (so we can access df at age 65 even when filtering to claim_age+)
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      df_norm = df[which(year == discount_year)][1]
+      real_df_norm = real_df[which(year == discount_year)][1]
     ) %>%
     filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
     mutate(
-      # Discount benefits to the normalization age
-      # PV = benefit * (df_norm / df_year) since higher df = further future
-      pv_factor = df_norm / df,
-      pv_annual = annual_ind * pv_factor
+      # Step 1: Convert nominal to real 2025 dollars
+      real_benefit = annual_ind * (gdp_pi_base / gdp_pi),
+      # Step 2: Discount real benefits using real discount factor
+      pv_factor = real_df_norm / real_df,
+      pv_annual = real_benefit * pv_factor
     ) %>%
     summarise(
       pv_benefits = sum(pv_annual, na.rm = TRUE),
@@ -121,59 +126,54 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65) {
 }
 
 
-#' Calculate Present Value of Lifetime Social Security Taxes
+#' Calculate Present Value of Lifetime Social Security Taxes (Real 2025 Dollars)
 #'
 #' Calculates the present value of lifetime Social Security taxes paid from
-#' first working age (21) through age 64, discounted using the nominal effective
+#' first working age (21) through age 64. Taxes are first converted to real
+#' 2025 dollars using the GDP price index, then discounted using the real
 #' discount factor from the Trustees Report assumptions.
 #'
 #' @param worker Data frame with worker earnings. Must contain columns:
 #'   \code{id}, \code{year}, \code{age}, and \code{earnings}.
 #' @param assumptions Data frame with the prepared Trustees assumptions.
-#'   Must contain columns: \code{year}, \code{df}, \code{oasi_tr},
-#'   \code{di_tr}, and \code{taxmax}.
+#'   Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df},
+#'   \code{oasi_tr}, \code{di_tr}, and \code{taxmax}.
 #' @param discount_to_age Numeric value specifying the age to which taxes
 #'   are discounted. Default is 65.
 #' @param include_employer Logical. If TRUE, includes both employee and
 #'   employer shares of payroll taxes (doubling the tax amount).
 #'   Default is FALSE (employee share only).
+#' @param base_year Numeric value specifying the year for real dollar conversion.
+#'   Default is 2025.
 #'
 #' @return Data frame with columns:
 #'   \itemize{
 #'     \item \code{id}: Worker identifier
-#'     \item \code{pv_taxes}: Present value of lifetime taxes
+#'     \item \code{pv_taxes}: Present value of lifetime taxes in real 2025 dollars
 #'   }
 #'
 #' @details
-#' Uses \code{calculate_taxes()} internally to compute annual tax amounts,
-#' then discounts using the nominal effective discount factor. Since tax
-#' amounts are in nominal dollars, the nominal discount factor is appropriate.
-#' The discount factor is normalized to the specified \code{discount_to_age}
-#' (default 65).
+#' The calculation proceeds in two steps:
+#' 1. Convert nominal taxes to real 2025 dollars using GDP price index
+#' 2. Discount real taxes using the real discount factor (real_df)
 #'
-#' The \code{include_employer} parameter allows for analysis that includes
-#' the employer's matching contribution, which is relevant for evaluating
-#' total contributions to the Social Security system.
+#' This ensures the result is in real 2025 dollars, comparable to other
+#' real measures.
 #'
 #' @examples
 #' \dontrun{
-#' # Generate worker with earnings
 #' worker <- earnings_generator(
 #'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
 #'   factors = sef2025, assumptions = tr2025
 #' )
-#'
-#' # Calculate PV of lifetime taxes (employee share only)
 #' pv_tax <- pv_lifetime_taxes(worker, tr2025)
-#'
-#' # Include employer share
 #' pv_tax_total <- pv_lifetime_taxes(worker, tr2025, include_employer = TRUE)
 #' }
 #'
 #' @importFrom dplyr %>% filter group_by summarise left_join mutate first
 #' @export
 pv_lifetime_taxes <- function(worker, assumptions, discount_to_age = 65,
-                               include_employer = FALSE) {
+                               include_employer = FALSE, base_year = 2025) {
 
   # Validate required columns in worker data
   worker_cols_needed <- c("id", "year", "age", "earnings")
@@ -182,39 +182,48 @@ pv_lifetime_taxes <- function(worker, assumptions, discount_to_age = 65,
   }
 
   # Validate required columns in assumptions
-  assumption_cols_needed <- c("year", "df", "oasi_tr", "di_tr", "taxmax")
+  assumption_cols_needed <- c("year", "gdp_pi", "real_df", "oasi_tr", "di_tr", "taxmax")
   if (!all(assumption_cols_needed %in% names(assumptions))) {
     stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
+  }
+
+  # Get base year price index
+  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+  if (length(gdp_pi_base) == 0) {
+    stop(paste("base_year", base_year, "not found in assumptions"))
   }
 
   # Calculate taxes using existing function
   worker_with_taxes <- calculate_taxes(worker, assumptions)
 
-  # Join df from assumptions if not already present
-  if (!"df" %in% names(worker_with_taxes)) {
+  # Join gdp_pi and real_df from assumptions if not already present
+  cols_needed <- c("gdp_pi", "real_df")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker_with_taxes)]
+  if (length(cols_missing) > 0) {
     dataset <- worker_with_taxes %>%
-      left_join(assumptions %>% select(year, df), by = "year")
+      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
   } else {
     dataset <- worker_with_taxes
   }
 
-  # Calculate PV of lifetime taxes (ages 21-64)
+  # Calculate PV of lifetime taxes in real 2025 dollars (ages 21-64)
   result <- dataset %>%
     group_by(id) %>%
     mutate(
       # Get discount factor at the normalization age BEFORE filtering
-      # (so we can access df at age 65 even when filtering to ages 21-64)
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      df_norm = df[which(year == discount_year)][1]
+      real_df_norm = real_df[which(year == discount_year)][1]
     ) %>%
     filter(age >= 21 & age <= 64) %>%
     mutate(
-      # Discount taxes to the normalization age
-      pv_factor = df_norm / df,
       # Apply employer multiplier if requested
       tax_amount = if (include_employer) ss_tax * 2 else ss_tax,
-      pv_annual = tax_amount * pv_factor
+      # Step 1: Convert nominal to real 2025 dollars
+      real_tax = tax_amount * (gdp_pi_base / gdp_pi),
+      # Step 2: Discount real taxes using real discount factor
+      pv_factor = real_df_norm / real_df,
+      pv_annual = real_tax * pv_factor
     ) %>%
     summarise(
       pv_taxes = sum(pv_annual, na.rm = TRUE),
@@ -600,34 +609,35 @@ real_lifetime_earnings <- function(worker, assumptions, base_year = 2025) {
 }
 
 
-#' Calculate Present Value of Lifetime Earnings
+#' Calculate Present Value of Lifetime Earnings (Real 2025 Dollars)
 #'
 #' Calculates the present value of lifetime earnings from age 21 through
-#' age 64, discounted using the nominal effective discount factor from
+#' age 64. Earnings are first converted to real 2025 dollars using the
+#' GDP price index, then discounted using the real discount factor from
 #' the Trustees Report assumptions.
 #'
 #' @param worker Data frame with worker earnings. Must contain columns:
 #'   \code{id}, \code{year}, \code{age}, and \code{earnings}.
 #' @param assumptions Data frame with the prepared Trustees assumptions.
-#'   Must contain columns: \code{year} and \code{df} (nominal discount factor).
+#'   Must contain columns: \code{year}, \code{gdp_pi}, and \code{real_df}.
 #' @param discount_to_age Numeric value specifying the age to which earnings
 #'   are discounted. Default is 65.
+#' @param base_year Numeric value specifying the year for real dollar conversion.
+#'   Default is 2025.
 #'
 #' @return Data frame with columns:
 #'   \itemize{
 #'     \item \code{id}: Worker identifier
-#'     \item \code{pv_earnings}: Present value of lifetime earnings
+#'     \item \code{pv_earnings}: Present value of lifetime earnings in real 2025 dollars
 #'   }
 #'
 #' @details
-#' The present value calculation uses the nominal effective discount factor
-#' (\code{df}) from the Trustees Report assumptions. Since earnings amounts
-#' are in nominal dollars, the nominal discount factor is appropriate.
-#' Earnings are normalized to the specified \code{discount_to_age} (default 65)
-#' for comparability across workers.
+#' The calculation proceeds in two steps:
+#' 1. Convert nominal earnings to real 2025 dollars using GDP price index
+#' 2. Discount real earnings using the real discount factor (real_df)
 #'
-#' The formula for each year's discounted earnings is:
-#' \code{earnings * (df_at_discount_age / df_at_earnings_year)}
+#' This ensures the result is in real 2025 dollars, comparable to the
+#' undiscounted real_lifetime_earnings() output.
 #'
 #' Earnings are summed from age 21 through age 64 (working years).
 #'
@@ -642,7 +652,7 @@ real_lifetime_earnings <- function(worker, assumptions, base_year = 2025) {
 #'
 #' @importFrom dplyr %>% filter group_by summarise left_join first mutate
 #' @export
-pv_lifetime_earnings <- function(worker, assumptions, discount_to_age = 65) {
+pv_lifetime_earnings <- function(worker, assumptions, discount_to_age = 65, base_year = 2025) {
 
   # Validate required columns in worker data
   worker_cols_needed <- c("id", "year", "age", "earnings")
@@ -651,33 +661,43 @@ pv_lifetime_earnings <- function(worker, assumptions, discount_to_age = 65) {
   }
 
   # Validate required columns in assumptions
-  assumption_cols_needed <- c("year", "df")
+  assumption_cols_needed <- c("year", "gdp_pi", "real_df")
   if (!all(assumption_cols_needed %in% names(assumptions))) {
     stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
   }
 
-  # Join df from assumptions if not already present
-  if (!"df" %in% names(worker)) {
+  # Get base year price index
+  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+  if (length(gdp_pi_base) == 0) {
+    stop(paste("base_year", base_year, "not found in assumptions"))
+  }
+
+  # Join gdp_pi and real_df from assumptions if not already present
+  cols_needed <- c("gdp_pi", "real_df")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+  if (length(cols_missing) > 0) {
     dataset <- worker %>%
-      left_join(assumptions %>% select(year, df), by = "year")
+      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
   } else {
     dataset <- worker
   }
 
-  # Calculate PV of lifetime earnings (ages 21-64)
+  # Calculate PV of lifetime earnings in real 2025 dollars (ages 21-64)
   result <- dataset %>%
     group_by(id) %>%
     mutate(
       # Get discount factor at the normalization age BEFORE filtering
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      df_norm = df[which(year == discount_year)][1]
+      real_df_norm = real_df[which(year == discount_year)][1]
     ) %>%
     filter(age >= 21 & age <= 64) %>%
     mutate(
-      # Discount earnings to the normalization age
-      pv_factor = df_norm / df,
-      pv_annual = earnings * pv_factor
+      # Step 1: Convert nominal to real 2025 dollars
+      real_earn = earnings * (gdp_pi_base / gdp_pi),
+      # Step 2: Discount real earnings using real discount factor
+      pv_factor = real_df_norm / real_df,
+      pv_annual = real_earn * pv_factor
     ) %>%
     summarise(
       pv_earnings = sum(pv_annual, na.rm = TRUE),
