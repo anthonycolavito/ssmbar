@@ -1,5 +1,5 @@
 # =============================================================================
-# Cohort Comparison Tab Module - Birth year analysis across cohorts
+# Cohort Comparison Tab Module - Birth year analysis with multiple charts
 # =============================================================================
 
 # Module UI
@@ -18,27 +18,47 @@ cohort_tab_ui <- function(id) {
           card_body(
             class = "p-3",
             fluidRow(
-              column(3,
+              column(2,
                 selectInput(ns("worker_type"), "Worker Type",
-                            choices = WORKER_TYPES[names(WORKER_TYPES) != "Custom"],
+                            choices = WORKER_TYPES,
                             selected = "medium")
               ),
-              column(3,
+              column(2,
+                conditionalPanel(
+                  condition = sprintf("input['%s'] == 'custom'", ns("worker_type")),
+                  numericInput(ns("custom_earnings"), "Avg Earnings ($)",
+                               value = 50000, min = 10000, max = 500000, step = 5000)
+                ),
+                conditionalPanel(
+                  condition = sprintf("input['%s'] != 'custom'", ns("worker_type")),
+                  tags$div(class = "form-group", style = "visibility: hidden;",
+                    numericInput(ns("placeholder"), "Placeholder", value = 0)
+                  )
+                )
+              ),
+              column(2,
                 selectInput(ns("sex"), "Sex", choices = SEX_OPTIONS, selected = "all")
               ),
-              column(3,
+              column(2,
                 numericInput(ns("claim_age"), "Claim Age",
                              value = 67, min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
               ),
-              column(3,
+              column(2,
                 tags$div(
                   class = "pt-4",
                   actionButton(
                     ns("calculate"),
-                    "Calculate Cohort",
+                    "Calculate",
                     icon = icon("play"),
                     class = "btn-primary w-100"
                   )
+                )
+              ),
+              column(2,
+                tags$div(
+                  class = "pt-4",
+                  downloadButton(ns("download_data"), "Export CSV",
+                                 class = "btn-outline-secondary w-100")
                 )
               )
             ),
@@ -67,19 +87,59 @@ cohort_tab_ui <- function(id) {
       column(12, uiOutput(ns("progress_indicator")))
     ),
 
-    # Results table
+    # Charts row 1: Replacement Rate & PV Benefits
     fluidRow(
       class = "mt-3",
-      column(12,
+      column(6,
         card(
           card_header(
-            class = "bg-info text-white py-2 d-flex justify-content-between align-items-center",
-            tags$span("Cohort Comparison Results"),
-            downloadButton(ns("download_data"), "Export CSV", class = "btn-sm btn-light")
+            class = "bg-info text-white py-2",
+            "Replacement Rate by Birth Year"
           ),
           card_body(
             class = "p-2",
-            DTOutput(ns("cohort_table"))
+            plotOutput(ns("chart_replacement"), height = "320px")
+          )
+        )
+      ),
+      column(6,
+        card(
+          card_header(
+            class = "bg-info text-white py-2",
+            "PV Lifetime Benefits by Birth Year"
+          ),
+          card_body(
+            class = "p-2",
+            plotOutput(ns("chart_pv_benefits"), height = "320px")
+          )
+        )
+      )
+    ),
+
+    # Charts row 2: Benefit-Tax Ratio & IRR
+    fluidRow(
+      class = "mt-3",
+      column(6,
+        card(
+          card_header(
+            class = "bg-info text-white py-2",
+            "Benefit-Tax Ratio by Birth Year"
+          ),
+          card_body(
+            class = "p-2",
+            plotOutput(ns("chart_ratio"), height = "320px")
+          )
+        )
+      ),
+      column(6,
+        card(
+          card_header(
+            class = "bg-info text-white py-2",
+            "Internal Rate of Return by Birth Year"
+          ),
+          card_body(
+            class = "p-2",
+            plotOutput(ns("chart_irr"), height = "320px")
           )
         )
       )
@@ -88,10 +148,37 @@ cohort_tab_ui <- function(id) {
     # Summary statistics
     fluidRow(
       class = "mt-3",
-      column(3, uiOutput(ns("metric_avg_benefit_change"))),
-      column(3, uiOutput(ns("metric_avg_pv_change"))),
-      column(3, uiOutput(ns("metric_avg_ratio_change"))),
-      column(3, uiOutput(ns("metric_avg_repl_change")))
+      column(3, uiOutput(ns("metric_avg_repl"))),
+      column(3, uiOutput(ns("metric_avg_pv"))),
+      column(3, uiOutput(ns("metric_avg_ratio"))),
+      column(3, uiOutput(ns("metric_avg_irr")))
+    ),
+
+    # Collapsible data table
+    fluidRow(
+      class = "mt-3",
+      column(12,
+        tags$div(
+          class = "text-end mb-2",
+          actionButton(ns("toggle_table"), "Show Data Table",
+                       icon = icon("table"), class = "btn-sm btn-outline-secondary")
+        )
+      )
+    ),
+
+    conditionalPanel(
+      condition = sprintf("input['%s'] %% 2 == 1", ns("toggle_table")),
+      fluidRow(
+        column(12,
+          card(
+            card_header(class = "py-2", "Cohort Data"),
+            card_body(
+              class = "p-2",
+              DTOutput(ns("cohort_table"))
+            )
+          )
+        )
+      )
     ),
 
     # Info panel
@@ -104,10 +191,10 @@ cohort_tab_ui <- function(id) {
             tags$small(
               class = "text-muted",
               tags$strong("Notes: "),
-              "All metrics are calculated for the specified worker type, sex, and claim age. ",
-              "PV values are discounted to age 65 using real discount rates. ",
-              "Replacement Rate uses wage-indexed highest 35 years earnings. ",
-              "% Change shows the reform impact relative to baseline for each birth year."
+              "All metrics calculated for specified worker configuration across birth years. ",
+              "PV values discounted to age 65. ",
+              "Replacement Rate = benefit / wage-indexed highest 35 years earnings. ",
+              "IRR = internal rate of return on lifetime SS taxes."
             )
           )
         )
@@ -147,6 +234,9 @@ cohort_tab_server <- function(id, reform_state) {
         reform_assumptions <- reform_state$reform_assumptions()
         reform_label <- if (has_reforms) reform_state$reform_label() else "Reform"
 
+        # Get custom earnings if applicable
+        custom_earnings <- if (input$worker_type == "custom") input$custom_earnings else NULL
+
         results <- lapply(seq_along(birth_years), function(i) {
           by <- birth_years[i]
 
@@ -161,6 +251,7 @@ cohort_tab_server <- function(id, reform_state) {
             age_claim = input$claim_age,
             factors = sef2025,
             assumptions = tr2025,
+            custom_avg_earnings = custom_earnings,
             debugg = TRUE
           )
           baseline$scenario <- "Baseline"
@@ -187,12 +278,18 @@ cohort_tab_server <- function(id, reform_state) {
             rr$rep_rate[rr$type == "wage_h35"][1]
           }, error = function(e) NA_real_)
 
+          # Internal rate of return
+          baseline_irr <- tryCatch({
+            internal_rate_of_return(baseline, tr2025, include_employer = FALSE)$irr[1]
+          }, error = function(e) NA_real_)
+
           # Calculate reform if selected
           reform_ben <- NA_real_
           reform_pv_ben <- NA_real_
           reform_pv_tax <- NA_real_
           reform_ratio <- NA_real_
           reform_repl <- NA_real_
+          reform_irr <- NA_real_
 
           if (has_reforms && !is.null(reform_assumptions)) {
             reform <- calculate_benefits(
@@ -202,6 +299,7 @@ cohort_tab_server <- function(id, reform_state) {
               age_claim = input$claim_age,
               factors = sef2025,
               assumptions = reform_assumptions,
+              custom_avg_earnings = custom_earnings,
               debugg = TRUE
             )
             reform$scenario <- reform_label
@@ -224,46 +322,26 @@ cohort_tab_server <- function(id, reform_state) {
               rr <- rep_rates(reform, reform_assumptions)
               rr$rep_rate[rr$type == "wage_h35"][1]
             }, error = function(e) NA_real_)
+
+            reform_irr <- tryCatch({
+              internal_rate_of_return(reform, reform_assumptions, include_employer = FALSE)$irr[1]
+            }, error = function(e) NA_real_)
           }
-
-          # Calculate percent changes
-          pct_ben <- if (!is.na(reform_ben) && !is.na(baseline_ben) && baseline_ben > 0) {
-            (reform_ben / baseline_ben - 1) * 100
-          } else NA_real_
-
-          pct_pv_ben <- if (!is.na(reform_pv_ben) && !is.na(baseline_pv_ben) && baseline_pv_ben > 0) {
-            (reform_pv_ben / baseline_pv_ben - 1) * 100
-          } else NA_real_
-
-          pct_pv_tax <- if (!is.na(reform_pv_tax) && !is.na(baseline_pv_tax) && baseline_pv_tax > 0) {
-            (reform_pv_tax / baseline_pv_tax - 1) * 100
-          } else NA_real_
-
-          pct_ratio <- if (!is.na(reform_ratio) && !is.na(baseline_ratio) && baseline_ratio > 0) {
-            (reform_ratio / baseline_ratio - 1) * 100
-          } else NA_real_
-
-          pct_repl <- if (!is.na(reform_repl) && !is.na(baseline_repl) && baseline_repl > 0) {
-            (reform_repl / baseline_repl - 1) * 100
-          } else NA_real_
 
           list(
             birth_year = by,
             benefit_baseline = baseline_ben,
             benefit_reform = reform_ben,
-            benefit_pct_change = pct_ben,
             pv_benefits_baseline = baseline_pv_ben,
             pv_benefits_reform = reform_pv_ben,
-            pv_benefits_pct_change = pct_pv_ben,
             pv_taxes_baseline = baseline_pv_tax,
             pv_taxes_reform = reform_pv_tax,
-            pv_taxes_pct_change = pct_pv_tax,
             ratio_baseline = baseline_ratio,
             ratio_reform = reform_ratio,
-            ratio_pct_change = pct_ratio,
             repl_rate_baseline = baseline_repl,
             repl_rate_reform = reform_repl,
-            repl_rate_pct_change = pct_repl
+            irr_baseline = baseline_irr,
+            irr_reform = reform_irr
           )
         })
 
@@ -274,6 +352,7 @@ cohort_tab_server <- function(id, reform_state) {
           has_reforms = has_reforms,
           reform_label = reform_label,
           worker_type = input$worker_type,
+          custom_earnings = custom_earnings,
           sex = input$sex,
           claim_age = input$claim_age
         )
@@ -311,12 +390,325 @@ cohort_tab_server <- function(id, reform_state) {
       )
     })
 
-    # Main cohort table
+    # Helper function to create chart data in long format
+    prepare_chart_data <- reactive({
+      result <- cohort_data()
+      if (is.null(result) || is.null(result$data)) return(NULL)
+
+      df <- result$data
+      has_reforms <- result$has_reforms
+      reform_label <- result$reform_label
+
+      # Create long format for plotting
+      if (has_reforms) {
+        baseline_df <- data.frame(
+          birth_year = df$birth_year,
+          repl_rate = df$repl_rate_baseline * 100,
+          pv_benefits = df$pv_benefits_baseline / 1000,
+          ratio = df$ratio_baseline,
+          irr = df$irr_baseline * 100,
+          scenario = "Baseline"
+        )
+        reform_df <- data.frame(
+          birth_year = df$birth_year,
+          repl_rate = df$repl_rate_reform * 100,
+          pv_benefits = df$pv_benefits_reform / 1000,
+          ratio = df$ratio_reform,
+          irr = df$irr_reform * 100,
+          scenario = reform_label
+        )
+        chart_df <- bind_rows(baseline_df, reform_df)
+      } else {
+        chart_df <- data.frame(
+          birth_year = df$birth_year,
+          repl_rate = df$repl_rate_baseline * 100,
+          pv_benefits = df$pv_benefits_baseline / 1000,
+          ratio = df$ratio_baseline,
+          irr = df$irr_baseline * 100,
+          scenario = "Baseline"
+        )
+      }
+
+      list(
+        data = chart_df,
+        has_reforms = has_reforms,
+        reform_label = reform_label
+      )
+    })
+
+    # Chart: Replacement Rate
+    output$chart_replacement <- renderPlot({
+      chart_info <- prepare_chart_data()
+      if (is.null(chart_info)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see results",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      df <- chart_info$data
+      show_legend <- chart_info$has_reforms
+
+      p <- ggplot(df, aes(x = birth_year, y = repl_rate, color = scenario, group = scenario)) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2, alpha = 0.7) +
+        scale_y_continuous(labels = function(x) paste0(x, "%")) +
+        scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
+        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        labs(x = "Birth Year", y = "Replacement Rate (%)", color = NULL) +
+        chart_theme +
+        theme(legend.position = if (show_legend) "top" else "none")
+
+      p
+    })
+
+    # Chart: PV Benefits
+    output$chart_pv_benefits <- renderPlot({
+      chart_info <- prepare_chart_data()
+      if (is.null(chart_info)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see results",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      df <- chart_info$data
+      show_legend <- chart_info$has_reforms
+
+      p <- ggplot(df, aes(x = birth_year, y = pv_benefits, color = scenario, group = scenario)) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2, alpha = 0.7) +
+        scale_y_continuous(labels = dollar_format(suffix = "K")) +
+        scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
+        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        labs(x = "Birth Year", y = "PV Lifetime Benefits ($K)", color = NULL) +
+        chart_theme +
+        theme(legend.position = if (show_legend) "top" else "none")
+
+      p
+    })
+
+    # Chart: Benefit-Tax Ratio
+    output$chart_ratio <- renderPlot({
+      chart_info <- prepare_chart_data()
+      if (is.null(chart_info)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see results",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      df <- chart_info$data
+      show_legend <- chart_info$has_reforms
+
+      p <- ggplot(df, aes(x = birth_year, y = ratio, color = scenario, group = scenario)) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2, alpha = 0.7) +
+        geom_hline(yintercept = 1.0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
+        scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
+        scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
+        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        labs(x = "Birth Year", y = "Benefit-Tax Ratio", color = NULL) +
+        annotate("text", x = 2007, y = 1.02, label = "Break-even",
+                 color = DARK_MUTED, size = 3, hjust = 1) +
+        chart_theme +
+        theme(legend.position = if (show_legend) "top" else "none")
+
+      p
+    })
+
+    # Chart: IRR
+    output$chart_irr <- renderPlot({
+      chart_info <- prepare_chart_data()
+      if (is.null(chart_info)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see results",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      df <- chart_info$data
+      show_legend <- chart_info$has_reforms
+
+      p <- ggplot(df, aes(x = birth_year, y = irr, color = scenario, group = scenario)) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2, alpha = 0.7) +
+        geom_hline(yintercept = 0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
+        scale_y_continuous(labels = function(x) paste0(x, "%")) +
+        scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
+        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        labs(x = "Birth Year", y = "Internal Rate of Return (%)", color = NULL) +
+        chart_theme +
+        theme(legend.position = if (show_legend) "top" else "none")
+
+      p
+    })
+
+    # Summary metrics
+    output$metric_avg_repl <- renderUI({
+      result <- cohort_data()
+      if (is.null(result) || is.null(result$data)) {
+        return(tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Replacement Rate"),
+          tags$strong(class = "text-muted", "-")
+        ))
+      }
+
+      avg_baseline <- mean(result$data$repl_rate_baseline, na.rm = TRUE) * 100
+
+      if (result$has_reforms) {
+        avg_reform <- mean(result$data$repl_rate_reform, na.rm = TRUE) * 100
+        pct_change <- (avg_reform / avg_baseline - 1) * 100
+        change_color <- if (pct_change < 0) "text-danger" else "text-success"
+
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Replacement Rate"),
+          tags$div(
+            tags$span(class = "text-muted", sprintf("%.1f%%", avg_baseline)),
+            tags$span(" \u2192 "),
+            tags$strong(class = change_color, sprintf("%.1f%%", avg_reform))
+          ),
+          tags$small(class = change_color, sprintf("(%+.1f%%)", pct_change))
+        )
+      } else {
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Replacement Rate"),
+          tags$strong(class = "text-info", sprintf("%.1f%%", avg_baseline))
+        )
+      }
+    })
+
+    output$metric_avg_pv <- renderUI({
+      result <- cohort_data()
+      if (is.null(result) || is.null(result$data)) {
+        return(tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg PV Benefits"),
+          tags$strong(class = "text-muted", "-")
+        ))
+      }
+
+      avg_baseline <- mean(result$data$pv_benefits_baseline, na.rm = TRUE) / 1000
+
+      if (result$has_reforms) {
+        avg_reform <- mean(result$data$pv_benefits_reform, na.rm = TRUE) / 1000
+        pct_change <- (avg_reform / avg_baseline - 1) * 100
+        change_color <- if (pct_change < 0) "text-danger" else "text-success"
+
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg PV Benefits"),
+          tags$div(
+            tags$span(class = "text-muted", format_currency(avg_baseline, suffix = "K")),
+            tags$span(" \u2192 "),
+            tags$strong(class = change_color, format_currency(avg_reform, suffix = "K"))
+          ),
+          tags$small(class = change_color, sprintf("(%+.1f%%)", pct_change))
+        )
+      } else {
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg PV Benefits"),
+          tags$strong(class = "text-success", format_currency(avg_baseline, suffix = "K"))
+        )
+      }
+    })
+
+    output$metric_avg_ratio <- renderUI({
+      result <- cohort_data()
+      if (is.null(result) || is.null(result$data)) {
+        return(tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Benefit-Tax Ratio"),
+          tags$strong(class = "text-muted", "-")
+        ))
+      }
+
+      avg_baseline <- mean(result$data$ratio_baseline, na.rm = TRUE)
+
+      if (result$has_reforms) {
+        avg_reform <- mean(result$data$ratio_reform, na.rm = TRUE)
+        pct_change <- (avg_reform / avg_baseline - 1) * 100
+        change_color <- if (pct_change < 0) "text-danger" else "text-success"
+
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Benefit-Tax Ratio"),
+          tags$div(
+            tags$span(class = "text-muted", sprintf("%.2f", avg_baseline)),
+            tags$span(" \u2192 "),
+            tags$strong(class = change_color, sprintf("%.2f", avg_reform))
+          ),
+          tags$small(class = change_color, sprintf("(%+.1f%%)", pct_change))
+        )
+      } else {
+        ratio_color <- if (avg_baseline >= 1) "text-success" else "text-danger"
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg Benefit-Tax Ratio"),
+          tags$strong(class = ratio_color, sprintf("%.2f", avg_baseline))
+        )
+      }
+    })
+
+    output$metric_avg_irr <- renderUI({
+      result <- cohort_data()
+      if (is.null(result) || is.null(result$data)) {
+        return(tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg IRR"),
+          tags$strong(class = "text-muted", "-")
+        ))
+      }
+
+      avg_baseline <- mean(result$data$irr_baseline, na.rm = TRUE) * 100
+
+      if (result$has_reforms) {
+        avg_reform <- mean(result$data$irr_reform, na.rm = TRUE) * 100
+        diff <- avg_reform - avg_baseline
+        change_color <- if (diff < 0) "text-danger" else "text-success"
+
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg IRR"),
+          tags$div(
+            tags$span(class = "text-muted", sprintf("%.1f%%", avg_baseline)),
+            tags$span(" \u2192 "),
+            tags$strong(class = change_color, sprintf("%.1f%%", avg_reform))
+          ),
+          tags$small(class = change_color, sprintf("(%+.1f pp)", diff))
+        )
+      } else {
+        irr_color <- if (avg_baseline >= 0) "text-success" else "text-danger"
+        tags$div(
+          class = "text-center p-3 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Avg IRR"),
+          tags$strong(class = irr_color, sprintf("%.1f%%", avg_baseline))
+        )
+      }
+    })
+
+    # Data table (collapsible)
     output$cohort_table <- renderDT({
       result <- cohort_data()
       if (is.null(result) || is.null(result$data)) {
         return(datatable(
-          data.frame(Message = "Click 'Calculate Cohort' to generate results"),
+          data.frame(Message = "Click 'Calculate' to generate results"),
           options = list(dom = 't'),
           rownames = FALSE
         ))
@@ -326,162 +718,38 @@ cohort_tab_server <- function(id, reform_state) {
       has_reforms <- result$has_reforms
 
       if (has_reforms) {
-        # Full table with baseline, reform, and % change columns
         display_df <- data.frame(
           `Birth Year` = df$birth_year,
-          `Benefit (Base)` = round(df$benefit_baseline, 0),
-          `Benefit (Reform)` = round(df$benefit_reform, 0),
-          `Benefit %Chg` = round(df$benefit_pct_change, 1),
-          `PV Ben (Base)` = round(df$pv_benefits_baseline / 1000, 0),
-          `PV Ben (Reform)` = round(df$pv_benefits_reform / 1000, 0),
-          `PV Ben %Chg` = round(df$pv_benefits_pct_change, 1),
-          `PV Tax (Base)` = round(df$pv_taxes_baseline / 1000, 0),
-          `PV Tax (Reform)` = round(df$pv_taxes_reform / 1000, 0),
-          `PV Tax %Chg` = round(df$pv_taxes_pct_change, 1),
-          `Ratio (Base)` = round(df$ratio_baseline, 2),
-          `Ratio (Reform)` = round(df$ratio_reform, 2),
-          `Ratio %Chg` = round(df$ratio_pct_change, 1),
           `Repl% (Base)` = round(df$repl_rate_baseline * 100, 1),
           `Repl% (Reform)` = round(df$repl_rate_reform * 100, 1),
-          `Repl% Chg` = round(df$repl_rate_pct_change, 1),
+          `PV Ben (Base)` = round(df$pv_benefits_baseline / 1000, 0),
+          `PV Ben (Reform)` = round(df$pv_benefits_reform / 1000, 0),
+          `Ratio (Base)` = round(df$ratio_baseline, 2),
+          `Ratio (Reform)` = round(df$ratio_reform, 2),
+          `IRR% (Base)` = round(df$irr_baseline * 100, 2),
+          `IRR% (Reform)` = round(df$irr_reform * 100, 2),
           check.names = FALSE
         )
-
-        dt <- datatable(
-          display_df,
-          options = list(
-            pageLength = 15,
-            scrollX = TRUE,
-            dom = 'tip',
-            columnDefs = list(
-              list(className = 'dt-right', targets = 1:15)
-            )
-          ),
-          rownames = FALSE,
-          class = "compact stripe"
-        ) %>%
-          formatCurrency(c("Benefit (Base)", "Benefit (Reform)"), currency = "$", digits = 0) %>%
-          formatCurrency(c("PV Ben (Base)", "PV Ben (Reform)", "PV Tax (Base)", "PV Tax (Reform)"),
-                         currency = "$", digits = 0, before = FALSE) %>%
-          formatStyle(
-            c("Benefit %Chg", "PV Ben %Chg", "Ratio %Chg", "Repl% Chg"),
-            color = styleInterval(0, c(CRFB_RED, CRFB_TEAL))
-          ) %>%
-          formatStyle(
-            c("PV Tax %Chg"),
-            color = styleInterval(0, c(CRFB_TEAL, CRFB_ORANGE))
-          )
-
       } else {
-        # Baseline-only table
         display_df <- data.frame(
           `Birth Year` = df$birth_year,
-          `Monthly Benefit` = round(df$benefit_baseline, 0),
+          `Repl Rate %` = round(df$repl_rate_baseline * 100, 1),
           `PV Benefits (K)` = round(df$pv_benefits_baseline / 1000, 0),
-          `PV Taxes (K)` = round(df$pv_taxes_baseline / 1000, 0),
-          `Benefit/Tax Ratio` = round(df$ratio_baseline, 2),
-          `Replacement Rate` = round(df$repl_rate_baseline * 100, 1),
+          `Benefit-Tax Ratio` = round(df$ratio_baseline, 2),
+          `IRR %` = round(df$irr_baseline * 100, 2),
           check.names = FALSE
         )
-
-        dt <- datatable(
-          display_df,
-          options = list(
-            pageLength = 15,
-            scrollX = TRUE,
-            dom = 'tip',
-            columnDefs = list(
-              list(className = 'dt-right', targets = 1:5)
-            )
-          ),
-          rownames = FALSE,
-          class = "compact stripe"
-        ) %>%
-          formatCurrency("Monthly Benefit", currency = "$", digits = 0) %>%
-          formatCurrency(c("PV Benefits (K)", "PV Taxes (K)"), currency = "$", digits = 0)
       }
 
-      dt
-    })
-
-    # Summary statistics
-    output$metric_avg_benefit_change <- renderUI({
-      result <- cohort_data()
-      if (is.null(result) || !result$has_reforms) {
-        return(tags$div(
-          class = "text-center p-3 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Avg Benefit Change"),
-          tags$strong(class = "text-muted", "Select reforms to compare")
-        ))
-      }
-
-      avg_change <- mean(result$data$benefit_pct_change, na.rm = TRUE)
-      change_color <- if (avg_change < 0) "text-danger" else "text-success"
-
-      tags$div(
-        class = "text-center p-3 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Avg Benefit Change"),
-        tags$strong(class = change_color, sprintf("%+.1f%%", avg_change))
-      )
-    })
-
-    output$metric_avg_pv_change <- renderUI({
-      result <- cohort_data()
-      if (is.null(result) || !result$has_reforms) {
-        return(tags$div(
-          class = "text-center p-3 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Avg PV Benefits Change"),
-          tags$strong(class = "text-muted", "-")
-        ))
-      }
-
-      avg_change <- mean(result$data$pv_benefits_pct_change, na.rm = TRUE)
-      change_color <- if (avg_change < 0) "text-danger" else "text-success"
-
-      tags$div(
-        class = "text-center p-3 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Avg PV Benefits Change"),
-        tags$strong(class = change_color, sprintf("%+.1f%%", avg_change))
-      )
-    })
-
-    output$metric_avg_ratio_change <- renderUI({
-      result <- cohort_data()
-      if (is.null(result) || !result$has_reforms) {
-        return(tags$div(
-          class = "text-center p-3 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Avg Ratio Change"),
-          tags$strong(class = "text-muted", "-")
-        ))
-      }
-
-      avg_change <- mean(result$data$ratio_pct_change, na.rm = TRUE)
-      change_color <- if (avg_change < 0) "text-danger" else "text-success"
-
-      tags$div(
-        class = "text-center p-3 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Avg Ratio Change"),
-        tags$strong(class = change_color, sprintf("%+.1f%%", avg_change))
-      )
-    })
-
-    output$metric_avg_repl_change <- renderUI({
-      result <- cohort_data()
-      if (is.null(result) || !result$has_reforms) {
-        return(tags$div(
-          class = "text-center p-3 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Avg Repl Rate Change"),
-          tags$strong(class = "text-muted", "-")
-        ))
-      }
-
-      avg_change <- mean(result$data$repl_rate_pct_change, na.rm = TRUE)
-      change_color <- if (avg_change < 0) "text-danger" else "text-success"
-
-      tags$div(
-        class = "text-center p-3 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Avg Repl Rate Change"),
-        tags$strong(class = change_color, sprintf("%+.1f%%", avg_change))
+      datatable(
+        display_df,
+        options = list(
+          pageLength = 15,
+          scrollX = TRUE,
+          dom = 'tip'
+        ),
+        rownames = FALSE,
+        class = "compact stripe"
       )
     })
 
@@ -489,22 +757,27 @@ cohort_tab_server <- function(id, reform_state) {
     output$download_data <- downloadHandler(
       filename = function() {
         result <- cohort_data()
-        type_label <- if (!is.null(result)) result$worker_type else "medium"
+        type_label <- if (!is.null(result)) {
+          if (result$worker_type == "custom") {
+            paste0("custom_", result$custom_earnings)
+          } else {
+            result$worker_type
+          }
+        } else "medium"
         paste0("cohort_comparison_", type_label, "_", Sys.Date(), ".csv")
       },
       content = function(file) {
         result <- cohort_data()
         if (!is.null(result) && !is.null(result$data)) {
-          # Add metadata columns
           export_df <- result$data
           export_df$worker_type <- result$worker_type
+          export_df$custom_earnings <- result$custom_earnings
           export_df$sex <- result$sex
           export_df$claim_age <- result$claim_age
           export_df$reform_scenario <- if (result$has_reforms) result$reform_label else "None"
 
-          # Reorder columns
           export_df <- export_df %>%
-            select(birth_year, worker_type, sex, claim_age, reform_scenario, everything())
+            select(birth_year, worker_type, custom_earnings, sex, claim_age, reform_scenario, everything())
 
           write.csv(export_df, file, row.names = FALSE)
         }
