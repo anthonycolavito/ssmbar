@@ -79,7 +79,7 @@ utils::globalVariables(c(
   "delta_aime_per_dollar", "delta_pia_per_dollar", "delta_pv_benefits",
   "claim_age_val", "death_age_val", "benefit_months", "discount_year",
   "real_df_norm", "real_df_at_claim", "gdp_pi_at_claim", "act_factor_val",
-  "net_marginal_tax_rate", "marginal_irr",
+  "net_marginal_tax_rate", "marginal_irr", "delta_pv_benefits_total",
 
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",

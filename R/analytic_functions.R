@@ -104,13 +104,82 @@ calculate_taxes <- function(worker, assumptions) {
 # Replacement Rate Functions
 # =============================================================================
 
-# TODO: Document - rep_rates() needs full roxygen documentation:
-#   - Function description explaining replacement rate concept
-#   - Parameter documentation for worker and assumptions
-#   - Return value documentation (pivoted data frame with multiple RR types)
-#   - Explanation of different replacement rate methods (pv_rr, real_all, wage_all, high-N, last-N)
-#   - SSA handbook citations for indexing methodology
-#   - Examples showing typical usage
+#' Calculate Multiple Replacement Rate Definitions
+#'
+#' Computes a comprehensive set of replacement rate measures for Social Security
+#' benefits. The replacement rate is the ratio of initial annual benefits to
+#' some measure of pre-retirement earnings, indicating how much of a worker's
+#' earnings Social Security replaces.
+#'
+#' @param worker Data frame with calculated benefits. Must contain columns:
+#'   \code{id}, \code{year}, \code{age}, \code{earnings}, \code{annual_ind},
+#'   and \code{claim_age}.
+#' @param assumptions Data frame with the prepared Trustees assumptions.
+#'   Must contain columns: \code{year}, \code{gdp_pi} (GDP price index),
+#'   \code{awi} (Average Wage Index), and \code{real_df} (real discount factor).
+#'
+#' @return Data frame in long format with columns:
+#'   \itemize{
+#'     \item \code{id}: Worker identifier
+#'     \item \code{type}: Replacement rate type (see Details)
+#'     \item \code{rep_rate}: Replacement rate value
+#'   }
+#'
+#' @details
+#' This function calculates 16 different replacement rate definitions, allowing
+#' comparison across methodologies commonly used in policy analysis.
+#'
+#' \strong{Indexing Methods:}
+#' \itemize{
+#'   \item \strong{Price-indexed (real_*)}: Earnings adjusted using GDP price index
+#'     to constant dollars of the last working year. Measures purchasing power replacement.
+#'   \item \strong{Wage-indexed (wage_*)}: Earnings adjusted using Average Wage Index (AWI)
+#'     to wage-equivalent dollars of the last working year. Measures relative position
+#'     in the earnings distribution.
+#' }
+#'
+#' \strong{Replacement Rate Types:}
+#' \itemize{
+#'   \item \strong{pv_rr}: Present-value replacement rate. Compares initial benefit to the
+#'     constant annual payment that has the same present value as career earnings.
+#'     Most economically rigorous measure.
+#'   \item \strong{*_all}: Simple average of all working years (ages 21 to claim_age - 1)
+#'   \item \strong{*_h35, *_h10, *_h5}: Average of highest N earning years
+#'   \item \strong{*_l35, *_l10, *_l5}: Average of last N working years (most recent)
+#' }
+#'
+#' \strong{Indexing Methodology:}
+#' Per SSA Handbook Section 700.3, earnings are indexed to the worker's indexing year
+#' (typically 2 years before eligibility age). This function indexes to the last
+#' working year (year before claiming) for replacement rate comparability.
+#'
+#' @note This function is not exported. Use \code{ssmbar:::rep_rates()} to access it.
+#'
+#' @references
+#' SSA Handbook Section 700.3: How Are Earnings Indexed?
+#' \url{https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html}
+#'
+#' @examples
+#' \dontrun{
+#' # Calculate benefits with debugg = TRUE to get annual_ind
+#' worker <- calculate_benefits(
+#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025, debugg = TRUE
+#' )
+#'
+#' # Calculate all replacement rates
+#' rr <- ssmbar:::rep_rates(worker, tr2025)
+#'
+#' # View results
+#' rr
+#'
+#' # Filter to specific type
+#' rr[rr$type == "pv_rr", ]
+#' }
+#'
+#' @importFrom dplyr %>% group_by arrange mutate filter summarise select first
+#' @importFrom tidyr pivot_longer
+#' @keywords internal
 rep_rates <- function(worker, assumptions) {
 
   # Error Prevention
@@ -483,19 +552,23 @@ marginal_benefit_analysis <- function(worker, assumptions, base_year = 2025) {
 #'     \item \code{earnings}: Nominal earnings
 #'     \item \code{ss_tax}: Social Security tax paid
 #'     \item \code{delta_pv_benefits}: PV of marginal benefit accrual
-#'     \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
+#'     \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits_total) / earnings
 #'   }
 #'
 #' @details
 #' The net marginal tax rate is calculated as:
-#' \deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits}{earnings}}
+#' \deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits\_total}{earnings}}
+#'
+#' Where \code{delta_pv_benefits_total} is the present value of additional lifetime
+#' benefits from this year's earnings (computed as \code{delta_pv_benefits × earnings},
+#' where \code{delta_pv_benefits} from \code{marginal_benefit_analysis()} is per-dollar).
 #'
 #' Interpretation:
 #' \itemize{
-#'   \item Value near 0.124 (12.4%) means no benefit accrual — pure tax
+#'   \item Value near 0.062 (6.2%) or 0.124 (12.4% with employer) means no benefit accrual — pure tax
 #'   \item Value near 0 means benefits offset most of the tax
-#'   \item Negative value means benefits exceed taxes (possible for low earners
-#'     in years where the marginal AIME falls in the 90% bracket)
+#'   \item Negative value means benefits exceed taxes (common for workers in the
+#'     90% or 32% PIA brackets where marginal benefits are substantial)
 #' }
 #'
 #' @examples
@@ -527,11 +600,14 @@ net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
       # Apply employer share if requested
       ss_tax_total = if (include_employer) ss_tax * 2 else ss_tax,
 
+      # Convert delta_pv_benefits from per-dollar to total dollars
+      delta_pv_benefits_total = delta_pv_benefits * earnings,
+
       # Net marginal tax rate
       # NMTR = (tax - marginal benefit) / earnings
       net_marginal_tax_rate = if_else(
         earnings > 0 & age >= 21 & age <= 64,
-        (ss_tax_total - delta_pv_benefits) / earnings,
+        (ss_tax_total - delta_pv_benefits_total) / earnings,
         NA_real_
       )
     )

@@ -134,11 +134,14 @@ test_that("net_marginal_tax_rate is in expected range", {
   # Filter to working years
   working_years <- result[result$age >= 21 & result$age <= 64, ]
 
-  # Net marginal tax rate should be between -10% and 12.4%
-  # (negative possible for low earners with high benefit accrual)
+  # Net marginal tax rate = tax_rate - delta_pv_benefits
+  # For workers in 32% PIA bracket: NMTR can be quite negative (-20% to -10%)
+  # For workers in 15% PIA bracket: NMTR is closer to 0 or slightly positive
+  # Range: approximately -30% to +6.2% (employee rate)
   valid_rates <- working_years$net_marginal_tax_rate[!is.na(working_years$net_marginal_tax_rate)]
-  expect_true(all(valid_rates >= -0.10))
-  expect_true(all(valid_rates <= 0.124))
+  expect_true(all(valid_rates >= -0.35))  # Can be negative for high-benefit workers
+
+  expect_true(all(valid_rates <= 0.124))   # Max is full tax rate if no benefit accrual
 })
 
 test_that("net_marginal_tax_rate varies by worker type", {
