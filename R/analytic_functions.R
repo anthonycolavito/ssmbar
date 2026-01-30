@@ -287,246 +287,282 @@ rep_rates <- function(worker, assumptions) {
 
 #' Marginal Benefit Analysis
 #'
-#' Computes per-year marginal benefit analysis for a worker. For each working year,
-#' calculates whether the year is in the top 35 indexed earnings years, the marginal
-#' AIME rate, the marginal PIA rate, and the present value of additional lifetime
-#' benefits from an additional dollar of earnings.
+#' Computes per-year marginal benefit analysis for a worker using the cumulative
+#' stopping-point method. For each working year t, calculates the change in
+#' present value of lifetime benefits from working t years vs t-1 years.
 #'
 #' @param worker Data frame with calculated benefits. Must contain columns from
 #'   \code{calculate_benefits()} run with \code{debugg = TRUE}: \code{id}, \code{year},
 #'   \code{age}, \code{earnings}, \code{indexed_earn}, \code{index_factor}, \code{aime},
-#'   \code{claim_age}, \code{death_age}, \code{bp1_elig}, \code{bp2_elig}, \code{comp_period}.
+#'   \code{claim_age}, \code{death_age}, \code{bp1_elig}, \code{bp2_elig}.
 #' @param assumptions Data frame with the prepared Trustees assumptions.
-#'   Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df}.
+#'   Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df}, \code{cola}.
 #' @param base_year Numeric value specifying the year for real dollar conversion.
 #'   Default is 2025.
 #'
-#' @return Data frame with the worker data plus additional columns:
+#' @return Data frame with columns for each working year:
 #'   \itemize{
-#'     \item \code{in_top_35}: Logical, is this year in the worker's top 35 indexed earning years?
-#'     \item \code{indexed_rank}: Rank of this year's indexed earnings (1 = highest)
-#'     \item \code{marginal_pia_rate}: PIA bracket rate for marginal AIME (0.90, 0.32, or 0.15)
-#'     \item \code{delta_aime_per_dollar}: AIME increase per additional dollar (index_factor / 420, or 0)
-#'     \item \code{delta_pia_per_dollar}: PIA increase per additional dollar of earnings
-#'     \item \code{delta_pv_benefits}: PV of lifetime benefit increase from $1 more earnings
+#'     \item \code{id}: Worker identifier
+#'     \item \code{year}: Calendar year
+#'     \item \code{age}: Worker's age
+#'     \item \code{earnings}: Nominal earnings that year
+#'     \item \code{indexed_earn}: Indexed earnings for AIME calculation
+#'     \item \code{years_worked}: Cumulative years of work (1 to 44)
+#'     \item \code{qcs}: Cumulative quarters of coverage (4 per year)
+#'     \item \code{eligible}: Whether worker is eligible for benefits (QCs >= 40)
+#'     \item \code{cumulative_aime}: AIME if worker stopped at this year
+#'     \item \code{cumulative_pia}: PIA if worker stopped at this year
+#'     \item \code{cumulative_pv}: PV of lifetime benefits if stopped at this year
+#'     \item \code{delta_pv_benefits}: Change in PV from working this year
+#'     \item \code{in_top_35}: Whether this year is in top 35 indexed earnings
+#'     \item \code{indexed_rank}: Rank of indexed earnings (1 = highest)
 #'   }
 #'
 #' @details
-#' The marginal analysis answers: "If I earn $1 more this year, how much more
-#' will I receive in lifetime Social Security benefits?"
+#' This function answers: "What is the value of working year t, given that I've
+#' already worked years 1 through t-1?"
+#'
+#' The calculation compares two hypothetical workers identical in every way except
+#' one worked t years and the other worked t-1 years. The marginal value is the
+#' difference in their lifetime PV of benefits.
 #'
 #' Key insights:
 #' \itemize{
-#'   \item Years not in the top 35 indexed earnings have zero marginal benefit
-#'   \item Marginal AIME = index_factor / (35 × 12) = index_factor / 420
-#'   \item Marginal PIA depends on which PIA bracket the marginal AIME falls into
-#'   \item Delta PV benefits = delta_monthly_pia × actuarial_factor × months_of_benefits × discount_factor
+#'   \item Years 1-9: Worker not yet eligible (< 40 QCs), so delta_pv = 0
+#'   \item Year 10: Worker becomes eligible, large positive delta_pv
+#'   \item Years 11-35: Each year adds to AIME numerator (denominator fixed at 420)
+#'   \item Years 36+: Only adds value if displacing a lower-earning year from top 35
 #' }
+#'
+#' The computation period (35 years) is fixed based on eligibility age, NOT on
+#' years worked. AIME = sum(top 35 indexed earnings, with zeros if < 35 years) / 420.
 #'
 #' @examples
 #' \dontrun{
 #' worker <- calculate_benefits(
-#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   birth_yr = 1960, sex = "male", type = "max", age_claim = 67,
 #'   factors = sef2025, assumptions = tr2025, debugg = TRUE
 #' )
 #' marginal <- marginal_benefit_analysis(worker, tr2025)
+#'
+#' # Check pattern for max earner:
+#' # Years 1-9: delta_pv should be 0 (not eligible)
+#' # Year 10: delta_pv should be large (eligibility transition)
+#' marginal[marginal$age %in% 21:35, c("age", "years_worked", "qcs", "eligible", "delta_pv_benefits")]
 #' }
 #'
-#' @importFrom dplyr %>% filter group_by mutate arrange row_number first ungroup left_join select
+#' @importFrom dplyr %>% filter group_by mutate arrange first ungroup left_join select
 #' @export
 marginal_benefit_analysis <- function(worker, assumptions, base_year = 2025) {
 
-  # Validate required columns - need debugg = TRUE output
-  required_cols <- c("id", "year", "age", "earnings", "indexed_earn", "index_factor",
-                     "aime", "claim_age", "death_age")
-  if (!all(required_cols %in% names(worker))) {
-    missing <- required_cols[!required_cols %in% names(worker)]
-    stop(paste("worker data must contain:", paste(missing, collapse = ", "),
-               "\nDid you run calculate_benefits() with debugg = TRUE?"))
-  }
+ # Validate required columns - need debugg = TRUE output
+ required_cols <- c("id", "year", "age", "earnings", "indexed_earn",
+                    "claim_age", "death_age")
+ if (!all(required_cols %in% names(worker))) {
+   missing <- required_cols[!required_cols %in% names(worker)]
+   stop(paste("worker data must contain:", paste(missing, collapse = ", "),
+              "\nDid you run calculate_benefits() with debugg = TRUE?"))
+ }
 
-  # Check for PIA bend points
-  if (!"bp1_elig" %in% names(worker) || !"bp2_elig" %in% names(worker)) {
-    stop("worker data must contain 'bp1_elig' and 'bp2_elig' columns (run with debugg = TRUE)")
-  }
+ # Check for PIA bend points
+ if (!"bp1_elig" %in% names(worker) || !"bp2_elig" %in% names(worker)) {
+   stop("worker data must contain 'bp1_elig' and 'bp2_elig' columns (run with debugg = TRUE)")
+ }
 
-  # Check for comp_period (computation period, typically 35 years)
-  if (!"comp_period" %in% names(worker)) {
-    # Default to 35 if not present
-    worker$comp_period <- 35
-  }
+ # Get assumption columns
+ assumption_cols <- c("gdp_pi", "real_df", "cola")
+ cols_missing <- assumption_cols[!assumption_cols %in% names(worker)]
+ if (length(cols_missing) > 0) {
+   worker <- worker %>%
+     left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
+ }
 
-  # Get assumption columns for discounting
-  assumption_cols <- c("gdp_pi", "real_df")
-  cols_missing <- assumption_cols[!assumption_cols %in% names(worker)]
-  if (length(cols_missing) > 0) {
-    worker <- worker %>%
-      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
-  }
+ # Get base year price index for real conversion
+ gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
+ if (length(gdp_pi_base) == 0) {
+   stop(paste("base_year", base_year, "not found in assumptions"))
+ }
 
-  # Get base year price index for real conversion
-  gdp_pi_base <- assumptions$gdp_pi[assumptions$year == base_year]
-  if (length(gdp_pi_base) == 0) {
-    stop(paste("base_year", base_year, "not found in assumptions"))
-  }
+ # Get PIA factors (typically 0.90, 0.32, 0.15)
+ fact1 <- 0.90
+ fact2 <- 0.32
+ fact3 <- 0.15
 
-  # Calculate marginal analysis for each worker
-  result <- worker %>%
-    group_by(id) %>%
-    arrange(id, age) %>%
-    mutate(
-      # Get computation period for this worker
-      comp_period_val = first(comp_period[!is.na(comp_period)]),
+ # Process each worker
+ result <- worker %>%
+   group_by(id) %>%
+   group_modify(~ {
+     w <- .x
+     n <- nrow(w)
 
-      # Rank indexed earnings (1 = highest) - only for working years (ages 21-64)
-      # Need to handle years before claim age (when indexed_earn is calculated)
-      working_year = age >= 21 & age <= 64,
+     # Extract worker parameters
+     claim_age <- first(w$claim_age[!is.na(w$claim_age)])
+     death_age <- first(w$death_age[!is.na(w$death_age)])
+     birth_yr <- first(w$year) - first(w$age)
+     bp1 <- first(w$bp1_elig[!is.na(w$bp1_elig)])
+     bp2 <- first(w$bp2_elig[!is.na(w$bp2_elig)])
+     eligibility_year <- birth_yr + 62
 
-      # Create rank based on indexed earnings for working years
-      indexed_rank = if_else(
-        working_year,
-        as.numeric(rank(-indexed_earn[working_year], ties.method = "first")[cumsum(working_year)]),
-        NA_real_
-      )
-    ) %>%
-    # Recalculate rank correctly using group_modify
-    ungroup() %>%
-    group_by(id) %>%
-    group_modify(~ {
-      # Get working years
-      working_idx <- which(.x$age >= 21 & .x$age <= 64)
-      n_working <- length(working_idx)
+     # Get actuarial factor if available
+     if ("act_factor" %in% names(w)) {
+       act_factor <- w$act_factor[which(w$age == claim_age)[1]]
+       if (is.na(act_factor) || length(act_factor) == 0) act_factor <- 1.0
+     } else {
+       act_factor <- 1.0
+     }
 
-      # Initialize rank column
-      .x$indexed_rank <- NA_real_
+     # Identify working years (ages 21-64)
+     working_idx <- which(w$age >= 21 & w$age <= 64)
+     n_working <- length(working_idx)
 
-      if (n_working > 0) {
-        # Rank the indexed earnings (descending - 1 = highest)
-        indexed_vals <- .x$indexed_earn[working_idx]
-        ranks <- rank(-indexed_vals, ties.method = "first")
-        .x$indexed_rank[working_idx] <- ranks
-      }
+     # Initialize output columns
+     w$years_worked <- NA_integer_
+     w$qcs <- NA_integer_
+     w$eligible <- NA
+     w$cumulative_aime <- NA_real_
+     w$cumulative_pia <- NA_real_
+     w$cumulative_pv <- NA_real_
+     w$delta_pv_benefits <- NA_real_
+     w$in_top_35 <- NA
+     w$indexed_rank <- NA_integer_
 
-      .x
-    }) %>%
-    ungroup() %>%
-    group_by(id) %>%
-    mutate(
-      # Get computation period for this worker (typically 35)
-      comp_period_val = first(comp_period[!is.na(comp_period)]),
+     if (n_working == 0) return(w)
 
-      # Is this year in the top N (computation period) indexed earning years?
-      in_top_35 = !is.na(indexed_rank) & indexed_rank <= comp_period_val,
+     # Get indexed earnings for working years
+     indexed_earnings <- w$indexed_earn[working_idx]
 
-      # AIME at claim age (for determining marginal PIA rate)
-      aime_at_claim = first(aime[age == first(claim_age)]),
-      bp1_val = first(bp1_elig[!is.na(bp1_elig)]),
-      bp2_val = first(bp2_elig[!is.na(bp2_elig)]),
+     # Get discount factor at age 65 for PV normalization
+     real_df_65 <- w$real_df[which(w$year == birth_yr + 65)]
+     if (length(real_df_65) == 0) real_df_65 <- 1
 
-      # Marginal PIA rate based on where AIME falls in the bend point formula
-      # If AIME < bp1: marginal rate = 0.90
-      # If bp1 <= AIME < bp2: marginal rate = 0.32
-      # If AIME >= bp2: marginal rate = 0.15
-      marginal_pia_rate = case_when(
-        aime_at_claim < bp1_val ~ 0.90,
-        aime_at_claim < bp2_val ~ 0.32,
-        TRUE ~ 0.15
-      ),
+     # Pre-compute COLA factors and discount factors for each benefit year
+     # This is the same regardless of AIME/PIA, so we compute once
+     benefit_ages <- seq(ceiling(claim_age), floor(death_age) - 1)
+     n_benefit_years <- length(benefit_ages)
 
-      # Delta AIME per dollar of additional earnings
-      # AIME = sum(top 35 indexed earnings) / (35 * 12)
-      # Marginal AIME = index_factor / (35 * 12) = index_factor / 420
-      # Only applies if this year would be in the top 35
-      delta_aime_per_dollar = if_else(
-        in_top_35,
-        index_factor / (comp_period_val * 12),
-        0
-      ),
+     # Build arrays of cumulative COLA and discount factors
+     cola_factors <- numeric(n_benefit_years)
+     discount_factors <- numeric(n_benefit_years)
+     price_deflators <- numeric(n_benefit_years)
 
-      # Delta PIA per dollar (monthly PIA increase)
-      delta_pia_per_dollar = delta_aime_per_dollar * marginal_pia_rate,
+     cumulative_cola <- 1.0
+     for (i in seq_along(benefit_ages)) {
+       ben_age <- benefit_ages[i]
+       ben_year <- birth_yr + ben_age
 
-      # Calculate PV of additional lifetime benefits from $1 more earnings
-      # Need: number of benefit years, actuarial adjustment, discount factor
+       # COLA is applied at the start of each year after eligibility
+       # First benefit year gets no COLA adjustment, then each subsequent year
+       if (ben_year > eligibility_year) {
+         cola_idx <- which(assumptions$year == ben_year)
+         if (length(cola_idx) > 0) {
+           cola_rate <- assumptions$cola[cola_idx[1]]
+           if (!is.na(cola_rate)) {
+             cumulative_cola <- cumulative_cola * (1 + cola_rate / 100)
+           }
+         }
+       }
+       cola_factors[i] <- cumulative_cola
 
-      # Get actuarial factor (from worker_benefit calculation if available)
-      claim_age_val = first(claim_age[!is.na(claim_age)]),
-      death_age_val = first(death_age[!is.na(death_age)]),
+       # Get discount factor and price deflator
+       df_idx <- which(w$year == ben_year)
+       if (length(df_idx) > 0) {
+         discount_factors[i] <- real_df_65 / w$real_df[df_idx[1]]
+         price_deflators[i] <- gdp_pi_base / w$gdp_pi[df_idx[1]]
+       } else {
+         discount_factors[i] <- 1
+         price_deflators[i] <- 1
+       }
+     }
 
-      # Number of months of benefits
-      benefit_months = (death_age_val - claim_age_val) * 12,
+     # Helper function to compute PV of lifetime benefits given a PIA
+     compute_pv <- function(pia) {
+       if (pia <= 0) return(0)
 
-      # Discount factor from current age to age 65 (for normalization)
-      birth_yr = first(year) - first(age),
-      discount_year = birth_yr + 65,
-      real_df_norm = real_df[which(year == discount_year)][1],
-      real_df_at_claim = real_df[which(year == birth_yr + claim_age_val)][1],
+       # Worker benefit at claim = PIA × actuarial factor
+       # (COLA from 62 to claim is already captured in cola_factors)
+       worker_benefit_monthly <- pia * act_factor
 
-      # Price index for converting to real dollars
-      gdp_pi_at_claim = gdp_pi[which(year == birth_yr + claim_age_val)][1]
-    ) %>%
-    # Calculate delta_pv_benefits using group_modify for complex calculation
-    group_modify(~ {
-      # Get actuarial factor if available
-      if ("act_factor" %in% names(.x)) {
-        act_factor_val <- .x$act_factor[which(.x$age == .x$claim_age_val[1])][1]
-        if (is.na(act_factor_val)) act_factor_val <- 1.0
-      } else {
-        act_factor_val <- 1.0
-      }
+       # Annual benefit at each age = monthly × 12 × COLA adjustment
+       # Convert to real dollars and discount
+       pv_sum <- 0
+       for (i in seq_along(benefit_ages)) {
+         annual_nominal <- worker_benefit_monthly * 12 * cola_factors[i]
+         annual_real <- annual_nominal * price_deflators[i]
+         pv_sum <- pv_sum + annual_real * discount_factors[i]
+       }
+       pv_sum
+     }
 
-      # Calculate PV of lifetime benefit increase
-      # Delta annual benefit = delta_pia_per_dollar * 12 * actuarial_factor
-      # PV = sum over all benefit years, discounted
+     # Rank all working years by indexed earnings (for reporting)
+     all_ranks <- rank(-indexed_earnings, ties.method = "first")
 
-      claim_age <- .x$claim_age_val[1]
-      death_age <- .x$death_age_val[1]
-      birth_yr <- .x$birth_yr[1]
-      gdp_pi_base_val <- gdp_pi_base
+     # Compute cumulative PV at each stopping point
+     cumulative_pv_prev <- 0
 
-      # For each working year, calculate PV of benefit increase
-      .x$delta_pv_benefits <- NA_real_
+     for (t in seq_len(n_working)) {
+       idx <- working_idx[t]
+       w$years_worked[idx] <- t
+       w$qcs[idx] <- 4 * t
+       w$eligible[idx] <- (4 * t) >= 40
+       w$indexed_rank[idx] <- all_ranks[t]
+       w$in_top_35[idx] <- all_ranks[t] <= 35
 
-      for (i in seq_len(nrow(.x))) {
-        if (!is.na(.x$in_top_35[i]) && .x$in_top_35[i]) {
-          # Annual benefit increase in real dollars
-          delta_annual_benefit <- .x$delta_pia_per_dollar[i] * 12 * act_factor_val
+       if (w$qcs[idx] < 40) {
+         # Not yet eligible
+         w$cumulative_aime[idx] <- 0
+         w$cumulative_pia[idx] <- 0
+         w$cumulative_pv[idx] <- 0
+         w$delta_pv_benefits[idx] <- 0
+       } else {
+         # Eligible - compute AIME with first t years of indexed earnings
+         # AIME = sum(top 35 indexed earnings, padding with zeros) / 420
+         earnings_so_far <- indexed_earnings[1:t]
 
-          # Sum PV over all benefit years
-          pv_sum <- 0
-          for (ben_age in seq(ceiling(claim_age), floor(death_age) - 1)) {
-            ben_year <- birth_yr + ben_age
-            # Get discount factor for this year
-            df_idx <- which(.x$year == ben_year)
-            if (length(df_idx) > 0) {
-              real_df_ben <- .x$real_df[df_idx[1]]
-              gdp_pi_ben <- .x$gdp_pi[df_idx[1]]
+         if (t <= 35) {
+           # All earnings count (plus implicit zeros)
+           aime <- sum(earnings_so_far, na.rm = TRUE) / 420
+         } else {
+           # Take top 35 only
+           top_35 <- sort(earnings_so_far, decreasing = TRUE)[1:35]
+           aime <- sum(top_35, na.rm = TRUE) / 420
+         }
 
-              if (!is.na(real_df_ben) && !is.na(gdp_pi_ben) && !is.na(.x$real_df_norm[1])) {
-                # Convert to real dollars and discount
-                real_benefit <- delta_annual_benefit * (gdp_pi_base_val / gdp_pi_ben)
-                pv_factor <- .x$real_df_norm[1] / real_df_ben
-                pv_sum <- pv_sum + real_benefit * pv_factor
-              }
-            }
-          }
-          .x$delta_pv_benefits[i] <- pv_sum
-        } else if (.x$age[i] >= 21 && .x$age[i] <= 64) {
-          .x$delta_pv_benefits[i] <- 0
-        }
-      }
+         # Compute PIA using bend point formula
+         pia <- if (aime <= bp1) {
+           fact1 * aime
+         } else if (aime <= bp2) {
+           fact1 * bp1 + fact2 * (aime - bp1)
+         } else {
+           fact1 * bp1 + fact2 * (bp2 - bp1) + fact3 * (aime - bp2)
+         }
 
-      .x
-    }) %>%
-    ungroup()
+         # Floor to dime (SSA rule)
+         pia <- floor(pia * 10) / 10
 
-  # Select relevant columns to return
-  output_cols <- c("id", "year", "age", "earnings", "indexed_earn", "index_factor",
-                   "in_top_35", "indexed_rank", "marginal_pia_rate",
-                   "delta_aime_per_dollar", "delta_pia_per_dollar", "delta_pv_benefits")
-  available_cols <- intersect(output_cols, names(result))
+         # Compute PV using the full benefit calculation
+         cumulative_pv <- compute_pv(pia)
 
-  return(result %>% select(all_of(available_cols)))
+         w$cumulative_aime[idx] <- aime
+         w$cumulative_pia[idx] <- pia
+         w$cumulative_pv[idx] <- cumulative_pv
+         w$delta_pv_benefits[idx] <- cumulative_pv - cumulative_pv_prev
+
+         cumulative_pv_prev <- cumulative_pv
+       }
+     }
+
+     w
+   }) %>%
+   ungroup()
+
+ # Select relevant columns to return
+ output_cols <- c("id", "year", "age", "earnings", "indexed_earn",
+                  "years_worked", "qcs", "eligible",
+                  "cumulative_aime", "cumulative_pia", "cumulative_pv",
+                  "delta_pv_benefits", "in_top_35", "indexed_rank")
+ available_cols <- intersect(output_cols, names(result))
+
+ return(result %>% select(all_of(available_cols)))
 }
 
 
@@ -534,7 +570,7 @@ marginal_benefit_analysis <- function(worker, assumptions, base_year = 2025) {
 #'
 #' Computes the net marginal tax rate on Social Security for each working year.
 #' The net marginal tax rate accounts for the marginal benefit accrued from
-#' additional earnings.
+#' additional earnings using the cumulative stopping-point method.
 #'
 #' @param worker Data frame with calculated benefits. Must contain columns from
 #'   \code{calculate_benefits()} run with \code{debugg = TRUE}.
@@ -550,41 +586,47 @@ marginal_benefit_analysis <- function(worker, assumptions, base_year = 2025) {
 #'     \item \code{year}: Calendar year
 #'     \item \code{age}: Worker's age
 #'     \item \code{earnings}: Nominal earnings
-#'     \item \code{ss_tax}: Social Security tax paid
-#'     \item \code{delta_pv_benefits}: PV of marginal benefit accrual
-#'     \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits_total) / earnings
+#'     \item \code{years_worked}: Cumulative years of work
+#'     \item \code{qcs}: Cumulative quarters of coverage
+#'     \item \code{eligible}: Whether eligible for benefits (QCs >= 40)
+#'     \item \code{ss_tax}: Social Security tax paid (employee share)
+#'     \item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
+#'     \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
+#'     \item \code{in_top_35}: Whether this year is in top 35 indexed earnings
 #'   }
 #'
 #' @details
 #' The net marginal tax rate is calculated as:
-#' \deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits\_total}{earnings}}
+#' \deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits}{earnings}}
 #'
-#' Where \code{delta_pv_benefits_total} is the present value of additional lifetime
-#' benefits from this year's earnings (computed as \code{delta_pv_benefits × earnings},
-#' where \code{delta_pv_benefits} from \code{marginal_benefit_analysis()} is per-dollar).
+#' Where \code{delta_pv_benefits} is the change in present value of lifetime
+#' benefits from working year t vs t-1 (using the cumulative stopping-point method).
 #'
-#' Interpretation:
+#' Expected pattern for a max earner:
 #' \itemize{
-#'   \item Value near 0.062 (6.2%) or 0.124 (12.4% with employer) means no benefit accrual — pure tax
-#'   \item Value near 0 means benefits offset most of the tax
-#'   \item Negative value means benefits exceed taxes (common for workers in the
-#'     90% or 32% PIA brackets where marginal benefits are substantial)
+#'   \item Years 1-9: NMTR ≈ 12.4% (not yet eligible, pure tax)
+#'   \item Year 10: NMTR strongly negative (eligibility transition, big benefit gain)
+#'   \item Years 11-35: NMTR varies based on PIA bracket and benefit accrual
+#'   \item Years 36+: NMTR = 12.4% if year doesn't enter top 35
 #' }
 #'
 #' @examples
 #' \dontrun{
 #' worker <- calculate_benefits(
-#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   birth_yr = 1960, sex = "male", type = "max", age_claim = 67,
 #'   factors = sef2025, assumptions = tr2025, debugg = TRUE
 #' )
-#' nmtr <- net_marginal_tax_rate(worker, tr2025)
+#' nmtr <- net_marginal_tax_rate(worker, tr2025, include_employer = TRUE)
+#'
+#' # Check the expected pattern
+#' nmtr[nmtr$age %in% 21:35, c("age", "years_worked", "eligible", "net_marginal_tax_rate")]
 #' }
 #'
 #' @export
 net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
                                    base_year = 2025) {
 
-  # Get marginal benefit analysis
+  # Get marginal benefit analysis (using cumulative stopping-point method)
   marginal <- marginal_benefit_analysis(worker, assumptions, base_year)
 
   # Calculate taxes
@@ -600,23 +642,21 @@ net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
       # Apply employer share if requested
       ss_tax_total = if (include_employer) ss_tax * 2 else ss_tax,
 
-      # Convert delta_pv_benefits from per-dollar to total dollars
-      delta_pv_benefits_total = delta_pv_benefits * earnings,
-
       # Net marginal tax rate
-      # NMTR = (tax - marginal benefit) / earnings
+      # NMTR = (tax - delta_pv_benefits) / earnings
+      # Note: delta_pv_benefits is already the total change in PV (not per-dollar)
       net_marginal_tax_rate = if_else(
-        earnings > 0 & age >= 21 & age <= 64,
-        (ss_tax_total - delta_pv_benefits_total) / earnings,
+        !is.na(earnings) & earnings > 0 & age >= 21 & age <= 64,
+        (ss_tax_total - delta_pv_benefits) / earnings,
         NA_real_
       )
     )
 
   # Select output columns
-  output_cols <- c("id", "year", "age", "earnings", "ss_tax", "delta_pv_benefits",
-                   "net_marginal_tax_rate")
+  output_cols <- c("id", "year", "age", "earnings", "years_worked", "qcs", "eligible",
+                   "ss_tax", "delta_pv_benefits", "net_marginal_tax_rate", "in_top_35")
   if (include_employer) {
-    output_cols <- c(output_cols[1:5], "ss_tax_total", output_cols[6:7])
+    output_cols <- c(output_cols[1:8], "ss_tax_total", output_cols[9:11])
   }
   available_cols <- intersect(output_cols, names(result))
 
@@ -628,7 +668,7 @@ net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
 #'
 #' Computes the marginal IRR for each working year. This is the IRR on that
 #' year's tax contribution, considering only the marginal benefit accrual
-#' from that year's earnings.
+#' from that year's work using the cumulative stopping-point method.
 #'
 #' @param worker Data frame with calculated benefits. Must contain columns from
 #'   \code{calculate_benefits()} run with \code{debugg = TRUE}.
@@ -646,19 +686,27 @@ net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
 #'     \item \code{earnings}: Nominal earnings
 #'     \item \code{ss_tax}: Social Security tax paid
 #'     \item \code{in_top_35}: Whether year is in top 35 indexed earnings
+#'     \item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
 #'     \item \code{marginal_irr}: IRR on this year's tax contribution
 #'   }
 #'
 #' @details
-#' For each working year, the marginal IRR is the rate r that solves:
-#' \deqn{tax_t = \sum_{y} \frac{\Delta benefit_y}{(1+r)^{(y - t)}}}
+#' The marginal IRR is computed using delta_pv_benefits from the cumulative
+#' stopping-point method. Since delta_pv_benefits is already the present value
+#' of additional lifetime benefits (discounted to age 65), the IRR is the rate
+#' that makes the tax contribution grow to equal this benefit gain:
 #'
-#' When the year is NOT in the top 35 indexed earnings (marginal benefit = 0),
-#' the marginal IRR is -1 (representing -100% return — complete loss of the
-#' tax contribution).
+#' \deqn{tax_t \times (1 + r)^{(65 - t)} = \Delta PV\_benefits}
 #'
-#' This calculation can be slow for many workers as it requires solving for r
-#' numerically for each working year.
+#' Solving for r:
+#' \deqn{r = (\Delta PV\_benefits / tax_t)^{1/(65-t)} - 1}
+#'
+#' Special cases:
+#' \itemize{
+#'   \item Years 1-9 (not yet eligible): delta_pv = 0, so IRR = -1 (-100%)
+#'   \item Year 10 (eligibility transition): Very high IRR (large delta_pv)
+#'   \item Years 36+ outside top 35: IRR = -1 (-100%)
+#' }
 #'
 #' @examples
 #' \dontrun{
@@ -667,16 +715,19 @@ net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
 #'   factors = sef2025, assumptions = tr2025, debugg = TRUE
 #' )
 #' mirr <- marginal_irr(worker, tr2025)
+#'
+#' # Check pattern - year 10 should have very high IRR
+#' mirr[mirr$age %in% 25:35, c("age", "delta_pv_benefits", "marginal_irr")]
 #' }
 #'
-#' @importFrom stats uniroot
 #' @export
 marginal_irr <- function(worker, assumptions, include_employer = FALSE,
                           base_year = 2025) {
 
-  # Get marginal benefit analysis and taxes
+  # Get marginal benefit analysis (using cumulative stopping-point method)
   marginal <- marginal_benefit_analysis(worker, assumptions, base_year)
 
+  # Calculate taxes
   worker_with_taxes <- calculate_taxes(worker, assumptions)
 
   # Combine data
@@ -689,106 +740,30 @@ marginal_irr <- function(worker, assumptions, include_employer = FALSE,
       ss_tax_total = if (include_employer) ss_tax * 2 else ss_tax
     )
 
-  # Get worker metadata
-  worker_meta <- worker %>%
-    group_by(id) %>%
-    summarise(
-      claim_age = first(claim_age[!is.na(claim_age)]),
-      death_age = first(death_age[!is.na(death_age)]),
-      birth_yr = first(year) - first(age),
-      .groups = "drop"
+  # Calculate marginal IRR for each working year
+  # IRR = (delta_pv_benefits / tax)^(1/(65-age)) - 1
+  result <- combined %>%
+    mutate(
+      marginal_irr = case_when(
+        # Not a working year
+        age < 21 | age > 64 ~ NA_real_,
+
+        # No tax paid
+        is.na(ss_tax_total) | ss_tax_total <= 0 ~ NA_real_,
+
+        # No benefit gain (not eligible, or not in top 35)
+        is.na(delta_pv_benefits) | delta_pv_benefits <= 0 ~ -1.0,
+
+        # Normal case: compute IRR
+        # tax * (1+r)^(65-age) = delta_pv_benefits
+        # r = (delta_pv_benefits / tax)^(1/(65-age)) - 1
+        TRUE ~ (delta_pv_benefits / ss_tax_total)^(1 / (65 - age)) - 1
+      )
     )
 
-  combined <- combined %>%
-    left_join(worker_meta, by = "id")
-
-  # Get actuarial factor if available
-  if ("act_factor" %in% names(worker)) {
-    act_factors <- worker %>%
-      group_by(id) %>%
-      summarise(
-        act_factor_val = first(act_factor[!is.na(act_factor) & act_factor > 0]),
-        .groups = "drop"
-      )
-    combined <- combined %>%
-      left_join(act_factors, by = "id") %>%
-      mutate(act_factor_val = if_else(is.na(act_factor_val), 1.0, act_factor_val))
-  } else {
-    combined$act_factor_val <- 1.0
-  }
-
-  # Calculate marginal IRR for each working year
-  result <- combined %>%
-    group_by(id) %>%
-    group_modify(~ {
-      n <- nrow(.x)
-      mirr_vals <- rep(NA_real_, n)
-
-      for (i in seq_len(n)) {
-        age_i <- .x$age[i]
-        year_i <- .x$year[i]
-
-        # Only calculate for working years
-        if (age_i >= 21 && age_i <= 64 && !is.na(.x$ss_tax_total[i]) && .x$ss_tax_total[i] > 0) {
-
-          # If not in top 35, return is -100% (complete loss)
-          if (!.x$in_top_35[i]) {
-            mirr_vals[i] <- -1.0
-          } else {
-            # Calculate marginal IRR
-            tax_i <- .x$ss_tax_total[i]
-            delta_pia_i <- .x$delta_pia_per_dollar[i]
-            act_factor <- .x$act_factor_val[i]
-            claim_age <- .x$claim_age[i]
-            death_age <- .x$death_age[i]
-            earnings_i <- .x$earnings[i]
-
-            # Skip if no earnings or delta_pia
-            if (is.na(earnings_i) || earnings_i == 0 || is.na(delta_pia_i) || delta_pia_i == 0) {
-              mirr_vals[i] <- NA_real_
-              next
-            }
-
-            # Marginal annual benefit from this year's earnings
-            # = delta_pia_per_dollar * earnings * 12 * actuarial_factor
-            delta_annual_benefit <- delta_pia_i * earnings_i * 12 * act_factor
-
-            # Benefit years
-            ben_ages <- seq(ceiling(claim_age), floor(death_age) - 1)
-
-            if (length(ben_ages) == 0) {
-              mirr_vals[i] <- NA_real_
-              next
-            }
-
-            # Define NPV function for this year's contribution
-            npv_func <- function(r) {
-              # PV of marginal benefits
-              pv_benefits <- sum(
-                delta_annual_benefit / (1 + r)^(ben_ages - age_i),
-                na.rm = TRUE
-              )
-              return(pv_benefits - tax_i)
-            }
-
-            # Find IRR using uniroot
-            mirr_vals[i] <- tryCatch({
-              result <- uniroot(npv_func, interval = c(-0.99, 2.0), tol = 1e-8)
-              result$root
-            }, error = function(e) {
-              NA_real_
-            })
-          }
-        }
-      }
-
-      .x$marginal_irr <- mirr_vals
-      .x
-    }) %>%
-    ungroup()
-
   # Select output columns
-  output_cols <- c("id", "year", "age", "earnings", "ss_tax", "in_top_35", "marginal_irr")
+  output_cols <- c("id", "year", "age", "earnings", "ss_tax", "in_top_35",
+                   "delta_pv_benefits", "marginal_irr")
   available_cols <- intersect(output_cols, names(result))
 
   return(result %>% select(all_of(available_cols)))
