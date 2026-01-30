@@ -376,6 +376,99 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   # Per 42 USC 402(d)(2): child benefit is 50% of worker's PIA
   assume$child_pia_share <- 0.5
 
+  # =============================================================================
+  # COLA Cap Data (for Reform #9)
+  # =============================================================================
+  # Load median PIA thresholds for COLA cap reform. If available, merge by year.
+  # This data represents the median monthly PIA and is used to cap COLAs for
+  # beneficiaries above the median.
+
+  cola_cap_file <- system.file("extdata", "cola_cap_median.csv", package = "ssmbar")
+  if (cola_cap_file == "") {
+    # Try relative path for development
+    if (file.exists("inst/extdata/cola_cap_median.csv")) {
+      cola_cap_file <- "inst/extdata/cola_cap_median.csv"
+    }
+  }
+
+  if (file.exists(cola_cap_file)) {
+    cola_cap_data <- read.csv(cola_cap_file)
+
+    # Initialize cola_cap column
+    assume$cola_cap <- NA_real_
+
+    # Merge cola_cap data by year
+    for (i in seq_len(nrow(assume))) {
+      yr <- assume$year[i]
+      cap_row <- cola_cap_data[cola_cap_data$year == yr, ]
+      if (nrow(cap_row) == 1) {
+        assume$cola_cap[i] <- cap_row$cola_cap
+      }
+    }
+  }
+
+  # =============================================================================
+  # REFORM PARAMETERS
+  # =============================================================================
+  # These parameters support policy reform modeling. Default values represent
+  # current law. Reform templates modify these values to model alternative policies.
+
+  # PIA Multiplier (Reform #1)
+  # Applied to basic_pia after formula calculation. Default 1.0 = no change.
+  assume$pia_multiplier <- 1.0
+
+  # Retirement Earnings Test Enabled (Reform #23)
+  # Set to FALSE to repeal the RET. Default TRUE = RET applies.
+  assume$ret_enabled <- TRUE
+
+  # Third PIA bend point (Reform #3, #12-14)
+  # For 4-bracket PIA formula. Default NA = 3-bracket formula only.
+  assume$bp3 <- NA_real_
+
+  # Fourth PIA replacement factor (Reform #3, #12-14)
+  # For 4-bracket PIA formula. Default NA = 3-bracket formula only.
+  assume$fact4 <- NA_real_
+
+  # COLA Cap - median PIA threshold (Reform #9)
+  # COLAs are capped for beneficiaries with PIA above this amount.
+  # Default NA = no COLA cap. Values loaded from cola_cap_median.csv earlier in this function.
+  # (Do not reinitialize here - would overwrite loaded data)
+  # cola_cap_active flag controls whether capping is applied (default FALSE = no cap)
+  assume$cola_cap_active <- FALSE
+
+  # Basic Minimum Benefit (Reform #27)
+  # Monthly BMB amounts: individual and couple. Default NA = no BMB.
+  # Values are in 2026 dollars and should be AWI-indexed for future years.
+  assume$bmb_individual <- NA_real_
+  assume$bmb_couple <- NA_real_
+
+  # Mini-PIA Blend Factor (Reform #22)
+  # 0 = current law, 1 = full mini-PIA. Phases in over time.
+  assume$mini_pia_blend <- 0
+
+  # Flat Benefit Amount (Reform #2)
+  # Monthly flat benefit floor. Default NA = no flat benefit.
+  assume$flat_benefit <- NA_real_
+
+  # Separate Tax and Benefit Caps (Reform #14)
+  # taxmax_tax: Maximum earnings subject to payroll tax (for calculating taxes)
+  # taxmax_benefit: Maximum earnings for benefit calculation (for AIME)
+  # Default: both equal taxmax (current law)
+  assume$taxmax_tax <- assume$taxmax
+  assume$taxmax_benefit <- assume$taxmax
+
+  # Child Care Credit (Reform #29)
+  # When enabled, credits earnings up to 0.5*AWI for years with child under 6
+  # Up to max_child_care_years years (default 5)
+  assume$child_care_credit_active <- FALSE
+  assume$max_child_care_years <- 5
+  assume$child_care_earnings_rate <- 0.5  # Fraction of AWI credited
+
+  # 75% Widow Benefit (Reform #28)
+  # When enabled, provides alternative widow benefit calculation:
+  # Alternative = min(75% * (survivor_wrk_ben + deceased_wrk_ben), medium_worker_pia)
+  assume$widow_75_pct_active <- FALSE
+
   return(assume)
 
 }

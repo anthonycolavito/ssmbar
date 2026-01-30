@@ -19,6 +19,21 @@ utils::globalVariables(c(
   "max_dropout_years", "min_comp_period", "max_qc_per_year",
   "drc_max_months", "ret_phaseout_rate",
 
+  # Reform parameters
+  "pia_multiplier", "ret_enabled", "bp3", "fact4", "cola_cap", "cola_cap_active",
+  "bmb_individual", "bmb_couple", "mini_pia_blend", "flat_benefit",
+  "taxmax_tax", "taxmax_benefit",
+  "bp3_elig", "fact4_elig", "cola_cap_year", "cola_cap_active_vals", "cap_is_active",
+  "bmb_rate", "bmb_rate_elig",
+  "flat_benefit_elig", "mini_pia_val", "regular_pia", "blended_pia",
+  "pia_mult_elig", "regular_pia_mult", "regular_pia_final",
+  "benefit_cap", "nra_bmb", "at_or_past_nra", "has_spouse", "bmb_supplement",
+  "child_care_credit_active", "years_with_child_under_6",
+  "max_child_care_years", "child_care_earnings_rate", "child_care_floor",
+  "earnings_with_cc", "mini_pia_blend_elig",
+  "widow_75_pct_active", "survivor_ben_current_law", "survivor_ben_alternative",
+  "own_wrk_ben", "widow_75_active",
+
   # AIME calculation variables
   "awi_age60", "awi_index_age", "index_age", "index_factor", "capped_earn", "indexed_earn",
   "qc_i", "qc_tot", "comp_period", "elapsed_years", "dropout_years",

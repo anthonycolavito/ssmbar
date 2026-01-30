@@ -177,8 +177,12 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   # - max_qc_per_year: Max QCs per year (Section 212)
   # - max_dropout_years, min_comp_period: For computation period (Section 703)
   # - index_age_offset: Indexing year offset from eligibility age (Section 700.4)
+  # - taxmax_benefit: For Reform #14, separate benefit calculation cap
+  # - child_care_credit_active: For Reform #29, child care credit
   cols_needed <- c("taxmax", "qc_rec", "qc_required", "max_qc_per_year",
-                   "max_dropout_years", "min_comp_period", "index_age_offset", "awi")
+                   "max_dropout_years", "min_comp_period", "index_age_offset", "awi",
+                   "taxmax_benefit", "child_care_credit_active", "max_child_care_years",
+                   "child_care_earnings_rate")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -195,12 +199,88 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
   # Calculate indexed earnings
   # Earnings are indexed to AWI at (elig_age - index_age_offset) 2 years before eligibility
   # SSA Handbook Section 700.4: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
+  # Reform #29: Child Care Credit - Apply earnings floor for years with child under 6
+  # Helper function to parse child birth year from child_spec (format: "birthyr-disabled")
+  parse_child_birth_year <- function(spec) {
+    if (is.na(spec) || spec == "") return(NA_integer_)
+    parts <- strsplit(as.character(spec), "-")[[1]]
+    if (length(parts) >= 1) {
+      return(as.integer(parts[1]))
+    }
+    NA_integer_
+  }
+
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
       index_age = elig_age - first(index_age_offset), # Age for wage indexing (e.g., 62 - 2 = 60)
       awi_index_age = awi[which(age == index_age)], # Retrieve AWI at indexing age
       index_factor = pmax(awi_index_age / awi, 1), # Calculate indexing factor. Earnings past indexing age are taken at face value.
-      capped_earn = pmin(earnings, taxmax), # Cap earnings amounts at the taxable maximum at each age
+      # Reform #14: Use taxmax_benefit for AIME calculation if available
+      # This allows taxmax_tax to be unlimited while keeping benefits capped at old taxmax
+      benefit_cap = if_else(is.na(taxmax_benefit), taxmax, taxmax_benefit),
+
+      # Reform #29: Child Care Credit
+      # If enabled, credit earnings up to child_care_earnings_rate * AWI for years with child under 6
+      child_care_floor = if_else(
+        !is.na(child_care_credit_active) & child_care_credit_active == TRUE,
+        child_care_earnings_rate * awi,
+        0
+      )
+    ) %>%
+    # Apply child care credit if active and worker has children
+    group_modify(~ {
+      n <- nrow(.x)
+      cc_active <- .x$child_care_credit_active[1]
+      cc_active <- !is.na(cc_active) && cc_active == TRUE
+
+      # Parse child birth years from child_spec columns
+      child1_by <- if ("child1_spec" %in% names(.x)) parse_child_birth_year(.x$child1_spec[1]) else NA_integer_
+      child2_by <- if ("child2_spec" %in% names(.x)) parse_child_birth_year(.x$child2_spec[1]) else NA_integer_
+      child3_by <- if ("child3_spec" %in% names(.x)) parse_child_birth_year(.x$child3_spec[1]) else NA_integer_
+
+      has_children <- !is.na(child1_by) | !is.na(child2_by) | !is.na(child3_by)
+
+      if (cc_active && has_children) {
+        max_cc_years <- .x$max_child_care_years[1]
+        max_cc_years <- if (is.na(max_cc_years)) 5 else max_cc_years
+
+        # Determine which years had a child under 6
+        years_with_child_under_6 <- logical(n)
+        for (i in seq_len(n)) {
+          yr <- .x$year[i]
+          has_young_child <- FALSE
+          if (!is.na(child1_by) && (yr - child1_by) >= 0 && (yr - child1_by) < 6) has_young_child <- TRUE
+          if (!is.na(child2_by) && (yr - child2_by) >= 0 && (yr - child2_by) < 6) has_young_child <- TRUE
+          if (!is.na(child3_by) && (yr - child3_by) >= 0 && (yr - child3_by) < 6) has_young_child <- TRUE
+          years_with_child_under_6[i] <- has_young_child
+        }
+
+        # Calculate potential credit gain for each year
+        potential_gain <- pmax(.x$child_care_floor - .x$earnings, 0) * years_with_child_under_6
+
+        # Select best max_cc_years years (highest gain)
+        if (sum(potential_gain > 0) > 0) {
+          gain_order <- order(potential_gain, decreasing = TRUE)
+          credit_years <- gain_order[1:min(max_cc_years, sum(potential_gain > 0))]
+          credit_mask <- seq_len(n) %in% credit_years
+
+          # Apply credit: use max(earnings, floor) for selected years
+          .x$earnings_with_cc <- if_else(
+            credit_mask,
+            pmax(.x$earnings, .x$child_care_floor),
+            .x$earnings
+          )
+        } else {
+          .x$earnings_with_cc <- .x$earnings
+        }
+      } else {
+        .x$earnings_with_cc <- .x$earnings
+      }
+      .x
+    }) %>%
+    mutate(
+      # Cap earnings and index
+      capped_earn = pmin(earnings_with_cc, benefit_cap), # Cap earnings amounts at the benefit cap
       indexed_earn = capped_earn * index_factor # Indexed capped earnings amounts
     ) %>%
     ungroup()
@@ -284,6 +364,52 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 # 2.2 PIA Calculation
 # -----------------------------------------------------------------------------
 
+#' Calculate Mini-PIA Value (Reform #22)
+#'
+#' Calculates the "mini-PIA" which applies the PIA formula to each year's
+#' indexed earnings, then averages the results. This is an alternative to
+#' the standard method of averaging earnings first, then applying the formula.
+#'
+#' Mini-PIA formula: PIA = average(formula(each year's indexed earnings / 12))
+#' vs Standard: PIA = formula(average(top 35 indexed earnings) / 12)
+#'
+#' @param indexed_earnings Vector of indexed earnings by year
+#' @param comp_period Number of years in computation period
+#' @param bp1 First PIA bend point (monthly)
+#' @param bp2 Second PIA bend point (monthly)
+#' @param fact1 First replacement factor (typically 0.90)
+#' @param fact2 Second replacement factor (typically 0.32)
+#' @param fact3 Third replacement factor (typically 0.15)
+#'
+#' @return The mini-PIA value
+#' @keywords internal
+calculate_mini_pia <- function(indexed_earnings, comp_period, bp1, bp2, fact1, fact2, fact3) {
+  if (length(indexed_earnings) == 0 || comp_period <= 0) return(0)
+
+  # Apply PIA formula to each year's monthly indexed earnings
+  mini_pias <- sapply(indexed_earnings, function(earn) {
+    monthly_earn <- earn / 12
+    pia_val <- if (monthly_earn > bp2) {
+      (fact1 * bp1) + (fact2 * (bp2 - bp1)) + (fact3 * (monthly_earn - bp2))
+    } else if (monthly_earn > bp1) {
+      (fact1 * bp1) + (fact2 * (monthly_earn - bp1))
+    } else {
+      fact1 * monthly_earn
+    }
+    floor(pia_val * 10) / 10  # Floor to dime
+  })
+
+  # Select top comp_period years by mini-PIA value and average
+  if (length(mini_pias) > comp_period) {
+    top_mini_pias <- sort(mini_pias, decreasing = TRUE)[1:comp_period]
+  } else {
+    top_mini_pias <- mini_pias
+  }
+
+  floor(mean(top_mini_pias) * 10) / 10
+}
+
+
 #' PIA Calculation
 #'
 #' Function that computes a worker's Primary Insurance Amount by age.
@@ -311,7 +437,9 @@ pia <- function(worker, assumptions, debugg = FALSE) {
 
   # Skip join if columns already present (from join_all_assumptions)
   cols_needed <- c("bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
-                   "yoc_threshold", "special_min_rate", "min_yoc_for_special_min")
+                   "yoc_threshold", "special_min_rate", "min_yoc_for_special_min",
+                   "pia_multiplier", "bp3", "fact4", "flat_benefit", "mini_pia_blend",
+                   "taxmax_benefit")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -335,18 +463,37 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       fact2_elig = fact2[which(age == first(elig_age))], # Second replacement factor (32%)
       fact3_elig = fact3[which(age == first(elig_age))], # Third replacement factor (15%)
 
+      # Reform parameters: 4th bracket and PIA multiplier (Reform #1, #3, #12-14)
+      # For Reforms #12-14, bp3 = old taxmax (in monthly terms for PIA formula)
+      # When bp3 is NA but fact4 is set, fall back to taxmax_benefit / 12
+      bp3_elig = if (all(is.na(bp3))) {
+        if (!all(is.na(fact4))) taxmax_benefit[which(age == first(elig_age))] / 12 else NA_real_
+      } else bp3[which(age == first(elig_age))],
+      fact4_elig = if (all(is.na(fact4))) NA_real_ else fact4[which(age == first(elig_age))],
+      pia_mult_elig = if (all(is.na(pia_multiplier))) 1.0 else pia_multiplier[which(age == first(elig_age))],
+      flat_benefit_elig = if (all(is.na(flat_benefit))) NA_real_ else flat_benefit[which(age == first(elig_age))],
+      # Reform #22: Mini-PIA blend factor (0 = current law, 1 = full mini-PIA)
+      mini_pia_blend_elig = if (all(is.na(mini_pia_blend))) 0 else mini_pia_blend[which(age == first(elig_age))],
+
       # Get special minimum rate at eligibility age (COLA-adjusted $11.50 base)
       special_min_rate_elig = special_min_rate[which(age == first(elig_age))],
       min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
 
-      # Regular PIA per 42 USC 415(a)(1)(A): 90/32/15 bend point formula
+      # Regular PIA per 42 USC 415(a)(1)(A): bend point formula
+      # Standard: 90/32/15 (3 brackets)
+      # Reform: 90/32/15/X (4 brackets) when bp3 and fact4 are specified
       # Per 42 USC 415(a)(2)(C): round to next lower $0.10
       regular_pia = case_when(
         age >= elig_age ~ floor_dime(case_when(
-                          aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
-                          aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
-                          TRUE ~ fact1_elig * aime
-                        )),
+          # 4-bracket formula when bp3 and fact4 are specified
+          !is.na(bp3_elig) & !is.na(fact4_elig) & aime > bp3_elig ~
+            (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) +
+            (fact3_elig * (bp3_elig - bp2_elig)) + (fact4_elig * (aime - bp3_elig)),
+          # Standard 3-bracket formula
+          aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
+          aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
+          TRUE ~ fact1_elig * aime
+        )),
         TRUE ~ 0),
 
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
@@ -358,10 +505,22 @@ pia <- function(worker, assumptions, debugg = FALSE) {
           floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
         TRUE ~ 0),
 
-      # Final PIA is the higher of regular or special minimum per 42 USC 415(a)(1)
-      basic_pia = pmax(regular_pia, special_min_pia)
+      # Apply PIA multiplier (Reform #1)
+      # This allows across-the-board benefit changes
+      regular_pia_mult = floor_dime(regular_pia * pia_mult_elig),
+
+      # Apply flat benefit floor (Reform #2) if specified
+      # Worker's PIA = max(formula_pia, flat_benefit) if they have 40 QCs
+      regular_pia_final = case_when(
+        !is.na(flat_benefit_elig) & age >= elig_age ~ pmax(regular_pia_mult, flat_benefit_elig),
+        TRUE ~ regular_pia_mult
+      ),
+
+      # Final PIA is the higher of regular (with multiplier and flat floor) or special minimum per 42 USC 415(a)(1)
+      basic_pia = pmax(regular_pia_final, special_min_pia)
     ) %>% select(-bp1, -bp2, -fact1, -fact2, -fact3, -elig_age_retired,
-                 -yoc_threshold, -special_min_rate, -min_yoc_for_special_min) %>% ungroup()
+                 -yoc_threshold, -special_min_rate, -min_yoc_for_special_min,
+                 -pia_multiplier, -bp3, -fact4, -flat_benefit, -taxmax_benefit) %>% ungroup()
 
   if (debugg) {
     cols_to_add <- c("basic_pia", "regular_pia", "special_min_pia", "years_of_coverage",
@@ -414,7 +573,7 @@ cola <- function (worker, assumptions, debugg = FALSE) {
   # in 2025 first receives a COLA'd benefit in 2026 (using the 2025 COLA).
 
   # Skip join if columns already present (from join_all_assumptions)
-  cols_needed <- c("cola", "elig_age_retired")
+  cols_needed <- c("cola", "elig_age_retired", "cola_cap", "cola_cap_active")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -444,11 +603,17 @@ cola <- function (worker, assumptions, debugg = FALSE) {
     # Apply COLA with year-by-year rounding (SSA method)
     # Each year's COLA-adjusted PIA is the PREVIOUS year's rounded PIA times current COLA factor
     # This matches how SSA actually calculates benefits
+    #
+    # Reform #9 (COLA Cap): If cola_cap is set and beneficiary's PIA exceeds the cap,
+    # they receive the same dollar COLA increase as the median beneficiary instead of
+    # a percentage increase.
     group_modify(~ {
       n <- nrow(.x)
       cola_basic_pia_vals <- numeric(n)
       basic_pia <- .x$basic_pia
       cola_factor <- .x$cola_factor
+      cola_cap_vals <- if ("cola_cap" %in% names(.x)) .x$cola_cap else rep(NA_real_, n)
+      cola_cap_active_vals <- if ("cola_cap_active" %in% names(.x)) .x$cola_cap_active else rep(FALSE, n)
       elig_age_val <- .x$elig_age[1]
       ages <- .x$age
 
@@ -459,9 +624,21 @@ cola <- function (worker, assumptions, debugg = FALSE) {
           # At eligibility age: no COLA yet, use basic_pia
           cola_basic_pia_vals[i] <- basic_pia[i]
         } else {
-          # After eligibility: multiply previous year's rounded PIA by current COLA factor
-          # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
-          cola_basic_pia_vals[i] <- floor_dime(cola_basic_pia_vals[i-1] * cola_factor[i])
+          # After eligibility: apply COLA with potential capping
+          prev_pia <- cola_basic_pia_vals[i-1]
+          cap_threshold <- cola_cap_vals[i]
+
+          cap_is_active <- if (length(cola_cap_active_vals) >= i) cola_cap_active_vals[i] else FALSE
+          if (cap_is_active && !is.na(cap_threshold) && prev_pia > cap_threshold) {
+            # Reform #9: COLA cap - give same dollar increase as median recipient
+            # max_cola_increase = cap_threshold * (cola_factor - 1)
+            max_cola_increase <- cap_threshold * (cola_factor[i] - 1)
+            cola_basic_pia_vals[i] <- floor_dime(prev_pia + max_cola_increase)
+          } else {
+            # Standard COLA: multiply previous year's rounded PIA by current COLA factor
+            # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
+            cola_basic_pia_vals[i] <- floor_dime(prev_pia * cola_factor[i])
+          }
         }
       }
 
@@ -516,7 +693,7 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
   #Function currently can only handle retired beneficiaries.
 
   # Skip join if columns already present (from join_all_assumptions)
-  cols_needed <- c("rf1", "rf2", "drc", "nra", "s_rf1", "s_rf2")
+  cols_needed <- c("rf1", "rf2", "drc", "nra", "s_rf1", "s_rf2", "elig_age_retired")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -563,6 +740,105 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
   return(worker)
 
+}
+
+
+# -----------------------------------------------------------------------------
+# 2.4b Basic Minimum Benefit Calculation (Reform #27)
+# -----------------------------------------------------------------------------
+
+#' Basic Minimum Benefit Calculation
+#'
+#' Applies the Basic Minimum Benefit (BMB) reform that supplements low benefits
+#' at or after Normal Retirement Age. The BMB is calculated as:
+#' BMB_supplement = max(BMB_rate - 0.70 * actuarially_adjusted_benefit, 0)
+#'
+#' This function should be called AFTER worker_benefit() in the calculation pipeline.
+#'
+#' @param worker Dataframe with a worker's benefits by age (must include wrk_ben, nra_ind)
+#' @param assumptions Dataframe with the Social Security Trustees assumptions
+#'   (must include bmb_individual, bmb_couple if reform is active)
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with BMB supplement added to wrk_ben
+#'
+#' @export
+basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
+  # Reform #27: Basic Minimum Benefit
+  # BMB kicks in at NRA, computed AFTER actuarial adjustments
+  # BMB_supplement = max(BMB_rate - 0.70 * wrk_ben, 0)
+
+  # Check if BMB reform is active (bmb_individual is not all NA)
+  if (all(is.na(assumptions$bmb_individual))) {
+    # BMB reform not active, return unchanged
+    return(worker)
+  }
+
+  # Join BMB rates from assumptions
+  cols_needed <- c("bmb_individual", "bmb_couple", "nra")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    cols_to_join <- c("year", cols_missing)
+    dataset <- worker %>%
+      left_join(assumptions %>% select(all_of(cols_to_join)), by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  # Calculate BMB supplement
+  dataset <- dataset %>%
+    group_by(id) %>%
+    arrange(id, age) %>%
+    mutate(
+      # Get worker's NRA
+      yr_62 = year - age + 62,
+      nra_bmb = nra[which(year == yr_62)][1],
+      at_or_past_nra = age >= nra_bmb,
+
+      # Determine BMB rate based on household type
+      # Use couple rate if spouse_spec is not NA, otherwise individual rate
+      has_spouse = !is.na(spouse_spec),
+      bmb_rate = if_else(has_spouse, bmb_couple, bmb_individual),
+
+      # Get BMB rate at eligibility year (AWI-indexed)
+      bmb_rate_elig = bmb_rate[which(age == first(elig_age))][1],
+
+      # Calculate BMB supplement: max(BMB - 0.70 * wrk_ben, 0)
+      # Only applies at/after NRA
+      bmb_supplement = if_else(
+        at_or_past_nra & !is.na(bmb_rate_elig),
+        pmax(bmb_rate_elig - 0.70 * wrk_ben, 0),
+        0
+      ),
+
+      # Add BMB supplement to worker benefit
+      wrk_ben = wrk_ben + floor(bmb_supplement)
+    ) %>%
+    ungroup()
+
+  # Return result
+  if (debugg) {
+    cols_to_add <- c("bmb_rate_elig", "bmb_supplement")
+    cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+
+    # Update wrk_ben in worker
+    worker$wrk_ben <- NULL
+    worker <- worker %>%
+      left_join(dataset %>% select(id, age, wrk_ben), by = c("id", "age"))
+
+    if (length(cols_new) > 0) {
+      worker <- worker %>%
+        left_join(dataset %>% select(id, age, all_of(cols_new)), by = c("id", "age"))
+    }
+  } else {
+    # Update wrk_ben only
+    worker$wrk_ben <- NULL
+    worker <- worker %>%
+      left_join(dataset %>% select(id, age, wrk_ben), by = c("id", "age"))
+  }
+
+  return(worker)
 }
 
 

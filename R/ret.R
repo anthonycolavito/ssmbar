@@ -319,6 +319,14 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
   # RET is described in Chapter 18 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
 
+  # Reform #23: Check if RET is enabled
+  # If ret_enabled is FALSE in assumptions, skip all RET calculations and return unchanged
+  ret_enabled_val <- assumptions$ret_enabled[1]
+  if (!is.na(ret_enabled_val) && ret_enabled_val == FALSE) {
+    # RET is repealed - return worker data unchanged
+    return(worker)
+  }
+
   # Generate spouse_data on-the-fly if needed
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))
   if (is.null(spouse_data) && has_spouse_spec) {

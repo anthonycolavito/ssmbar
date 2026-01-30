@@ -290,16 +290,38 @@ apply_single_parameter <- function(assumptions, param, value, type,
   }
 
   # Apply modification based on type
+  # Handle NA values:
+  # - Where target is NA: keep original
+  # - Where original is NA and phase_factor > 0: use target directly
   if (type == "replace") {
-    # Linear interpolation between original and target
-    new_values <- original_values + phase_factor * (target_values - original_values)
+    # For replace: when phase_factor = 1, new = target; when phase_factor = 0, new = original
+    # Handle NA in original: treat as 0 for interpolation purposes, then use target when active
+    new_values <- ifelse(
+      is.na(original_values) & phase_factor > 0,
+      target_values,  # Original is NA but reform is active - use target
+      ifelse(
+        is.na(target_values),
+        original_values,  # Target is NA - keep original
+        original_values + phase_factor * (target_values - original_values)  # Normal interpolation
+      )
+    )
+    # Keep original NA when phase_factor = 0 and original was NA
+    new_values <- ifelse(phase_factor == 0 & is.na(original_values), NA, new_values)
   } else if (type == "add") {
-    # Add the target value (scaled by phase factor)
-    new_values <- original_values + phase_factor * target_values
+    # For add: new = original + phase_factor * target
+    new_values <- ifelse(
+      is.na(original_values),
+      ifelse(phase_factor > 0, target_values, NA),  # Start from 0 if original NA
+      ifelse(is.na(target_values), original_values, original_values + phase_factor * target_values)
+    )
   } else if (type == "multiply") {
-    # Multiply by target value (interpolated from 1 to target)
+    # For multiply: new = original * (1 + phase_factor * (target - 1))
     multiplier <- 1 + phase_factor * (target_values - 1)
-    new_values <- original_values * multiplier
+    new_values <- ifelse(
+      is.na(original_values),
+      ifelse(phase_factor > 0, target_values, NA),
+      ifelse(is.na(target_values), original_values, original_values * multiplier)
+    )
   }
 
   assumptions[[param]] <- new_values
