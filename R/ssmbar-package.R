@@ -103,7 +103,11 @@ utils::globalVariables(c(
   "dataset", ".data",
 
   # Constants (defined in earnings.R)
-  "FIRST_WORKING_AGE", "MAX_AGE"
+  "FIRST_WORKING_AGE", "MAX_AGE",
+
+  # Reform analysis variables
+  "annual_nominal", "annual_real", "baseline_nominal", "baseline_real",
+  "annual_ind", "rep_rate"
 ))
 
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange
