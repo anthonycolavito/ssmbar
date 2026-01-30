@@ -150,6 +150,26 @@ AVAILABLE_REFORMS <- list(
     "10% Benefit Cut" = list(
       fn = function() reform_reduce_benefits(0.90, 2030),
       desc = "Reduce all benefits by 10%"
+    ),
+    "Reduce Fact3 to 5%" = list(
+      fn = function() reform_reduce_fact3(0.05, 2030),
+      desc = "Reduce top PIA bracket from 15% to 5%",
+      group = "pia_formula"
+    ),
+    "Flat Benefit" = list(
+      fn = function() reform_flat_benefit(19300/12, 2030, 25),
+      desc = "Phase in flat benefit replacing formula",
+      group = "pia_formula"
+    ),
+    "Simpson-Bowles PIA" = list(
+      fn = function() reform_simpson_bowles(2030, 10),
+      desc = "4-bracket PIA (30/10/5% phase-in)",
+      group = "pia_formula"
+    ),
+    "Mini-PIA" = list(
+      fn = function() reform_mini_pia(2030, 10),
+      desc = "Average yearly PIAs instead of AIME",
+      group = "pia_formula"
     )
   ),
   "NRA Changes" = list(
@@ -186,21 +206,43 @@ AVAILABLE_REFORMS <- list(
       group = "cola"
     )
   ),
-  "Tax Max Changes" = list(
+  "Tax Changes" = list(
     "90% Coverage + 5% Credit" = list(
       fn = function() reform_taxmax_90_pct(2030),
       desc = "Raise taxmax to cover 90% of earnings",
       group = "taxmax"
     ),
-    "Eliminate + 15% Credit" = list(
+    "Eliminate Taxmax + 15% Credit" = list(
       fn = function() reform_eliminate_taxmax(2030),
       desc = "Eliminate taxmax with 15% benefit credit",
       group = "taxmax"
     ),
-    "Eliminate, No Credit" = list(
+    "Eliminate Taxmax, No Credit" = list(
       fn = function() reform_eliminate_taxmax_no_credit(2030),
       desc = "Eliminate taxmax for taxes only",
       group = "taxmax"
+    ),
+    "Increase Tax Rate +1pp" = list(
+      fn = function() reform_change_tax_rate(1.0, 2030),
+      desc = "Increase payroll tax rate by 1 percentage point"
+    ),
+    "Increase Tax Rate +2pp" = list(
+      fn = function() reform_change_tax_rate(2.0, 2030),
+      desc = "Increase payroll tax rate by 2 percentage points"
+    )
+  ),
+  "Benefit Enhancements" = list(
+    "Basic Minimum Benefit" = list(
+      fn = function() reform_basic_minimum(900, 1342, 2030),
+      desc = "Add minimum benefit floor ($900/$1,342)"
+    ),
+    "Child Care Credit" = list(
+      fn = function() reform_child_care_credit(2030, 5),
+      desc = "Credit earnings for child care years"
+    ),
+    "75% Widow Benefit" = list(
+      fn = function() reform_widow_75_pct(2030),
+      desc = "75% of combined benefits for widows"
     )
   ),
   "Other Reforms" = list(
@@ -215,10 +257,6 @@ AVAILABLE_REFORMS <- list(
     "Phase Out Spousal" = list(
       fn = function() reform_phase_out_spousal(2030),
       desc = "Phase out spousal benefits over 10 years"
-    ),
-    "Basic Minimum Benefit" = list(
-      fn = function() reform_basic_minimum(900, 1342, 2030),
-      desc = "Add minimum benefit floor ($900/$1,342)"
     )
   )
 )
@@ -245,7 +283,8 @@ check_ui_exclusivity <- function(selected_reforms) {
   groups <- list(
     nra = c("Raise NRA to 68", "Index NRA to Longevity", "NRA to 69, then Index"),
     cola = c("Chained CPI", "Cap COLAs at Median", "CPI-E (Higher)"),
-    taxmax = c("90% Coverage + 5% Credit", "Eliminate + 15% Credit", "Eliminate, No Credit")
+    taxmax = c("90% Coverage + 5% Credit", "Eliminate Taxmax + 15% Credit", "Eliminate Taxmax, No Credit"),
+    pia_formula = c("Reduce Fact3 to 5%", "Flat Benefit", "Simpson-Bowles PIA", "Mini-PIA")
   )
 
   conflicts <- list()
