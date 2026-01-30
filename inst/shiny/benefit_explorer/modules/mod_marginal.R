@@ -99,7 +99,6 @@ marginal_server <- function(id, worker_data) {
         mean_nmtr <- mean(working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
         mean_mirr_top35 <- mean(working_mirr$marginal_irr[working_mirr$in_top_35 & working_mirr$marginal_irr > -1], na.rm = TRUE)
         n_top_35 <- sum(working_marginal$in_top_35, na.rm = TRUE)
-        eligibility_year <- min(working_marginal$age[working_marginal$eligible], na.rm = TRUE)
 
         table_data <- data.frame(
           age = working_marginal$age,
@@ -112,7 +111,6 @@ marginal_server <- function(id, worker_data) {
         )
 
         result <- list(
-          eligibility_age = eligibility_year,
           mean_nmtr = mean_nmtr,
           mean_mirr_top35 = mean_mirr_top35,
           n_top_35 = n_top_35,
@@ -195,28 +193,28 @@ marginal_server <- function(id, worker_data) {
           theme(legend.position = "top")
 
       } else {
-        # Standard bar chart colored by top 35
+        # Standard bar chart
         nmtr_data <- mdata$table_data %>%
           filter(!is.na(net_marginal_tax_rate)) %>%
           mutate(
             nmtr_pct = net_marginal_tax_rate * 100,
-            in_top_35_label = ifelse(in_top_35, "In Top 35", "Outside Top 35")
+            # Truncate extreme values for display (clamp to -50% to 20%)
+            nmtr_pct_display = pmax(pmin(nmtr_pct, 20), -50)
           )
 
         if (nrow(nmtr_data) == 0) return(NULL)
 
-        p <- ggplot(nmtr_data, aes(x = age, y = nmtr_pct, fill = in_top_35_label)) +
-          geom_col(width = 0.8, alpha = 0.85) +
+        p <- ggplot(nmtr_data, aes(x = age, y = nmtr_pct_display)) +
+          geom_col(width = 0.8, alpha = 0.85, fill = CRFB_TEAL) +
           geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
           geom_hline(yintercept = 12.4, color = CRFB_ORANGE, linewidth = 0.8, linetype = "dashed") +
-          scale_y_continuous(labels = function(x) paste0(x, "%")) +
+          scale_y_continuous(labels = function(x) paste0(x, "%"),
+                             limits = c(-50, 20), oob = scales::squish) +
           scale_x_continuous(breaks = seq(25, 65, by = 5)) +
-          scale_fill_manual(values = c("In Top 35" = CRFB_TEAL, "Outside Top 35" = CRFB_RED)) +
-          labs(x = "Age", y = "Net Marginal Tax Rate", fill = NULL) +
+          labs(x = "Age", y = "Net Marginal Tax Rate") +
           annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
                    color = CRFB_ORANGE, size = 3, hjust = 1) +
-          chart_theme +
-          theme(legend.position = "top")
+          chart_theme
       }
 
       p
@@ -234,11 +232,12 @@ marginal_server <- function(id, worker_data) {
           tags$strong(class = "text-warning", mdata$reform_scenario)
         )
       } else {
-        elig_age <- if (!is.na(mdata$eligibility_age) && is.finite(mdata$eligibility_age)) mdata$eligibility_age else "N/A"
+        # Show total years worked
+        n_years <- nrow(mdata$table_data)
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Eligible at Age"),
-          tags$strong(class = "text-info", elig_age)
+          tags$small(class = "text-muted d-block", "Years Worked"),
+          tags$strong(class = "text-info", n_years)
         )
       }
     })
