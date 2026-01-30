@@ -9,7 +9,8 @@
 # benefit functions are in separate files (spousal.R, survivor.R):
 #
 #   earnings -> aime() -> pia() -> cola() -> worker_benefit() -> spousal_pia()
-#            -> spouse_benefit() -> widow_pia() -> widow_benefit() -> ret() -> final_benefit()
+#            -> spouse_benefit() -> child_pia() -> child_benefit() -> family_maximum()
+#            -> widow_pia() -> widow_benefit() -> ret() -> final_benefit()
 #
 # =============================================================================
 
@@ -34,18 +35,22 @@
 join_all_assumptions <- function(worker, assumptions) {
   # All columns needed by the benefit calculation pipeline
   # - aime: awi, taxmax, qc_rec, qc_required, max_qc_per_year, max_dropout_years, min_comp_period, index_age_offset
-  # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired
+  # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired, yoc_threshold, special_min_rate, min_yoc_for_special_min
   # - cola: cola (year-by-year COLA percentage)
   # - worker_benefit: nra, rf1, rf2, drc, drc_max_months
   # - spousal_pia: s_pia_share
   # - spouse_benefit: s_rf1, s_rf2
+  # - child_pia: child_pia_share
+  # - family_maximum: fm_bp1, fm_bp2, fm_bp3
   # - ret: ret1, ret_phaseout_rate
 
   cols_needed <- c("year", "awi", "taxmax", "qc_rec", "qc_required", "max_qc_per_year",
                    "max_dropout_years", "min_comp_period", "index_age_offset",
                    "bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
+                   "yoc_threshold", "special_min_rate", "min_yoc_for_special_min",
                    "cola", "nra", "rf1", "rf2", "drc", "drc_max_months",
-                   "s_pia_share", "s_rf1", "s_rf2", "ret1", "ret_phaseout_rate")
+                   "s_pia_share", "s_rf1", "s_rf2", "child_pia_share",
+                   "fm_bp1", "fm_bp2", "fm_bp3", "ret1", "ret_phaseout_rate")
 
   # Only join columns that aren't already present
   cols_present <- names(worker)
@@ -264,7 +269,9 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 
 #' PIA Calculation
 #'
-#' Function that computes a worker's Primary Insurance Amount by age
+#' Function that computes a worker's Primary Insurance Amount by age.
+#' Compares the regular PIA (bend point formula) with the special minimum PIA
+#' per 42 USC 415(a)(1)(C) and returns the higher of the two.
 #'
 #' @param worker Dataframe with a worker's earnings and AIME by year and age
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
@@ -277,12 +284,17 @@ pia <- function(worker, assumptions, debugg = FALSE) {
   # PIA calculation is described in Section 706 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0706.html
   #
+  # Per 42 USC 415(a)(1), PIA is the HIGHER of:
+  # - Regular PIA: 90/32/15 bend point formula per 42 USC 415(a)(1)(A)
+  # - Special minimum PIA: $11.50 × (years_of_coverage - 10), COLA-adjusted, per 42 USC 415(a)(1)(C)
+  #
   # Bend points and replacement factors are determined at the worker's eligibility age
   # (elig_age_retired from assumptions, currently 62 for retirement benefits)
 
 
   # Skip join if columns already present (from join_all_assumptions)
-  cols_needed <- c("bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired")
+  cols_needed <- c("bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
+                   "yoc_threshold", "special_min_rate", "min_yoc_for_special_min")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -293,6 +305,10 @@ pia <- function(worker, assumptions, debugg = FALSE) {
     dataset <- worker
   }
 
+  # Calculate years of coverage for special minimum PIA
+  # This counts years where earnings >= yoc_threshold
+  dataset <- dataset %>% years_of_coverage(debugg)
+
   dataset <- dataset %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
       # Use worker's elig_age for bend points (disability age for disabled workers, 62 for retired workers)
@@ -301,18 +317,39 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       fact1_elig = fact1[which(age == first(elig_age))], # First replacement factor (90%)
       fact2_elig = fact2[which(age == first(elig_age))], # Second replacement factor (32%)
       fact3_elig = fact3[which(age == first(elig_age))], # Third replacement factor (15%)
-      # PIA per 42 USC 415(a)(2)(C): round to next lower $0.10
-      basic_pia = case_when(
-      age >= elig_age ~ floor_dime(case_when( # PIA Calculation -- only occurs in and after a worker's eligibility age
-                        aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
-                        aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
-                        TRUE ~ fact1_elig * aime
-                      )),
-      TRUE ~ 0)
-    ) %>% select(-bp1, -bp2, -fact1, -fact2, -fact3, -elig_age_retired) %>% ungroup()
+
+      # Get special minimum rate at eligibility age (COLA-adjusted $11.50 base)
+      special_min_rate_elig = special_min_rate[which(age == first(elig_age))],
+      min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
+
+      # Regular PIA per 42 USC 415(a)(1)(A): 90/32/15 bend point formula
+      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      regular_pia = case_when(
+        age >= elig_age ~ floor_dime(case_when(
+                          aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
+                          aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
+                          TRUE ~ fact1_elig * aime
+                        )),
+        TRUE ~ 0),
+
+      # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
+      # PIA = special_min_rate × (years_of_coverage - 10)
+      # Only applies if years_of_coverage >= min_yoc_for_special_min (11)
+      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      special_min_pia = case_when(
+        age >= elig_age & years_of_coverage >= min_yoc_elig ~
+          floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
+        TRUE ~ 0),
+
+      # Final PIA is the higher of regular or special minimum per 42 USC 415(a)(1)
+      basic_pia = pmax(regular_pia, special_min_pia)
+    ) %>% select(-bp1, -bp2, -fact1, -fact2, -fact3, -elig_age_retired,
+                 -yoc_threshold, -special_min_rate, -min_yoc_for_special_min) %>% ungroup()
 
   if (debugg) {
-    cols_to_add <- c("basic_pia", "bp1_elig", "bp2_elig", "fact1_elig", "fact2_elig", "fact3_elig")
+    cols_to_add <- c("basic_pia", "regular_pia", "special_min_pia", "years_of_coverage",
+                     "bp1_elig", "bp2_elig", "fact1_elig", "fact2_elig", "fact3_elig",
+                     "special_min_rate_elig")
     cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
     if (length(cols_new) > 0) {
       worker <- worker %>% left_join(dataset %>% select(id, age, all_of(cols_new)),
@@ -513,7 +550,194 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 
 
 # -----------------------------------------------------------------------------
-# 2.5 Final Benefit Calculation
+# 2.5 Family Maximum Calculation
+# -----------------------------------------------------------------------------
+
+#' Calculate Family Maximum
+#'
+#' Calculates the family maximum benefit per 42 USC 403(a)(1) and applies
+#' proportional reduction to auxiliary benefits (spouse, child) when the total
+#' exceeds the family maximum.
+#'
+#' Per 42 USC 403(a)(1), the family maximum is calculated using a bend point formula:
+#'   150% of PIA up to fm_bp1 +
+#'   272% of PIA between fm_bp1 and fm_bp2 +
+#'   134% of PIA between fm_bp2 and fm_bp3 +
+#'   175% of PIA above fm_bp3
+#'
+#' For disabled workers, 42 USC 403(a)(6) provides an alternative:
+#'   family_max = min(85% of AIME × 12, 150% of PIA × 12) / 12
+#'
+#' The family maximum limits total auxiliary benefits. If total auxiliary benefits
+#' exceed (family_max - worker's own benefit), auxiliary benefits are proportionally
+#' reduced. The worker's own benefit is NEVER reduced.
+#'
+#' @param worker Dataframe with worker's benefits by year and age. Must include:
+#'   cola_basic_pia, wrk_ben, spouse_ben, child1_ben, child2_ben, child3_ben, aime, elig_age
+#' @param assumptions Dataframe with the Social Security Trustees assumptions.
+#'   Must include fm_bp1, fm_bp2, fm_bp3 columns.
+#' @param debugg Boolean value that directs function to output additional variables if set to true
+#'
+#' @return worker Dataframe with spouse_ben_fm, child1_ben_fm, child2_ben_fm, child3_ben_fm columns
+#'   containing family-maximum-adjusted auxiliary benefits
+#'
+#' @export
+family_maximum <- function(worker, assumptions, debugg = FALSE) {
+  # Family maximum is described in 42 USC 403(a)
+  # https://www.ssa.gov/OP_Home/ssact/title02/0203.htm
+  #
+  # The family maximum limits total benefits payable on one worker's record.
+  # Worker's own benefit is never reduced; only auxiliary benefits are reduced.
+  #
+  # Regular formula (42 USC 403(a)(1)):
+  # FM = 150% × min(PIA, fm_bp1) +
+  #      272% × max(0, min(PIA, fm_bp2) - fm_bp1) +
+  #      134% × max(0, min(PIA, fm_bp3) - fm_bp2) +
+  #      175% × max(0, PIA - fm_bp3)
+  #
+  # Disability alternative (42 USC 403(a)(6)):
+  # FM = min(85% × AIME, 150% × PIA)
+
+  # Ensure child benefit columns exist
+  if (!"child1_ben" %in% names(worker)) {
+    worker$child1_ben <- 0
+    worker$child2_ben <- 0
+    worker$child3_ben <- 0
+  }
+
+  # Ensure spouse_ben column exists
+  if (!"spouse_ben" %in% names(worker)) {
+    worker$spouse_ben <- 0
+  }
+
+  # Get family max bend points and COLA from assumptions
+  cols_needed <- c("fm_bp1", "fm_bp2", "fm_bp3", "elig_age_retired", "cola")
+  cols_missing <- cols_needed[!cols_needed %in% names(worker)]
+
+  if (length(cols_missing) > 0) {
+    dataset <- worker %>%
+      left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
+  } else {
+    dataset <- worker
+  }
+
+  # Calculate family maximum for each worker
+  dataset <- dataset %>%
+    group_by(id) %>%
+    mutate(
+      # Get bend points at eligibility age
+      fm_bp1_elig = fm_bp1[which(age == elig_age)][1],
+      fm_bp2_elig = fm_bp2[which(age == elig_age)][1],
+      fm_bp3_elig = fm_bp3[which(age == elig_age)][1],
+      elig_age_ret = elig_age_retired[1],
+
+      # Determine if worker is disabled (eligibility age < 62)
+      is_disabled_worker = elig_age < elig_age_ret,
+
+      # Calculate regular family maximum (42 USC 403(a)(1))
+      # Uses worker's PIA at eligibility age (basic_pia or cola_basic_pia at elig_age)
+      # Family max is calculated once at eligibility and then COLA'd
+      pia_at_elig = basic_pia[which(age == elig_age)][1],
+      regular_fm = floor_dime(
+        1.50 * pmin(pia_at_elig, fm_bp1_elig) +
+        2.72 * pmax(0, pmin(pia_at_elig, fm_bp2_elig) - fm_bp1_elig) +
+        1.34 * pmax(0, pmin(pia_at_elig, fm_bp3_elig) - fm_bp2_elig) +
+        1.75 * pmax(0, pia_at_elig - fm_bp3_elig)
+      ),
+
+      # Calculate disability family maximum alternative (42 USC 403(a)(6))
+      # For disabled workers: min(85% of AIME, 150% of PIA)
+      aime_at_elig = aime[which(age == elig_age)][1],
+      disability_fm = floor_dime(pmin(0.85 * aime_at_elig, 1.50 * pia_at_elig)),
+
+      # Use disability formula if disabled worker and it's lower than regular formula
+      # (disability formula is always used for disabled workers, even if lower)
+      fm_at_elig = if_else(is_disabled_worker, disability_fm, regular_fm)
+    ) %>%
+    # Apply COLA to family maximum year by year (same as PIA COLA)
+    group_modify(~ {
+      n <- nrow(.x)
+      fm_cola_vals <- numeric(n)
+      fm_at_elig <- .x$fm_at_elig[1]
+      elig_age_val <- .x$elig_age[1]
+      ages <- .x$age
+      cola_pct <- .x$cola  # COLA percentages from assumptions
+
+      for (i in seq_len(n)) {
+        if (ages[i] < elig_age_val) {
+          fm_cola_vals[i] <- 0
+        } else if (ages[i] == elig_age_val) {
+          fm_cola_vals[i] <- fm_at_elig
+        } else {
+          # Calculate COLA factor from previous year's COLA percentage
+          # The COLA announced in year Y-1 is applied to benefits in year Y
+          prev_cola <- if (i > 1 && !is.na(cola_pct[i-1])) cola_pct[i-1] else 0
+          cola_factor_i <- 1 + pmax(prev_cola, 0) / 100
+          # Apply COLA and floor to nearest dime
+          fm_cola_vals[i] <- floor_dime(fm_cola_vals[i-1] * cola_factor_i)
+        }
+      }
+
+      .x$family_max <- fm_cola_vals
+      .x
+    }) %>%
+    ungroup()
+
+  # Apply family maximum reduction to auxiliary benefits
+  dataset <- dataset %>%
+    mutate(
+      # Total auxiliary benefits (before family max reduction)
+      # Only child benefits are included here, not spousal benefits, because spousal
+      # benefits come from the spouse's record and are subject to the spouse's family
+      # max, not this worker's family max.
+      total_aux_ben = pmax(child1_ben, 0, na.rm = TRUE) +
+                      pmax(child2_ben, 0, na.rm = TRUE) +
+                      pmax(child3_ben, 0, na.rm = TRUE),
+
+      # Available amount for auxiliary benefits = family_max - worker's benefit
+      # Worker's benefit is based on cola_basic_pia * act_factor, floored
+      # We use wrk_ben which is already calculated
+      aux_available = pmax(family_max - pmax(wrk_ben, 0, na.rm = TRUE), 0, na.rm = TRUE),
+
+      # Reduction factor: if total_aux > aux_available, reduce proportionally
+      fm_reduction_factor = if_else(
+        total_aux_ben > aux_available & total_aux_ben > 0,
+        aux_available / total_aux_ben,
+        1.0  # No reduction needed
+      ),
+
+      # Apply proportional reduction to each auxiliary benefit
+      # Note: Spousal benefits are NOT reduced here because they are paid from the
+      # spouse's record, not the worker's record. The spouse's family max (which we
+      # don't calculate here) is what limits spousal benefits. Only child benefits
+      # (which are paid from this worker's record) are subject to this worker's family max.
+      spouse_ben_fm = pmax(spouse_ben, 0, na.rm = TRUE),  # Pass through unchanged
+      child1_ben_fm = floor(pmax(child1_ben, 0, na.rm = TRUE) * fm_reduction_factor),
+      child2_ben_fm = floor(pmax(child2_ben, 0, na.rm = TRUE) * fm_reduction_factor),
+      child3_ben_fm = floor(pmax(child3_ben, 0, na.rm = TRUE) * fm_reduction_factor)
+    )
+
+  # Add columns to worker
+  if (debugg) {
+    cols_to_add <- c("family_max", "regular_fm", "disability_fm", "fm_at_elig",
+                     "total_aux_ben", "aux_available", "fm_reduction_factor",
+                     "spouse_ben_fm", "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
+  } else {
+    cols_to_add <- c("family_max", "spouse_ben_fm", "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
+  }
+
+  cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
+  if (length(cols_new) > 0) {
+    worker <- worker %>%
+      left_join(dataset %>% select(id, year, all_of(cols_new)), by = c("id", "year"))
+  }
+
+  return(worker)
+}
+
+
+# -----------------------------------------------------------------------------
+# 2.6 Final Benefit Calculation
 # -----------------------------------------------------------------------------
 # Note: ret() function has been moved to R/ret.R
 
@@ -569,11 +793,13 @@ final_benefit <- function(worker, debugg = FALSE) {
   #
   # In this calculator:
   # - wrk_ben: Worker's own retired worker benefit (always paid)
-  # - spouse_ben: EXCESS spousal benefit (spousal PIA - own PIA, with actuarial adjustment)
+  # - spouse_ben_fm: Family-max-adjusted spousal benefit
+  # - child1_ben_fm, child2_ben_fm, child3_ben_fm: Family-max-adjusted child benefits
   # - survivor_ben: EXCESS survivor benefit (survivor PIA - own PIA, with actuarial adjustment)
   #
-  # Spousal benefits apply while spouse is alive; survivor benefits apply after spouse dies.
-  # Worker receives: wrk_ben + max(spouse_ben, survivor_ben)
+  # Spousal and child benefits apply while worker is alive (auxiliary benefits).
+  # Survivor benefits apply after worker's spouse dies.
+  # Worker receives: wrk_ben + spouse_ben_fm + child_bens_fm + max(0, survivor_ben)
 
   # Handle case where survivor_ben column doesn't exist (backwards compatibility)
   if (!"survivor_ben" %in% names(worker)) {
@@ -614,6 +840,27 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker$s_age <- NA_real_
   }
 
+  # Handle case where family-max-adjusted benefit columns don't exist (backwards compatibility)
+  # If spouse_ben_fm doesn't exist but spouse_ben does, use spouse_ben
+  if (!"spouse_ben_fm" %in% names(worker)) {
+    if ("spouse_ben" %in% names(worker)) {
+      worker$spouse_ben_fm <- worker$spouse_ben
+    } else {
+      worker$spouse_ben_fm <- 0
+    }
+  }
+
+  # Handle missing child benefit columns
+  if (!"child1_ben_fm" %in% names(worker)) {
+    worker$child1_ben_fm <- 0
+  }
+  if (!"child2_ben_fm" %in% names(worker)) {
+    worker$child2_ben_fm <- 0
+  }
+  if (!"child3_ben_fm" %in% names(worker)) {
+    worker$child3_ben_fm <- 0
+  }
+
   dataset <- worker %>%
     group_by(id) %>%
     mutate(
@@ -628,13 +875,24 @@ final_benefit <- function(worker, debugg = FALSE) {
     ungroup() %>%
     mutate(
       # Zero out spousal benefit after spouse dies - survivor benefit takes over
-      # Spousal benefits require the spouse to be alive
+      # Spousal and child benefits require the worker to be alive
       spouse_ben_adj = if_else(
         !is.na(worker_age_at_spouse_death) & age >= worker_age_at_spouse_death,
         0,  # Spouse is dead, spousal benefit stops
-        spouse_ben
+        spouse_ben_fm  # Use family-max-adjusted spousal benefit
       ),
-      ben = pmax(wrk_ben, 0, na.rm = TRUE) + pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE),
+      # Total benefit = worker's own + spousal (FM adjusted) + child benefits (FM adjusted) + survivor
+      # Child benefits only paid while worker is alive (age < death_age)
+      total_child_ben = if_else(
+        age < death_age,
+        pmax(child1_ben_fm, 0, na.rm = TRUE) +
+          pmax(child2_ben_fm, 0, na.rm = TRUE) +
+          pmax(child3_ben_fm, 0, na.rm = TRUE),
+        0
+      ),
+      ben = pmax(wrk_ben, 0, na.rm = TRUE) +
+            pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE) +
+            total_child_ben,
 
       # Composite Benefit Class (bc) indicator
       # Following SSA BEPUF classification system
@@ -713,8 +971,10 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker <- worker %>%
       left_join(dataset %>% select(id, age, ben, bc), by=c("id","age"))
 
-    # Select core output columns, including sex, spouse_spec, and bc if they exist
-    output_cols <- c("id", "sex", "year", "age", "spouse_spec", "earnings", "ben", "bc")
+    # Select core output columns, including sex, spouse_spec, child_spec, and bc if they exist
+    output_cols <- c("id", "sex", "year", "age", "spouse_spec",
+                     "child1_spec", "child2_spec", "child3_spec",
+                     "earnings", "ben", "bc")
     available_cols <- intersect(output_cols, names(worker))
 
     worker <- worker %>% select(all_of(available_cols))

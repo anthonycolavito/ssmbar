@@ -21,6 +21,10 @@
 #' @param spouse_disabled_age Numeric value(s) for the age(s) at which the spouse becomes disabled. Default is NULL.
 #'   Use this for spouses who become disabled at age 62 or later (up to NRA). A worker claiming
 #'   spousal benefits on a disabled spouse's record receives benefit class BD instead of BR.
+#' @param child1_spec Character value(s) specifying the first child. Format: "birthyr-disabled"
+#'   (e.g., "2010-FALSE" for non-disabled child, "2005-TRUE" for disabled child). Default is NULL.
+#' @param child2_spec Character value(s) specifying the second child. Same format as child1_spec. Default is NULL.
+#' @param child3_spec Character value(s) specifying the third child. Same format as child1_spec. Default is NULL.
 #' @param reform A Reform object created by `create_reform()` that specifies policy changes. Default is NULL (current law).
 #' @param debugg Boolean value that outputs additional variables if set to TRUE. Default is FALSE.
 #'
@@ -113,6 +117,9 @@ calculate_benefits <- function(birth_yr,
                                spouse_age_claim = NULL,
                                spouse_custom_avg_earnings = NULL,
                                spouse_disabled_age = NULL,
+                               child1_spec = NULL,
+                               child2_spec = NULL,
+                               child3_spec = NULL,
                                reform = NULL,
                                debugg = FALSE) {
 
@@ -138,6 +145,9 @@ calculate_benefits <- function(birth_yr,
     spouse_age_claim = spouse_age_claim,
     spouse_custom_avg_earnings = spouse_custom_avg_earnings,
     spouse_disabled_age = spouse_disabled_age,
+    child1_spec = child1_spec,
+    child2_spec = child2_spec,
+    child3_spec = child3_spec,
     debugg = debugg
   )
 
@@ -166,6 +176,9 @@ calculate_benefits <- function(birth_yr,
     worker_benefit(assumptions, debugg) %>%
     spousal_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
+    child_pia(assumptions, debugg) %>%
+    child_benefit(assumptions, debugg) %>%
+    family_maximum(assumptions, debugg) %>%
     widow_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     widow_benefit(assumptions, debugg) %>%
     ret(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%

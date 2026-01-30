@@ -100,3 +100,56 @@ comp_period <- function(worker, debugg=FALSE) {
   return(worker)
 
 }
+
+
+#' Years of Coverage Computation
+#'
+#' Function for computing a worker's years of coverage for special minimum PIA.
+#' Per 42 USC 415(a)(1)(C)(i), special minimum PIA requires at least 11 years of coverage.
+#'
+#' Years of coverage threshold (from SSA OACT https://www.ssa.gov/OACT/COLA/yoc.html):
+#' - 1951-1978: 25% of contribution and benefit base
+#' - 1979-1990: 25% of old-law contribution base
+#' - 1991+: 15% of old-law contribution base
+#'
+#' @param worker Data frame with workers' earnings by age/year (must include yoc_threshold column)
+#' @param debugg Optional boolean variable that allows for the output of additional variables for testing.
+#'
+#' @return worker Data frame with years_of_coverage column appended
+#'
+#' @export
+
+years_of_coverage <- function(worker, debugg=FALSE) {
+
+  # Count years where earnings >= yoc_threshold
+  # Only count years from age 21 through eligibility age - 1 (working years)
+  dataset <- worker %>%
+    group_by(id) %>%
+    arrange(id, age) %>%
+    mutate(
+      # Flag each year as a coverage year (1) or not (0)
+      is_coverage_year = if_else(
+        age >= 21 & age < elig_age & !is.na(yoc_threshold) & earnings >= yoc_threshold,
+        1L,
+        0L
+      ),
+      # Cumulative years of coverage through each age
+      years_of_coverage = cumsum(is_coverage_year)
+    ) %>%
+    ungroup()
+
+  if(debugg) {
+    worker <- worker %>% left_join(
+      dataset %>% select(id, age, years_of_coverage, is_coverage_year),
+      by = c("id", "age")
+    )
+  } else {
+    worker <- worker %>% left_join(
+      dataset %>% select(id, age, years_of_coverage),
+      by = c("id", "age")
+    )
+  }
+
+  return(worker)
+
+}

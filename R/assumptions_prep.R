@@ -212,6 +212,170 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
     }
   }
 
+  # =============================================================================
+  # Years of Coverage (YOC) for Special Minimum PIA
+  # =============================================================================
+  # Per 42 USC 415(a)(1)(C)(i), special minimum PIA = $11.50 × (years of coverage - 10)
+  # where $11.50 is COLA-adjusted from its 1979 base.
+  #
+  # Years of coverage threshold (from SSA OACT):
+  # - 1951-1978: 25% of contribution and benefit base
+  # - 1979-1990: 25% of old-law contribution base
+  # - 1991+: 15% of old-law contribution base
+  #
+  # Old-law contribution base projection (from SSA):
+  # max(45000 * AWI_2yrs_before / AWI_1992, current_old_law_base), rounded to $300
+
+  assume$yoc_threshold <- NA_real_
+  assume$old_law_base <- NA_real_
+  assume$special_min_rate <- NA_real_
+
+  # Try to load YOC data
+  yoc_file <- system.file("extdata", "yoc.csv", package = "ssmbar")
+  if (yoc_file == "") {
+    # Try relative path for development
+    if (file.exists("inst/extdata/yoc.csv")) {
+      yoc_file <- "inst/extdata/yoc.csv"
+    }
+  }
+
+  if (file.exists(yoc_file)) {
+    yoc_hist <- read.csv(yoc_file)
+    names(yoc_hist) <- c("year", "old_law_base", "yoc_threshold")
+
+    # Merge historical YOC data
+    for (i in seq_len(nrow(assume))) {
+      yr <- assume$year[i]
+      hist_row <- yoc_hist[yoc_hist$year == yr, ]
+      if (nrow(hist_row) == 1) {
+        assume$old_law_base[i] <- hist_row$old_law_base
+        assume$yoc_threshold[i] <- hist_row$yoc_threshold
+      }
+    }
+  }
+
+  # Project old-law base and YOC threshold for future years
+  # Old-law base: max(45000 * AWI_end / AWI_1992, prev_old_law_base), rounded to $300
+  old_law_base_1994 <- 45000
+  for (i in seq_len(nrow(assume))) {
+    yr <- assume$year[i]
+    if (yr >= 1994 && is.na(assume$old_law_base[i])) {
+      awi_end <- assume$awi[assume$year == yr - 2]
+      prev_old_law <- assume$old_law_base[assume$year == yr - 1]
+
+      if (length(awi_end) == 1 && !is.na(awi_end) && length(prev_old_law) == 1 && !is.na(prev_old_law)) {
+        # Project old-law base: max of formula result or previous year, rounded to $300
+        projected <- round(old_law_base_1994 * awi_end / awi_1992 / 300) * 300
+        assume$old_law_base[i] <- max(projected, prev_old_law)
+
+        # YOC threshold: 15% of old-law base (post-1990 rule)
+        assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.15
+      }
+    }
+  }
+
+  # =============================================================================
+  # Special Minimum PIA Rate (COLA-adjusted)
+  # =============================================================================
+  # Per 42 USC 415(a)(1)(C)(i): $11.50 per year of coverage over 10, COLA-adjusted
+  # The $11.50 was established in 1979 and is adjusted by each year's COLA.
+  # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
+
+  special_min_base <- 11.50  # 1979 base amount per year of coverage over 10
+
+  # Calculate COLA-adjusted rate for each year
+  # The rate for year Y is the 1979 base adjusted by COLAs through year Y-1
+  for (i in seq_len(nrow(assume))) {
+    yr <- assume$year[i]
+    if (yr < 1979) {
+      # Before 1979, special minimum didn't exist in current form
+      assume$special_min_rate[i] <- NA_real_
+    } else if (yr == 1979) {
+      # 1979 is the base year
+      assume$special_min_rate[i] <- special_min_base
+    } else {
+      # Apply COLA from previous year and round to $0.10
+      prev_rate <- assume$special_min_rate[i - 1]
+      cola_pct <- assume$cola[i]  # COLA applied in December of year i, effective for year i+1
+
+      if (!is.na(prev_rate) && !is.na(cola_pct)) {
+        # Apply COLA and round to next lower $0.10
+        new_rate <- prev_rate * (1 + cola_pct / 100)
+        assume$special_min_rate[i] <- floor(new_rate * 10) / 10
+      } else {
+        assume$special_min_rate[i] <- prev_rate
+      }
+    }
+  }
+
+  # Minimum years of coverage required for special minimum PIA
+  assume$min_yoc_for_special_min <- 11
+
+  # =============================================================================
+  # Family Maximum Bend Points
+  # =============================================================================
+  # Per 42 USC 403(a)(1), the family maximum is calculated using a bend point
+  # formula similar to PIA calculation. The bend points are indexed to AWI
+  # from the 1979 base values ($230, $332, $433).
+  #
+  # Family maximum formula (42 USC 403(a)(1)):
+  # 150% of PIA up to fm_bp1 +
+  # 272% of PIA between fm_bp1 and fm_bp2 +
+  # 134% of PIA between fm_bp2 and fm_bp3 +
+  # 175% of PIA above fm_bp3
+
+  assume$fm_bp1 <- NA_real_
+  assume$fm_bp2 <- NA_real_
+  assume$fm_bp3 <- NA_real_
+
+  # Try to load historical family max bend point data
+  fm_bp_file <- system.file("extdata", "family_max_bp.csv", package = "ssmbar")
+  if (fm_bp_file == "") {
+    # Try relative path for development
+    if (file.exists("inst/extdata/family_max_bp.csv")) {
+      fm_bp_file <- "inst/extdata/family_max_bp.csv"
+    }
+  }
+
+  if (file.exists(fm_bp_file)) {
+    fm_bp_hist <- read.csv(fm_bp_file)
+
+    # Merge historical family max bend points by year
+    for (i in seq_len(nrow(assume))) {
+      yr <- assume$year[i]
+      hist_row <- fm_bp_hist[fm_bp_hist$year == yr, ]
+      if (nrow(hist_row) == 1) {
+        assume$fm_bp1[i] <- hist_row$fm_bp1
+        assume$fm_bp2[i] <- hist_row$fm_bp2
+        assume$fm_bp3[i] <- hist_row$fm_bp3
+      }
+    }
+  }
+
+  # Project family max bend points for future years
+  # Formula: fm_bp_base * AWI_2yrs_before / AWI_1977, rounded to nearest dollar
+  # Per SSA OACT: https://www.ssa.gov/oact/cola/familymax.html
+  fm_bp1_base <- 230  # 1979 base value
+  fm_bp2_base <- 332  # 1979 base value
+  fm_bp3_base <- 433  # 1979 base value
+
+  for (i in seq_len(nrow(assume))) {
+    yr <- assume$year[i]
+    if (yr >= 1979 && is.na(assume$fm_bp1[i])) {
+      awi_end <- assume$awi[assume$year == yr - 2]
+
+      if (length(awi_end) == 1 && !is.na(awi_end)) {
+        assume$fm_bp1[i] <- round(fm_bp1_base * awi_end / awi_1977)
+        assume$fm_bp2[i] <- round(fm_bp2_base * awi_end / awi_1977)
+        assume$fm_bp3[i] <- round(fm_bp3_base * awi_end / awi_1977)
+      }
+    }
+  }
+
+  # Child benefit share of worker's PIA
+  # Per 42 USC 402(d)(2): child benefit is 50% of worker's PIA
+  assume$child_pia_share <- 0.5
+
   return(assume)
 
 }

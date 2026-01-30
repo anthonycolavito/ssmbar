@@ -28,6 +28,10 @@ MAX_AGE <- 119           # Maximum age for benefit calculations (end of lifetime
 #' @param spouse_custom_avg_earnings Numeric value(s) for spouse's real average earnings if spouse_type = "custom". Default is NULL.
 #' @param spouse_disabled_age Numeric value(s) for the age(s) at which the spouse becomes disabled. Default is NULL.
 #'   Use this for spouses who become disabled at age 62 or later (up to NRA).
+#' @param child1_spec Character value(s) specifying the first child. Format: "birthyr-disabled"
+#'   (e.g., "2010-FALSE" for non-disabled child, "2005-TRUE" for disabled child). Default is NULL.
+#' @param child2_spec Character value(s) specifying the second child. Same format as child1_spec. Default is NULL.
+#' @param child3_spec Character value(s) specifying the third child. Same format as child1_spec. Default is NULL.
 #' @param debugg Boolean variable used to output additional variables for debugging.
 #'
 #' @return worker Data frame with the earnings of the worker(s), including spouse_spec if spouse is specified.
@@ -61,6 +65,7 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
                                custom_avg_earnings=NULL,
                                spouse_type=NULL, spouse_sex="all", spouse_birth_yr=NULL, spouse_age_claim=NULL,
                                spouse_custom_avg_earnings=NULL, spouse_disabled_age=NULL,
+                               child1_spec=NULL, child2_spec=NULL, child3_spec=NULL,
                                debugg = FALSE) {
 
   # Determine the number of workers from the longest input vector
@@ -76,7 +81,10 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
     length(spouse_birth_yr),
     length(spouse_age_claim),
     length(spouse_custom_avg_earnings),
-    length(spouse_disabled_age)
+    length(spouse_disabled_age),
+    length(child1_spec),
+    length(child2_spec),
+    length(child3_spec)
   )
 
   # Helper function to recycle parameters to n_workers length
@@ -104,6 +112,9 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
   spouse_age_claim_vec <- recycle_param(spouse_age_claim, n_workers, allow_null = TRUE)
   spouse_custom_avg_earnings_vec <- recycle_param(spouse_custom_avg_earnings, n_workers, allow_null = TRUE)
   spouse_disabled_age_vec <- recycle_param(spouse_disabled_age, n_workers, allow_null = TRUE)
+  child1_spec_vec <- recycle_param(child1_spec, n_workers, allow_null = TRUE)
+  child2_spec_vec <- recycle_param(child2_spec, n_workers, allow_null = TRUE)
+  child3_spec_vec <- recycle_param(child3_spec, n_workers, allow_null = TRUE)
 
   # Generate each worker and combine
   workers_list <- lapply(seq_len(n_workers), function(i) {
@@ -122,6 +133,9 @@ earnings_generator <- function(birth_yr=1960, sex="all", type="medium", age_clai
       spouse_age_claim = if (is.na(spouse_age_claim_vec[i])) NULL else spouse_age_claim_vec[i],
       spouse_custom_avg_earnings = if (is.na(spouse_custom_avg_earnings_vec[i])) NULL else spouse_custom_avg_earnings_vec[i],
       spouse_disabled_age = if (is.na(spouse_disabled_age_vec[i])) NULL else spouse_disabled_age_vec[i],
+      child1_spec = if (is.na(child1_spec_vec[i])) NULL else child1_spec_vec[i],
+      child2_spec = if (is.na(child2_spec_vec[i])) NULL else child2_spec_vec[i],
+      child3_spec = if (is.na(child3_spec_vec[i])) NULL else child3_spec_vec[i],
       debugg = debugg
     )
   })
@@ -165,6 +179,7 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
                                    spouse_type = NULL, spouse_sex = "all", spouse_birth_yr = NULL,
                                    spouse_age_claim = NULL, spouse_custom_avg_earnings = NULL,
                                    spouse_disabled_age = NULL,
+                                   child1_spec = NULL, child2_spec = NULL, child3_spec = NULL,
                                    debugg = FALSE) {
 
   # Validate sex parameter
@@ -250,12 +265,22 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
                  assumptions$le_f[which(assumptions$year == birth_yr + 65)])))
   }
 
+  # Convert child_spec NULL to NA_character_ for data frame
+  child1_spec_val <- if (is.null(child1_spec) || is.na(child1_spec)) NA_character_ else child1_spec
+  child2_spec_val <- if (is.null(child2_spec) || is.na(child2_spec)) NA_character_ else child2_spec
+  child3_spec_val <- if (is.null(child3_spec) || is.na(child3_spec)) NA_character_ else child3_spec
+
   worker <- data.frame(year = years, age = ages, id = id, sex = worker_sex, claim_age = claim_age, elig_age = elig_age,
                        death_age = death_age,
-                       spouse_spec = spouse_spec, stringsAsFactors = FALSE) %>%
+                       spouse_spec = spouse_spec,
+                       child1_spec = child1_spec_val,
+                       child2_spec = child2_spec_val,
+                       child3_spec = child3_spec_val,
+                       stringsAsFactors = FALSE) %>%
     left_join(assumptions %>% select(year, awi, gdp_pi), by = "year")
   #Initial dataframe that merges in necessary assumptions with the worker's trait variables.
   #spouse_spec encodes spouse info for later spousal benefit calculation (NA if no spouse).
+  #child_spec columns encode child info for child benefit calculation (NA if no children).
 
 
   if (type %in% c("very_low","low","medium","high")) {
@@ -308,7 +333,8 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   }
 
   if (!debugg) {
-    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, death_age, spouse_spec, earnings) #Selects only the needed variables.
+    worker <- worker %>% select(id, sex, year, age, claim_age, elig_age, death_age, spouse_spec,
+                                child1_spec, child2_spec, child3_spec, earnings) #Selects only the needed variables.
   }
 
   return(worker)
