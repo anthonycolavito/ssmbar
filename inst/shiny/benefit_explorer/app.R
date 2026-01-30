@@ -15,10 +15,8 @@ ui <- page_navbar(
 
   # Sidebar for worker configuration
   sidebar = sidebar(
-    width = 320,
-    title = "Worker Configuration",
-
-    # Worker input module
+    width = 280,
+    title = "Configuration",
     worker_input_ui("worker")
   ),
 
