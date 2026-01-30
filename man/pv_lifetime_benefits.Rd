@@ -2,9 +2,14 @@
 % Please edit documentation in R/pv_functions.R
 \name{pv_lifetime_benefits}
 \alias{pv_lifetime_benefits}
-\title{Calculate Present Value of Lifetime Benefits}
+\title{Calculate Present Value of Lifetime Benefits (Real 2025 Dollars)}
 \usage{
-pv_lifetime_benefits(worker, assumptions, discount_to_age = 65)
+pv_lifetime_benefits(
+  worker,
+  assumptions,
+  discount_to_age = 65,
+  base_year = 2025
+)
 }
 \arguments{
 \item{worker}{Data frame with calculated benefits. Must contain columns:
@@ -12,45 +17,47 @@ pv_lifetime_benefits(worker, assumptions, discount_to_age = 65)
 \code{claim_age}, and \code{death_age}.}
 
 \item{assumptions}{Data frame with the prepared Trustees assumptions.
-Must contain columns: \code{year} and \code{df} (nominal discount factor).}
+Must contain columns: \code{year}, \code{gdp_pi} (GDP price index),
+and \code{real_df} (real discount factor).}
 
 \item{discount_to_age}{Numeric value specifying the age to which benefits
 are discounted. Default is 65.}
+
+\item{base_year}{Numeric value specifying the year for real dollar conversion.
+Default is 2025.}
 }
 \value{
 Data frame with columns:
 \itemize{
 \item \code{id}: Worker identifier
-\item \code{pv_benefits}: Present value of lifetime benefits
+\item \code{pv_benefits}: Present value of lifetime benefits in real 2025 dollars
 }
 }
 \description{
 Calculates the present value of lifetime Social Security benefits from
-claim age to expected death age, discounted using the nominal effective
+claim age to expected death age. Benefits are first converted to real
+2025 dollars using the GDP price index, then discounted using the real
 discount factor from the Trustees Report assumptions.
 }
 \details{
-The present value calculation uses the nominal effective discount factor
-(\code{df}) from the Trustees Report assumptions. Since benefit amounts
-are in nominal dollars, the nominal discount factor is appropriate.
-Benefits are normalized to the specified \code{discount_to_age} (default 65)
-for comparability across workers with different birth years.
+The calculation proceeds in two steps:
+\enumerate{
+\item Convert nominal benefits to real 2025 dollars using GDP price index
+\item Discount real benefits using the real discount factor (real_df)
+}
 
-The formula for each year's discounted benefit is:
-\code{annual_benefit * (df_at_discount_age / df_at_benefit_year)}
+This ensures the result is in real 2025 dollars, comparable to the
+undiscounted real_lifetime_benefits() output.
 
 Benefits are summed from the worker's claim age through their expected death age
 (based on cohort life expectancy). Benefits after death are excluded.
 }
 \examples{
 \dontrun{
-# Calculate benefits for a worker
 worker <- calculate_benefits(
   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
   factors = sef2025, assumptions = tr2025
 )
-
-# Calculate PV of lifetime benefits
 pv_ben <- pv_lifetime_benefits(worker, tr2025)
 }
 

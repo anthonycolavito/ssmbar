@@ -19,6 +19,9 @@ earnings_generator(
   spouse_age_claim = NULL,
   spouse_custom_avg_earnings = NULL,
   spouse_disabled_age = NULL,
+  child1_spec = NULL,
+  child2_spec = NULL,
+  child3_spec = NULL,
   debugg = FALSE
 )
 }
@@ -51,6 +54,13 @@ earnings_generator(
 
 \item{spouse_disabled_age}{Numeric value(s) for the age(s) at which the spouse becomes disabled. Default is NULL.
 Use this for spouses who become disabled at age 62 or later (up to NRA).}
+
+\item{child1_spec}{Character value(s) specifying the first child. Format: "birthyr-disabled"
+(e.g., "2010-FALSE" for non-disabled child, "2005-TRUE" for disabled child). Default is NULL.}
+
+\item{child2_spec}{Character value(s) specifying the second child. Same format as child1_spec. Default is NULL.}
+
+\item{child3_spec}{Character value(s) specifying the third child. Same format as child1_spec. Default is NULL.}
 
 \item{debugg}{Boolean variable used to output additional variables for debugging.}
 }

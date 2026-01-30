@@ -17,5 +17,7 @@ pia(worker, assumptions, debugg = FALSE)
 worker dataframe with a worker's retired worker PIA by age
 }
 \description{
-Function that computes a worker's Primary Insurance Amount by age
+Function that computes a worker's Primary Insurance Amount by age.
+Compares the regular PIA (bend point formula) with the special minimum PIA
+per 42 USC 415(a)(1)(C) and returns the higher of the two.
 }

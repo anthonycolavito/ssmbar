@@ -9,7 +9,7 @@
 #   - Computing spousal PIA (Primary Insurance Amount)
 #   - Computing spousal benefits with actuarial adjustments
 #
-# Functions are called by calculate_benefits() in CL_benefit_calculator.R
+# Functions are called by calculate_benefits() in calculate_benefits.R
 #
 # =============================================================================
 

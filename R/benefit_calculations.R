@@ -5,7 +5,7 @@
 #
 # This file contains the core benefit calculation functions for the ssmbar package.
 # Functions are organized in the order they are called in the benefit calculation
-# pipeline (see calculate_benefits() in CL_benefit_calculator.R). Spousal and survivor
+# pipeline (see calculate_benefits() in calculate_benefits.R). Spousal and survivor
 # benefit functions are in separate files (spousal.R, survivor.R):
 #
 #   earnings -> aime() -> pia() -> cola() -> worker_benefit() -> spousal_pia()
@@ -207,6 +207,13 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
 
   # AIME Calculation
   # SSA Handbook Section 701: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
+  #
+  # AIME equals the average monthly earnings of the highest earning years
+  # in the computation period (typically 35 years for retired workers).
+  # For January 1 claims, AIME at age X uses earnings through age X-1.
+  #
+  # Optimization: Uses partial sort which is O(n) vs full sort O(n log n).
+  # Pre-computes eligibility flags to reduce redundant checks.
   dataset <- dataset %>%
     group_by(id) %>%
     arrange(id, age) %>%
@@ -214,33 +221,43 @@ aime <- function(worker, assumptions, debugg = FALSE){ #Function for calculating
       n <- nrow(.x)
       aime_vals <- numeric(n)
       indexed_earnings <- .x$indexed_earn
-      qc_required_val <- .x$qc_required[1] # QCs required for eligibility (from assumptions)
-      qc_eligible <- .x$qc_tot >= qc_required_val # Workers need qc_required QCs for retirement benefits (Section 203)
-      comp_period <- .x$comp_period # Worker's computation (or, averaging) period
-      age_eligible <- .x$age >= .x$elig_age # Worker's eligibility age (age 62 for retirement, age of disability, or age of death of deceased spouse)
+      qc_required_val <- .x$qc_required[1]
+      comp_period <- .x$comp_period
 
-      #AIME is equal to the average monthly earnings of the hightest earnings years in the computation period (typically 35, as for retired worker beneficiaries)
-      # For January 1 claims: AIME at age X uses earnings through age X-1 (last complete year before claim)
-      for (i in seq_len(n)) {
-        if (!is.na(qc_eligible[i]) && qc_eligible[i] && !is.na(age_eligible[i]) && age_eligible[i]) { #Only calculates AIME if worker has enough QCs and is at or past their eligiblity age.
-          # Use earnings through age-1 (i-1 rows) since claim is on January 1 before current year's earnings
-          available_years <- i - 1
-          years_to_use <- min(available_years, comp_period[i]) #Restriction so AIME calculation doesn't break if not enough years have passed to equal full comp period.
-          # Optimized: use partial sort when years_to_use < available_years (O(n) vs O(n log n))
-          # partial = k ensures elements 1:k are the k smallest, so we negate to get largest
-          earnings_subset <- indexed_earnings[1:available_years]
-          if (available_years > years_to_use) {
-            # Partial sort: get the years_to_use largest values efficiently
-            top_earnings_sum <- sum(-sort(-earnings_subset, partial = 1:years_to_use)[1:years_to_use])
-          } else {
-            # Use all available earnings
-            top_earnings_sum <- sum(earnings_subset)
+      # Pre-compute eligibility: needs QCs and at/past eligibility age
+      is_eligible <- (!is.na(.x$qc_tot) & .x$qc_tot >= qc_required_val &
+                      !is.na(.x$age) & !is.na(.x$elig_age) & .x$age >= .x$elig_age)
+
+      # Find first eligible index to skip early years
+      first_eligible <- which(is_eligible)[1]
+
+      if (!is.na(first_eligible)) {
+        # Only iterate from first eligible year onwards
+        for (i in first_eligible:n) {
+          if (is_eligible[i]) {
+            # Earnings through age-1 (i-1 rows)
+            available_years <- i - 1
+
+            if (available_years > 0) {
+              years_to_use <- min(available_years, comp_period[i])
+              earnings_subset <- indexed_earnings[1:available_years]
+
+              # Compute sum of top years_to_use earnings
+              # Partial sort is O(n) for finding k largest elements
+              if (available_years > years_to_use) {
+                top_earnings_sum <- sum(-sort(-earnings_subset, partial = 1:years_to_use)[1:years_to_use])
+              } else {
+                top_earnings_sum <- sum(earnings_subset)
+              }
+
+              # AIME rounded down to the next lowest dollar
+              aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12))
+            }
           }
-          aime_vals[i] <- floor(top_earnings_sum / (comp_period[i] * 12)) #AIME calculation, rounded to the next lowest dollar (see Handbook)
         }
       }
 
-      .x$aime <- aime_vals #Stores AIME vals
+      .x$aime <- aime_vals
       .x
     }) %>%
     ungroup()

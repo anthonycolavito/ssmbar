@@ -285,3 +285,71 @@ test_that("benefit_tax_ratio varies by worker type", {
   expect_gt(ratio_med, 0)
   expect_gt(ratio_high, 0)
 })
+
+
+# =============================================================================
+# Tests for internal_rate_of_return()
+# =============================================================================
+
+test_that("internal_rate_of_return returns correct structure", {
+  worker <- create_test_worker()
+
+  result <- internal_rate_of_return(worker, tr2025)
+
+  # Check structure
+  expect_true(is.data.frame(result))
+  expect_true("id" %in% names(result))
+  expect_true("irr" %in% names(result))
+
+  # Should have exactly one row per unique worker
+  expect_equal(nrow(result), length(unique(worker$id)))
+})
+
+test_that("internal_rate_of_return returns value in expected range", {
+  worker <- create_test_worker()
+
+  result <- internal_rate_of_return(worker, tr2025)
+
+  # IRR should typically be between -10% and +15% for Social Security
+  expect_true(!is.na(result$irr[1]))
+  expect_gt(result$irr[1], -0.10)
+  expect_lt(result$irr[1], 0.15)
+})
+
+test_that("internal_rate_of_return doubles tax with employer share", {
+  worker <- create_test_worker()
+
+  irr_employee <- internal_rate_of_return(worker, tr2025, include_employer = FALSE)
+  irr_total <- internal_rate_of_return(worker, tr2025, include_employer = TRUE)
+
+  # IRR with employer share should be lower (more taxes for same benefits)
+  expect_lt(irr_total$irr[1], irr_employee$irr[1])
+})
+
+test_that("internal_rate_of_return varies by worker type due to progressivity", {
+  worker_low <- create_test_worker(type = "low")
+  worker_med <- create_test_worker(type = "medium")
+  worker_high <- create_test_worker(type = "high")
+
+  irr_low <- internal_rate_of_return(worker_low, tr2025)$irr[1]
+  irr_med <- internal_rate_of_return(worker_med, tr2025)$irr[1]
+  irr_high <- internal_rate_of_return(worker_high, tr2025)$irr[1]
+
+  # Due to progressive benefit formula, lower earners have higher IRR
+  expect_gt(irr_low, irr_med)
+  expect_gt(irr_med, irr_high)
+})
+
+test_that("internal_rate_of_return validates required columns", {
+  bad_worker <- data.frame(
+    id = "test",
+    year = 2025,
+    age = 65
+    # Missing earnings, annual_ind, claim_age, death_age
+  )
+
+  expect_error(
+    internal_rate_of_return(bad_worker, tr2025),
+    "worker data must contain"
+  )
+})

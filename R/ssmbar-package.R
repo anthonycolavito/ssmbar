@@ -71,6 +71,15 @@ utils::globalVariables(c(
 
   # Tax calculation variables
   "oasi_tr", "di_tr", "ss_taxable_earn", "oasi_tax", "di_tax", "ss_tax",
+  "tax_amount", "ss_tax_total",
+
+  # Marginal analysis variables
+  "comp_period_val", "working_year", "indexed_rank", "in_top_35",
+  "aime_at_claim", "bp1_val", "bp2_val", "marginal_pia_rate",
+  "delta_aime_per_dollar", "delta_pia_per_dollar", "delta_pv_benefits",
+  "claim_age_val", "death_age_val", "benefit_months", "discount_year",
+  "real_df_norm", "real_df_at_claim", "gdp_pi_at_claim", "act_factor_val",
+  "net_marginal_tax_rate", "marginal_irr",
 
   # Custom earnings variables
   "pi_curr", "index", "nom_earn", "real_earn", "adj_real_earn",
@@ -83,6 +92,7 @@ utils::globalVariables(c(
 ))
 
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange
-#' @importFrom dplyr case_when if_else first row_number group_modify bind_rows rename all_of
-#' @importFrom stats na.omit
+#' @importFrom dplyr case_when if_else first row_number group_modify bind_rows rename all_of summarise any_of
+#' @importFrom tidyr pivot_longer
+#' @importFrom stats na.omit uniroot
 NULL

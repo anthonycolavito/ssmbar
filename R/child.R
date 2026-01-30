@@ -10,7 +10,7 @@
 #   - Computing child benefits (no actuarial adjustment for children)
 #
 # Child benefits are governed by 42 USC 402(d).
-# Functions are called by calculate_benefits() in CL_benefit_calculator.R
+# Functions are called by calculate_benefits() in calculate_benefits.R
 #
 # =============================================================================
 

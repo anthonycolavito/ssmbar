@@ -2,13 +2,14 @@
 % Please edit documentation in R/pv_functions.R
 \name{pv_lifetime_taxes}
 \alias{pv_lifetime_taxes}
-\title{Calculate Present Value of Lifetime Social Security Taxes}
+\title{Calculate Present Value of Lifetime Social Security Taxes (Real 2025 Dollars)}
 \usage{
 pv_lifetime_taxes(
   worker,
   assumptions,
   discount_to_age = 65,
-  include_employer = FALSE
+  include_employer = FALSE,
+  base_year = 2025
 )
 }
 \arguments{
@@ -16,8 +17,8 @@ pv_lifetime_taxes(
 \code{id}, \code{year}, \code{age}, and \code{earnings}.}
 
 \item{assumptions}{Data frame with the prepared Trustees assumptions.
-Must contain columns: \code{year}, \code{df}, \code{oasi_tr},
-\code{di_tr}, and \code{taxmax}.}
+Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df},
+\code{oasi_tr}, \code{di_tr}, and \code{taxmax}.}
 
 \item{discount_to_age}{Numeric value specifying the age to which taxes
 are discounted. Default is 65.}
@@ -25,42 +26,40 @@ are discounted. Default is 65.}
 \item{include_employer}{Logical. If TRUE, includes both employee and
 employer shares of payroll taxes (doubling the tax amount).
 Default is FALSE (employee share only).}
+
+\item{base_year}{Numeric value specifying the year for real dollar conversion.
+Default is 2025.}
 }
 \value{
 Data frame with columns:
 \itemize{
 \item \code{id}: Worker identifier
-\item \code{pv_taxes}: Present value of lifetime taxes
+\item \code{pv_taxes}: Present value of lifetime taxes in real 2025 dollars
 }
 }
 \description{
 Calculates the present value of lifetime Social Security taxes paid from
-first working age (21) through age 64, discounted using the nominal effective
+first working age (21) through age 64. Taxes are first converted to real
+2025 dollars using the GDP price index, then discounted using the real
 discount factor from the Trustees Report assumptions.
 }
 \details{
-Uses \code{calculate_taxes()} internally to compute annual tax amounts,
-then discounts using the nominal effective discount factor. Since tax
-amounts are in nominal dollars, the nominal discount factor is appropriate.
-The discount factor is normalized to the specified \code{discount_to_age}
-(default 65).
+The calculation proceeds in two steps:
+\enumerate{
+\item Convert nominal taxes to real 2025 dollars using GDP price index
+\item Discount real taxes using the real discount factor (real_df)
+}
 
-The \code{include_employer} parameter allows for analysis that includes
-the employer's matching contribution, which is relevant for evaluating
-total contributions to the Social Security system.
+This ensures the result is in real 2025 dollars, comparable to other
+real measures.
 }
 \examples{
 \dontrun{
-# Generate worker with earnings
 worker <- earnings_generator(
   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
   factors = sef2025, assumptions = tr2025
 )
-
-# Calculate PV of lifetime taxes (employee share only)
 pv_tax <- pv_lifetime_taxes(worker, tr2025)
-
-# Include employer share
 pv_tax_total <- pv_lifetime_taxes(worker, tr2025, include_employer = TRUE)
 }
 

@@ -7,7 +7,7 @@
 #   - Computing survivor PIA from deceased spouse's earnings record
 #   - Applying widow(er) actuarial adjustments
 #
-# Functions are called by calculate_benefits() in CL_benefit_calculator.R
+# Functions are called by calculate_benefits() in calculate_benefits.R
 # after spousal benefit calculations and before RET.
 #
 # Reference: SSA Handbook Chapter 4 (Survivors Insurance)

@@ -2,41 +2,50 @@
 % Please edit documentation in R/pv_functions.R
 \name{pv_lifetime_earnings}
 \alias{pv_lifetime_earnings}
-\title{Calculate Present Value of Lifetime Earnings}
+\title{Calculate Present Value of Lifetime Earnings (Real 2025 Dollars)}
 \usage{
-pv_lifetime_earnings(worker, assumptions, discount_to_age = 65)
+pv_lifetime_earnings(
+  worker,
+  assumptions,
+  discount_to_age = 65,
+  base_year = 2025
+)
 }
 \arguments{
 \item{worker}{Data frame with worker earnings. Must contain columns:
 \code{id}, \code{year}, \code{age}, and \code{earnings}.}
 
 \item{assumptions}{Data frame with the prepared Trustees assumptions.
-Must contain columns: \code{year} and \code{df} (nominal discount factor).}
+Must contain columns: \code{year}, \code{gdp_pi}, and \code{real_df}.}
 
 \item{discount_to_age}{Numeric value specifying the age to which earnings
 are discounted. Default is 65.}
+
+\item{base_year}{Numeric value specifying the year for real dollar conversion.
+Default is 2025.}
 }
 \value{
 Data frame with columns:
 \itemize{
 \item \code{id}: Worker identifier
-\item \code{pv_earnings}: Present value of lifetime earnings
+\item \code{pv_earnings}: Present value of lifetime earnings in real 2025 dollars
 }
 }
 \description{
 Calculates the present value of lifetime earnings from age 21 through
-age 64, discounted using the nominal effective discount factor from
+age 64. Earnings are first converted to real 2025 dollars using the
+GDP price index, then discounted using the real discount factor from
 the Trustees Report assumptions.
 }
 \details{
-The present value calculation uses the nominal effective discount factor
-(\code{df}) from the Trustees Report assumptions. Since earnings amounts
-are in nominal dollars, the nominal discount factor is appropriate.
-Earnings are normalized to the specified \code{discount_to_age} (default 65)
-for comparability across workers.
+The calculation proceeds in two steps:
+\enumerate{
+\item Convert nominal earnings to real 2025 dollars using GDP price index
+\item Discount real earnings using the real discount factor (real_df)
+}
 
-The formula for each year's discounted earnings is:
-\code{earnings * (df_at_discount_age / df_at_earnings_year)}
+This ensures the result is in real 2025 dollars, comparable to the
+undiscounted real_lifetime_earnings() output.
 
 Earnings are summed from age 21 through age 64 (working years).
 }

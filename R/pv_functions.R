@@ -806,3 +806,153 @@ pv_benefit_earnings_ratio <- function(pv_benefits, pv_earnings) {
 
   return(ratio)
 }
+
+
+#' Calculate Internal Rate of Return
+#'
+#' Calculates the lifetime internal rate of return (IRR) for Social Security
+#' contributions. The IRR is the discount rate at which the present value of
+#' lifetime benefits equals the present value of lifetime taxes.
+#'
+#' @param worker Data frame with calculated benefits. Must contain columns:
+#'   \code{id}, \code{year}, \code{age}, \code{earnings}, \code{annual_ind},
+#'   \code{claim_age}, and \code{death_age}.
+#' @param assumptions Data frame with the prepared Trustees assumptions.
+#'   Must contain columns: \code{year}, \code{oasi_tr}, \code{di_tr}, \code{taxmax}.
+#' @param include_employer Logical. If TRUE, includes both employee and employer
+#'   shares of payroll taxes. Default is FALSE (employee share only).
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{id}: Worker identifier
+#'     \item \code{irr}: Internal rate of return as a decimal (e.g., 0.03 = 3%)
+#'   }
+#'
+#' @details
+#' The IRR is found by solving for r in the equation:
+#' \deqn{\sum_{t} \frac{tax_t}{(1+r)^{(t - base\_year)}} = \sum_{t} \frac{benefit_t}{(1+r)^{(t - base\_year)}}}
+#'
+#' This function uses \code{uniroot()} to find the discount rate where the
+#' net present value (PV benefits - PV taxes) equals zero.
+#'
+#' The IRR represents the "return" on Social Security contributions. Higher
+#' values indicate better returns. Due to the progressive benefit formula,
+#' lower earners typically have higher IRRs than higher earners.
+#'
+#' Returns NA when:
+#' \itemize{
+#'   \item Total lifetime benefits = 0
+#'   \item Total lifetime taxes = 0
+#'   \item No solution found in the range [-0.99, 1.0]
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' worker <- calculate_benefits(
+#'   birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+#'   factors = sef2025, assumptions = tr2025, debugg = TRUE
+#' )
+#' irr <- internal_rate_of_return(worker, tr2025)
+#' irr_total <- internal_rate_of_return(worker, tr2025, include_employer = TRUE)
+#' }
+#'
+#' @importFrom stats uniroot
+#' @importFrom dplyr %>% filter group_by summarise left_join first mutate
+#' @export
+internal_rate_of_return <- function(worker, assumptions, include_employer = FALSE) {
+
+  # Validate required columns in worker data
+  worker_cols_needed <- c("id", "year", "age", "earnings", "annual_ind")
+  if (!all(worker_cols_needed %in% names(worker))) {
+    stop(paste("worker data must contain:", paste(worker_cols_needed, collapse = ", ")))
+  }
+
+  # Check for claim_age and death_age
+  if (!"claim_age" %in% names(worker)) {
+    stop("worker data must contain 'claim_age' column")
+  }
+  if (!"death_age" %in% names(worker)) {
+    stop("worker data must contain 'death_age' column")
+  }
+
+  # Validate required columns in assumptions
+  assumption_cols_needed <- c("year", "oasi_tr", "di_tr", "taxmax")
+  if (!all(assumption_cols_needed %in% names(assumptions))) {
+    stop(paste("assumptions data must contain:", paste(assumption_cols_needed, collapse = ", ")))
+  }
+
+  # Calculate taxes using existing function
+  worker_with_taxes <- calculate_taxes(worker, assumptions)
+
+  # Get unique worker IDs
+  worker_ids <- unique(worker$id)
+
+  # Calculate IRR for each worker
+  results <- lapply(worker_ids, function(wid) {
+    # Filter to this worker
+    w_data <- worker_with_taxes %>% filter(id == wid)
+
+    # Get worker metadata
+    claim_age_val <- w_data$claim_age[1]
+    death_age_val <- w_data$death_age[1]
+    birth_yr <- w_data$year[1] - w_data$age[1]
+
+    # Extract tax stream (ages 21-64)
+    tax_data <- w_data %>%
+      filter(age >= 21 & age <= 64) %>%
+      mutate(
+        tax_amount = if (include_employer) ss_tax * 2 else ss_tax
+      ) %>%
+      select(year, age, tax_amount)
+
+    # Extract benefit stream (claim_age to death_age)
+    benefit_data <- w_data %>%
+      filter(age >= claim_age_val & age < death_age_val & annual_ind > 0) %>%
+      select(year, age, annual_ind)
+
+    # Check for edge cases
+    total_taxes <- sum(tax_data$tax_amount, na.rm = TRUE)
+    total_benefits <- sum(benefit_data$annual_ind, na.rm = TRUE)
+
+    if (total_taxes == 0 || total_benefits == 0) {
+      return(data.frame(id = wid, irr = NA_real_))
+    }
+
+    # Define the NPV function (PV benefits - PV taxes) as function of r
+    # We want to find r where NPV = 0
+    npv_func <- function(r) {
+      # Use age 21 as base year for discounting
+      base_age <- 21
+
+      # PV of taxes
+      pv_taxes <- sum(
+        tax_data$tax_amount / (1 + r)^(tax_data$age - base_age),
+        na.rm = TRUE
+      )
+
+      # PV of benefits
+      pv_benefits <- sum(
+        benefit_data$annual_ind / (1 + r)^(benefit_data$age - base_age),
+        na.rm = TRUE
+      )
+
+      return(pv_benefits - pv_taxes)
+    }
+
+    # Use uniroot to find the IRR
+    # Search in range [-0.99, 1.0] (can't have r <= -1)
+    irr_result <- tryCatch({
+      result <- uniroot(npv_func, interval = c(-0.99, 1.0), tol = 1e-8)
+      result$root
+    }, error = function(e) {
+      NA_real_
+    })
+
+    data.frame(id = wid, irr = irr_result)
+  })
+
+  # Combine results
+  result <- do.call(rbind, results)
+
+  return(result)
+}
