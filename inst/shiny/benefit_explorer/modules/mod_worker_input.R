@@ -207,6 +207,7 @@ worker_input_server <- function(id) {
         # Calculate reform scenarios
         reform_data <- NULL
         reform_summary <- NULL
+        combined_assumptions <- NULL
         selected_reforms <- input$selected_reforms
 
         if (input$enable_reforms && !is.null(selected_reforms) && length(selected_reforms) > 0) {
@@ -222,34 +223,43 @@ worker_input_server <- function(id) {
           }
 
           if (length(valid_reforms) > 0) {
-            reform_list <- lapply(valid_reforms, function(reform_name) {
-              reform_info <- REFORM_LOOKUP[[reform_name]]
-              reform_obj <- reform_info$fn()
-              reformed_assumptions <- apply_reform(tr2025, reform_obj)
-
-              reform_worker <- calculate_benefits(
-                birth_yr = input$birth_year,
-                sex = input$sex,
-                type = input$worker_type,
-                age_claim = input$claim_age,
-                factors = sef2025,
-                assumptions = reformed_assumptions,
-                custom_avg_earnings = custom_avg,
-                spouse_type = spouse_type,
-                spouse_sex = spouse_sex,
-                spouse_birth_yr = spouse_birth_yr,
-                spouse_age_claim = spouse_claim_age,
-                spouse_custom_avg_earnings = spouse_custom,
-                debugg = TRUE
-              )
-
-              reform_worker$scenario <- reform_name
-              reform_worker$is_reform <- TRUE
-              reform_worker
+            # Create reform objects for all valid reforms
+            reform_objects <- lapply(valid_reforms, function(reform_name) {
+              REFORM_LOOKUP[[reform_name]]$fn()
             })
 
-            reform_data <- bind_rows(reform_list)
-            reform_summary <- create_reform_summary(primary, reform_data, tr2025)
+            # Apply ALL reforms together to get combined effect
+            combined_assumptions <- apply_reforms(tr2025, reform_objects, check_exclusivity = FALSE)
+
+            # Calculate benefits under combined reforms
+            combined_worker <- calculate_benefits(
+              birth_yr = input$birth_year,
+              sex = input$sex,
+              type = input$worker_type,
+              age_claim = input$claim_age,
+              factors = sef2025,
+              assumptions = combined_assumptions,
+              custom_avg_earnings = custom_avg,
+              spouse_type = spouse_type,
+              spouse_sex = spouse_sex,
+              spouse_birth_yr = spouse_birth_yr,
+              spouse_age_claim = spouse_claim_age,
+              spouse_custom_avg_earnings = spouse_custom,
+              debugg = TRUE
+            )
+
+            # Name the scenario based on number of reforms
+            scenario_name <- if (length(valid_reforms) == 1) {
+              valid_reforms[1]
+            } else {
+              paste0("Combined (", length(valid_reforms), " reforms)")
+            }
+
+            combined_worker$scenario <- scenario_name
+            combined_worker$is_reform <- TRUE
+            reform_data <- combined_worker
+
+            reform_summary <- create_reform_summary(primary, reform_data, combined_assumptions)
           }
         }
 
@@ -267,8 +277,9 @@ worker_input_server <- function(id) {
           reform_summary = reform_summary,
           has_spouse = input$add_spouse,
           has_reforms = input$enable_reforms && !is.null(reform_data),
-          selected_reforms = if (input$enable_reforms) selected_reforms else NULL,
+          selected_reforms = if (input$enable_reforms) valid_reforms else NULL,
           assumptions = tr2025,
+          reform_assumptions = combined_assumptions,
           factors = sef2025
         )
 
