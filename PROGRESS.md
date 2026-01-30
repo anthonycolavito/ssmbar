@@ -28,6 +28,47 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### January 29, 2026 — SSA Max Benefit Table Investigation
+
+**Task**: Investigate discrepancies between ssmbar and SSA's Maximum Benefit table (max.xlsx) to understand why birth year 1960 showed larger differences in V.C7 validation.
+
+**Investigation Process**:
+
+1. Compared ssmbar output to SSA max benefit table for max earners at various retirement ages
+2. Verified AIME values match exactly between ssmbar and SSA table
+3. Reverse-engineered SSA's calculations to identify methodology differences
+4. Reviewed statutory requirements (42 USC 415(a)(1)(B)) for bend point determination
+
+**Key Findings**:
+
+1. **AIME matches**: ssmbar's AIME calculation matches SSA's published values exactly (e.g., 11,621 for birth year 1960 at age 65)
+
+2. **Bend point year discrepancy**: SSA's max benefit table appears to use bend points from the year BEFORE eligibility (2021 for birth year 1960), while the statute specifies the eligibility year (2022)
+
+3. **ssmbar is correct per statute**: 42 USC 415(a)(1)(B) states bend points are "for individuals who initially become eligible... in the calendar year" - meaning the eligibility year's bend points should be used
+
+4. **Reproduction test**:
+   - Using ssmbar's method (2022 bend points): Benefit = $3,519.90
+   - Using year-before bend points (2021): Benefit = $3,374.30
+   - SSA table shows: $3,374
+   - SSA table can only be reproduced using the year-before-eligibility bend points
+
+5. **Age 67 case inconclusive**: Could not exactly reproduce SSA's age 67 values with any combination of COLAs and DRCs tested
+
+**Conclusion**:
+
+ssmbar's methodology is **correct per statute**. The SSA max benefit table may use a simplified or illustrative methodology that differs from the actual statutory calculation. No changes to ssmbar are warranted.
+
+**Verification**:
+- V.C7 validation: 1.36% average difference (improved from 2.51% after rounding fixes)
+- Medium earner: 0.06% average difference (nearly perfect)
+- Statutory compliance verified against 42 USC 415(a)(1)(B)
+
+**Commits**:
+- `1c5c32b`: Add V.C7 validation script and document improved accuracy
+
+---
+
 ### January 29, 2026 — Child Benefits and Family Maximum Implementation
 
 **Task**: Implement child benefits (42 USC 402(d)) and family maximum (42 USC 403(a)) per approved plan.
