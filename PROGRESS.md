@@ -342,6 +342,37 @@ All PV calculations use **real 2025 dollars** to ensure comparability across tim
 - Default claim age: 65
 - Default worker type: Medium earner
 
+### Performance Optimization Strategy
+
+**Current Performance**: ~500ms per worker (as of January 2026)
+
+**Target Use Case**: Tens of thousands to hundreds of thousands of workers
+
+**Architecture Assessment** (January 30, 2026):
+
+The benefit calculation pipeline uses `group_by(id) %>% group_modify()` which processes workers sequentially. Key bottlenecks identified:
+
+| Function | Issue | Vectorizable? |
+|----------|-------|---------------|
+| AIME | for-loop over ages per worker | Partially (top-35 sort is inherent) |
+| COLA | Sequential loop (path-dependent rounding) | **No** - SSA compliance requires sequential |
+| child_pia | sapply over rows | **Yes** - vectorized in Jan 2026 |
+| family_maximum | Sequential COLA loop | **No** - same path dependency |
+
+**Constraints**:
+1. **SSA Compliance**: Sequential calculations like COLA must remain sequential because SSA rounds to the nearest dime at each step, and each year's input depends on the previous year's rounded output. This is statutory, not an implementation artifact.
+2. **Code Readability**: dplyr is preferred over data.table for auditability—code must be verifiable against SSA rules.
+
+**Deferred: Parallelization**
+
+Parallelization via `furrr::future_map()` would provide 4-8x speedup by processing multiple workers simultaneously across CPU cores. Each worker's sequential calculations remain intact.
+
+**Why deferred**: Current processing needs don't justify the added complexity. Parallelization makes debugging harder (error messages lose context, can't use `browser()`, errors can appear non-deterministic).
+
+**When to revisit**: When processing >10,000 workers becomes a regular need, or single-run time exceeds acceptable thresholds.
+
+**To enable parallelization later**: Maintain current architecture where each worker's calculation is self-contained within `group_modify()`. This makes future `future_map()` conversion straightforward.
+
 ---
 
 ## Critical Implementation Rules

@@ -88,20 +88,21 @@ parse_child_spec <- function(child_spec) {
 
 is_child_eligible <- function(child_birth_yr, is_disabled, year, worker_claim_age, worker_age, worker_death_age) {
   # Child's age in the given year
-
-child_age <- year - child_birth_yr
+  child_age <- year - child_birth_yr
 
   # Worker must have claimed and be alive
   worker_receiving <- worker_age >= worker_claim_age & worker_age < worker_death_age
 
+
   # Child eligibility rules (simplified - no student benefits)
   # Non-disabled: ages 0-17 (stops at 18)
   # Disabled before 22: indefinitely
-  child_eligible <- if_else(
-    is_disabled,
-    child_age >= 0,  # Disabled child eligible at any age >= 0
-    child_age >= 0 & child_age < 18  # Non-disabled eligible under 18
-  )
+  # Note: is_disabled is scalar per child, so use if/else (not if_else)
+  if (is_disabled) {
+    child_eligible <- child_age >= 0
+  } else {
+    child_eligible <- child_age >= 0 & child_age < 18
+  }
 
   return(worker_receiving & child_eligible)
 }
@@ -185,23 +186,17 @@ child_pia <- function(worker, assumptions, debugg = FALSE) {
           parsed <- parse_child_spec(spec)
 
           if (!is.null(parsed)) {
-            # Calculate child PIA for each year
-            .x[[pia_col]] <- sapply(seq_len(nrow(.x)), function(j) {
-              eligible <- is_child_eligible(
-                child_birth_yr = parsed$birth_yr,
-                is_disabled = parsed$is_disabled,
-                year = .x$year[j],
-                worker_claim_age = claim_age_val,
-                worker_age = .x$age[j],
-                worker_death_age = death_age_val
-              )
-              if (eligible) {
-                # Child PIA = 50% of worker's COLA-adjusted PIA
-                child_pia_share * .x$cola_basic_pia[j]
-              } else {
-                0
-              }
-            })
+            # Calculate child eligibility for all years at once (vectorized)
+            eligible <- is_child_eligible(
+              child_birth_yr = parsed$birth_yr,
+              is_disabled = parsed$is_disabled,
+              year = .x$year,
+              worker_claim_age = claim_age_val,
+              worker_age = .x$age,
+              worker_death_age = death_age_val
+            )
+            # Child PIA = 50% of worker's COLA-adjusted PIA when eligible
+            .x[[pia_col]] <- if_else(eligible, child_pia_share * .x$cola_basic_pia, 0)
           }
         }
       }
