@@ -51,6 +51,18 @@ CLAIM_AGE_DEFAULT <- 65
 # Default custom earnings amount (in current dollars)
 CUSTOM_EARNINGS_DEFAULT <- 50000
 
+# Cohort tab defaults
+BIRTH_YEAR_RANGE_DEFAULT <- c(1960, 2005)
+
+# Cohort metrics to calculate
+COHORT_METRICS <- c(
+  "benefit" = "Monthly Benefit at Claim",
+  "pv_benefits" = "PV Lifetime Benefits",
+  "pv_taxes" = "PV Lifetime Taxes",
+  "ratio" = "Benefit-Tax Ratio",
+  "repl_rate" = "Replacement Rate (Wage H35)"
+)
+
 # CRFB Color Palette
 CRFB_DARK_BLUE <- "#003477"
 CRFB_LIGHT_BLUE <- "#9ACDFF"
@@ -302,10 +314,16 @@ check_ui_exclusivity <- function(selected_reforms) {
 # Load Shiny modules
 # =============================================================================
 
-source("modules/mod_worker_input.R")
-source("modules/mod_benefits.R")
-source("modules/mod_replacement.R")
-source("modules/mod_lifetime.R")
-source("modules/mod_ratios.R")
-source("modules/mod_marginal.R")
-source("modules/mod_reform_summary.R")
+# New 2-tab architecture modules
+source("modules/mod_reform_selector.R")
+source("modules/mod_individual_tab.R")
+source("modules/mod_cohort_tab.R")
+
+# Legacy modules (archived - kept for reference)
+# source("modules/mod_worker_input.R")
+# source("modules/mod_benefits.R")
+# source("modules/mod_replacement.R")
+# source("modules/mod_lifetime.R")
+# source("modules/mod_ratios.R")
+# source("modules/mod_marginal.R")
+# source("modules/mod_reform_summary.R")

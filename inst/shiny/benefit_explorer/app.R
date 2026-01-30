@@ -1,5 +1,5 @@
 # =============================================================================
-# Benefit Explorer App - Main App File
+# Benefit Explorer App - Main App File (Redesigned 2-Tab Architecture)
 # =============================================================================
 
 source("global.R")
@@ -13,48 +13,52 @@ ui <- page_navbar(
   theme = app_theme,
   id = "main_nav",
 
-  # Sidebar for worker configuration
+  # Sidebar with shared reform selector
   sidebar = sidebar(
-    width = 280,
-    title = "Configuration",
-    worker_input_ui("worker")
+    width = 300,
+    title = "Reform Comparison",
+
+    # Shared reform selector (mandatory)
+    reform_selector_ui("reforms"),
+
+    # Divider
+    tags$hr(class = "my-3"),
+
+    # App info
+    tags$div(
+      class = "text-muted small",
+      tags$p(
+        icon("info-circle"), " ",
+        "Select reforms above to compare against baseline. ",
+        "All visualizations show baseline vs reform comparison."
+      ),
+      tags$p(
+        class = "mt-2",
+        icon("user"), " ",
+        tags$strong("Individual Tab: "),
+        "Configure a specific worker and see detailed benefits/marginal analysis."
+      ),
+      tags$p(
+        class = "mt-2",
+        icon("users"), " ",
+        tags$strong("Cohort Tab: "),
+        "Compare metrics across birth years (1960-2005)."
+      )
+    )
   ),
 
-  # Main content tabs
+  # Tab 1: Individual Worker
   nav_panel(
-    title = "Benefits",
-    icon = icon("chart-line"),
-    benefits_ui("benefits")
+    title = "Individual Worker",
+    icon = icon("user"),
+    individual_tab_ui("individual")
   ),
 
+  # Tab 2: Cohort Comparison
   nav_panel(
-    title = "Replacement Rates",
-    icon = icon("percent"),
-    replacement_ui("replacement")
-  ),
-
-  nav_panel(
-    title = "Lifetime Value",
-    icon = icon("piggy-bank"),
-    lifetime_ui("lifetime")
-  ),
-
-  nav_panel(
-    title = "Ratios",
-    icon = icon("scale-balanced"),
-    ratios_ui("ratios")
-  ),
-
-  nav_panel(
-    title = "Marginal",
-    icon = icon("chart-bar"),
-    marginal_ui("marginal")
-  ),
-
-  nav_panel(
-    title = "Reform Summary",
-    icon = icon("balance-scale"),
-    reform_summary_ui("reform_summary")
+    title = "Cohort Comparison",
+    icon = icon("users"),
+    cohort_tab_ui("cohort")
   ),
 
   # Footer with package info
@@ -73,16 +77,12 @@ ui <- page_navbar(
 
 server <- function(input, output, session) {
 
-  # Worker input module - returns reactive with calculated benefits
-  worker_data <- worker_input_server("worker")
+  # Shared reform selector state
+  reform_state <- reform_selector_server("reforms")
 
-  # Pass worker data to visualization modules
-  benefits_server("benefits", worker_data)
-  replacement_server("replacement", worker_data)
-  lifetime_server("lifetime", worker_data)
-  ratios_server("ratios", worker_data)
-  marginal_server("marginal", worker_data)
-  reform_summary_server("reform_summary", worker_data)
+  # Tab servers receive shared reform state
+  individual_tab_server("individual", reform_state)
+  cohort_tab_server("cohort", reform_state)
 
 }
 

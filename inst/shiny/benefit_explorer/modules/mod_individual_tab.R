@@ -1,0 +1,859 @@
+# =============================================================================
+# Individual Worker Tab Module - Combined input + benefits + marginal analysis
+# =============================================================================
+
+# Beneficiary class labels
+BC_LABELS <- c(
+  "AR" = "Retired Worker", "ARB" = "Retired + Spousal", "ARD" = "Retired + Widow(er)",
+  "ARF" = "Retired + Disabled Widow(er)", "AD" = "Disabled Worker",
+  "ADB" = "Disabled + Spousal", "ADD" = "Disabled + Widow(er)",
+  "ADF" = "Disabled + Disabled Widow(er)", "BR" = "Spouse Only (Retired)",
+  "BD" = "Spouse Only (Disabled)", "D" = "Widow(er) Only", "F" = "Disabled Widow(er) Only"
+)
+
+# Module UI
+individual_tab_ui <- function(id) {
+  ns <- NS(id)
+
+  tagList(
+    # Row 1: Worker configuration cards
+    fluidRow(
+      # Primary worker config
+      column(6,
+        card(
+          card_header(
+            class = "bg-primary text-white py-2",
+            tags$span("Worker Configuration")
+          ),
+          card_body(
+            class = "p-3",
+            fluidRow(
+              column(6,
+                selectInput(ns("worker_type"), "Worker Type",
+                            choices = WORKER_TYPES, selected = "medium")
+              ),
+              column(6,
+                selectInput(ns("sex"), "Sex", choices = SEX_OPTIONS, selected = "all")
+              )
+            ),
+
+            conditionalPanel(
+              condition = sprintf("input['%s'] == 'custom'", ns("worker_type")),
+              numericInput(ns("custom_earnings"), "Avg Real Earnings ($)",
+                           value = CUSTOM_EARNINGS_DEFAULT, min = 1000, max = 500000, step = 1000)
+            ),
+
+            fluidRow(
+              column(6,
+                numericInput(ns("birth_year"), "Birth Year",
+                             value = BIRTH_YEAR_DEFAULT,
+                             min = BIRTH_YEAR_MIN, max = BIRTH_YEAR_MAX, step = 1)
+              ),
+              column(6,
+                numericInput(ns("claim_age"), "Claim Age",
+                             value = CLAIM_AGE_DEFAULT,
+                             min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
+              )
+            )
+          )
+        )
+      ),
+
+      # Spouse config (optional)
+      column(6,
+        card(
+          card_header(
+            class = "bg-success text-white py-2 d-flex justify-content-between align-items-center",
+            tags$span("Spouse Configuration"),
+            checkboxInput(ns("add_spouse"), "Include", value = FALSE, width = "80px")
+          ),
+          card_body(
+            class = "p-3",
+            conditionalPanel(
+              condition = sprintf("input['%s']", ns("add_spouse")),
+              fluidRow(
+                column(6,
+                  selectInput(ns("spouse_type"), "Spouse Type",
+                              choices = WORKER_TYPES, selected = "low")
+                ),
+                column(6,
+                  selectInput(ns("spouse_sex"), "Sex",
+                              choices = SEX_OPTIONS, selected = "all")
+                )
+              ),
+              conditionalPanel(
+                condition = sprintf("input['%s'] == 'custom'", ns("spouse_type")),
+                numericInput(ns("spouse_custom_earnings"), "Spouse Earnings ($)",
+                             value = CUSTOM_EARNINGS_DEFAULT, min = 1000, max = 500000, step = 1000)
+              ),
+              fluidRow(
+                column(6,
+                  numericInput(ns("spouse_birth_year"), "Birth Year",
+                               value = BIRTH_YEAR_DEFAULT,
+                               min = BIRTH_YEAR_MIN, max = BIRTH_YEAR_MAX, step = 1)
+                ),
+                column(6,
+                  numericInput(ns("spouse_claim_age"), "Claim Age",
+                               value = CLAIM_AGE_DEFAULT,
+                               min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
+                )
+              )
+            ),
+            conditionalPanel(
+              condition = sprintf("!input['%s']", ns("add_spouse")),
+              tags$div(
+                class = "text-center text-muted py-4",
+                tags$small("Check 'Include' to add a spouse")
+              )
+            )
+          )
+        )
+      )
+    ),
+
+    # Calculate button
+    fluidRow(
+      class = "mt-3 mb-3",
+      column(12,
+        actionButton(
+          ns("calculate"),
+          "Calculate Benefits",
+          icon = icon("play"),
+          class = "btn-primary btn-lg w-100"
+        )
+      )
+    ),
+
+    # Row 2: Charts side by side
+    fluidRow(
+      # Benefits by age chart
+      column(6,
+        card(
+          card_header(
+            class = "bg-info text-white d-flex justify-content-between align-items-center py-2",
+            tags$span("Annual Benefits by Age"),
+            radioButtons(
+              ns("chart_type"), NULL,
+              choices = c("Nominal $" = "nominal", "Real 2025 $" = "real"),
+              selected = "nominal", inline = TRUE
+            )
+          ),
+          card_body(
+            class = "p-2",
+            plotOutput(ns("benefit_chart"), height = "380px")
+          )
+        )
+      ),
+
+      # NMTR by age chart
+      column(6,
+        card(
+          card_header(
+            class = "bg-info text-white d-flex justify-content-between align-items-center py-2",
+            tags$span("Net Marginal Tax Rate by Age"),
+            checkboxInput(ns("include_employer"), "Incl. Employer", value = FALSE, width = "120px")
+          ),
+          card_body(
+            class = "p-2",
+            plotOutput(ns("nmtr_chart"), height = "380px")
+          )
+        )
+      )
+    ),
+
+    # Row 3: Key metrics
+    fluidRow(
+      class = "mt-3",
+      column(3, uiOutput(ns("metric_monthly"))),
+      column(3, uiOutput(ns("metric_pv_benefits"))),
+      column(3, uiOutput(ns("metric_pv_taxes"))),
+      column(3, uiOutput(ns("metric_ratio")))
+    ),
+
+    # Row 4: Additional metrics (mean NMTR, IRR, etc.)
+    fluidRow(
+      class = "mt-2",
+      column(3, uiOutput(ns("metric_mean_nmtr"))),
+      column(3, uiOutput(ns("metric_irr"))),
+      column(3, uiOutput(ns("metric_years_top35"))),
+      column(3,
+        tags$div(
+          class = "text-end pt-3",
+          actionButton(ns("toggle_data"), "Show Data Tables",
+                       icon = icon("table"), class = "btn-sm btn-outline-secondary")
+        )
+      )
+    ),
+
+    # Collapsible data tables
+    conditionalPanel(
+      condition = sprintf("input['%s'] %% 2 == 1", ns("toggle_data")),
+      fluidRow(
+        class = "mt-3",
+        column(6,
+          card(
+            card_header(class = "py-2", "Benefits Data"),
+            card_body(
+              class = "p-2",
+              downloadButton(ns("download_benefits"), "Export CSV",
+                             class = "btn-sm btn-outline-primary mb-2"),
+              DTOutput(ns("benefits_table"))
+            )
+          )
+        ),
+        column(6,
+          card(
+            card_header(class = "py-2", "Marginal Analysis Data"),
+            card_body(
+              class = "p-2",
+              downloadButton(ns("download_marginal"), "Export CSV",
+                             class = "btn-sm btn-outline-primary mb-2"),
+              DTOutput(ns("marginal_table"))
+            )
+          )
+        )
+      )
+    )
+  )
+}
+
+# Module Server
+individual_tab_server <- function(id, reform_state) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    # Calculate benefits when button is clicked
+    worker_data <- eventReactive(input$calculate, {
+      showNotification("Calculating benefits...", id = "calc_notify", duration = NULL)
+      on.exit(removeNotification("calc_notify"))
+
+      tryCatch({
+        # Prepare primary worker parameters
+        custom_avg <- if (input$worker_type == "custom") input$custom_earnings else NULL
+
+        # Prepare spouse parameters
+        spouse_type <- if (input$add_spouse) input$spouse_type else NULL
+        spouse_sex <- if (input$add_spouse) input$spouse_sex else NULL
+        spouse_birth_yr <- if (input$add_spouse) input$spouse_birth_year else NULL
+        spouse_claim_age <- if (input$add_spouse) input$spouse_claim_age else NULL
+        spouse_custom <- if (input$add_spouse && input$spouse_type == "custom") {
+          input$spouse_custom_earnings
+        } else NULL
+
+        # Calculate BASELINE benefits
+        baseline <- calculate_benefits(
+          birth_yr = input$birth_year,
+          sex = input$sex,
+          type = input$worker_type,
+          age_claim = input$claim_age,
+          factors = sef2025,
+          assumptions = tr2025,
+          custom_avg_earnings = custom_avg,
+          spouse_type = spouse_type,
+          spouse_sex = spouse_sex,
+          spouse_birth_yr = spouse_birth_yr,
+          spouse_age_claim = spouse_claim_age,
+          spouse_custom_avg_earnings = spouse_custom,
+          debugg = TRUE
+        )
+        baseline$scenario <- "Baseline"
+
+        # Calculate spouse benefits independently (if enabled)
+        spouse_data <- NULL
+        if (input$add_spouse) {
+          spouse_custom_ind <- if (input$spouse_type == "custom") {
+            input$spouse_custom_earnings
+          } else NULL
+
+          spouse_data <- calculate_benefits(
+            birth_yr = input$spouse_birth_year,
+            sex = input$spouse_sex,
+            type = input$spouse_type,
+            age_claim = input$spouse_claim_age,
+            factors = sef2025,
+            assumptions = tr2025,
+            custom_avg_earnings = spouse_custom_ind,
+            debugg = TRUE
+          )
+          spouse_data$scenario <- "Spouse"
+        }
+
+        # Calculate REFORM benefits (if reforms selected)
+        reform_data <- NULL
+        reform_assumptions <- reform_state$reform_assumptions()
+
+        if (reform_state$has_reforms() && !is.null(reform_assumptions)) {
+          reform_data <- calculate_benefits(
+            birth_yr = input$birth_year,
+            sex = input$sex,
+            type = input$worker_type,
+            age_claim = input$claim_age,
+            factors = sef2025,
+            assumptions = reform_assumptions,
+            custom_avg_earnings = custom_avg,
+            spouse_type = spouse_type,
+            spouse_sex = spouse_sex,
+            spouse_birth_yr = spouse_birth_yr,
+            spouse_age_claim = spouse_claim_age,
+            spouse_custom_avg_earnings = spouse_custom,
+            debugg = TRUE
+          )
+          reform_data$scenario <- reform_state$reform_label()
+          reform_data$is_reform <- TRUE
+        }
+
+        list(
+          baseline = baseline,
+          reform = reform_data,
+          spouse = spouse_data,
+          has_spouse = input$add_spouse,
+          has_reforms = reform_state$has_reforms(),
+          reform_label = reform_state$reform_label(),
+          assumptions = tr2025,
+          reform_assumptions = reform_assumptions,
+          factors = sef2025
+        )
+
+      }, error = function(e) {
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+        return(NULL)
+      })
+    }, ignoreNULL = FALSE)
+
+    # Prepare chart data (combined baseline + reform)
+    chart_data <- reactive({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline <- data$baseline
+      assumptions <- data$assumptions
+      gdp_pi_2025 <- assumptions$gdp_pi[assumptions$year == 2025]
+
+      # Add GDP deflator for real calculations
+      if (!"gdp_pi" %in% names(baseline)) {
+        baseline <- baseline %>%
+          left_join(assumptions %>% select(year, gdp_pi), by = "year")
+      }
+
+      baseline <- baseline %>%
+        mutate(
+          annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
+          annual_nominal = annual_ind
+        )
+
+      # Add reform data if present
+      if (!is.null(data$reform)) {
+        reform <- data$reform
+        if (!"gdp_pi" %in% names(reform)) {
+          reform <- reform %>%
+            left_join(assumptions %>% select(year, gdp_pi), by = "year")
+        }
+        reform <- reform %>%
+          mutate(
+            annual_real = annual_ind * (gdp_pi_2025 / gdp_pi),
+            annual_nominal = annual_ind
+          )
+        baseline <- bind_rows(baseline, reform)
+      }
+
+      baseline
+    })
+
+    # Benefits by age chart
+    output$benefit_chart <- renderPlot({
+      data <- chart_data()
+      if (is.null(data)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see benefits",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      data_filtered <- data %>%
+        filter(annual_ind > 0 & age < death_age)
+
+      if (nrow(data_filtered) == 0) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "No benefits to display",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      y_var <- if (input$chart_type == "nominal") "annual_nominal" else "annual_real"
+      y_label <- if (input$chart_type == "nominal") "Annual Benefit ($)" else "Annual Benefit (2025 $)"
+
+      unique_scenarios <- unique(data_filtered$scenario)
+      show_legend <- length(unique_scenarios) > 1
+
+      p <- ggplot(data_filtered, aes(x = age, y = .data[[y_var]],
+                                      color = scenario, group = scenario)) +
+        geom_line(linewidth = 1.5) +
+        geom_point(size = 2.5, alpha = 0.8) +
+        scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0.02, 0.1))) +
+        scale_x_continuous(breaks = seq(60, 100, by = 5)) +
+        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                       setNames(CRFB_ORANGE, setdiff(unique_scenarios, "Baseline")))) +
+        labs(x = "Age", y = y_label, color = NULL) +
+        chart_theme +
+        theme(
+          legend.position = if (show_legend) "top" else "none",
+          legend.margin = margin(0, 0, 0, 0),
+          plot.margin = margin(10, 15, 10, 10)
+        )
+
+      p
+    })
+
+    # Calculate marginal data
+    marginal_data <- reactive({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline <- data$baseline
+      assumptions <- data$assumptions
+
+      tryCatch({
+        # Baseline marginal analysis
+        marginal <- marginal_benefit_analysis(baseline, assumptions)
+        nmtr <- net_marginal_tax_rate(baseline, assumptions,
+                                       include_employer = input$include_employer)
+        mirr <- marginal_irr(baseline, assumptions,
+                             include_employer = input$include_employer)
+
+        working_marginal <- marginal[marginal$age >= 21 & marginal$age <= 64, ]
+        working_nmtr <- nmtr[nmtr$age >= 21 & nmtr$age <= 64, ]
+        working_mirr <- mirr[mirr$age >= 21 & mirr$age <= 64, ]
+
+        mean_nmtr <- mean(working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
+        mean_mirr_top35 <- mean(working_mirr$marginal_irr[working_mirr$in_top_35 & working_mirr$marginal_irr > -1], na.rm = TRUE)
+        n_top_35 <- sum(working_marginal$in_top_35, na.rm = TRUE)
+
+        table_data <- data.frame(
+          age = working_marginal$age,
+          earnings = working_marginal$earnings,
+          in_top_35 = working_marginal$in_top_35,
+          indexed_rank = working_marginal$indexed_rank,
+          delta_pv_benefits = working_marginal$delta_pv_benefits,
+          net_marginal_tax_rate = working_nmtr$net_marginal_tax_rate,
+          marginal_irr = working_mirr$marginal_irr
+        )
+
+        result <- list(
+          mean_nmtr = mean_nmtr,
+          mean_mirr_top35 = mean_mirr_top35,
+          n_top_35 = n_top_35,
+          table_data = table_data,
+          working_nmtr = working_nmtr,
+          has_reforms = FALSE
+        )
+
+        # Calculate reform marginal if reforms are enabled
+        if (!is.null(data$reform) && !is.null(data$reform_assumptions)) {
+          reform <- data$reform
+          reform_assumptions <- data$reform_assumptions
+
+          reform_nmtr <- net_marginal_tax_rate(reform, reform_assumptions,
+                                                include_employer = input$include_employer)
+          reform_working_nmtr <- reform_nmtr[reform_nmtr$age >= 21 & reform_nmtr$age <= 64, ]
+          reform_mean_nmtr <- mean(reform_working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
+
+          result$reform_mean_nmtr <- reform_mean_nmtr
+          result$reform_working_nmtr <- reform_working_nmtr
+          result$reform_scenario <- data$reform_label
+          result$has_reforms <- TRUE
+        }
+
+        result
+      }, error = function(e) NULL)
+    })
+
+    # NMTR chart
+    output$nmtr_chart <- renderPlot({
+      mdata <- marginal_data()
+      if (is.null(mdata) || is.null(mdata$working_nmtr)) {
+        return(ggplot() +
+                 annotate("text", x = 0.5, y = 0.5,
+                          label = "Click Calculate to see marginal analysis",
+                          size = 5, color = DARK_MUTED) +
+                 theme_void() +
+                 theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
+      }
+
+      # If reforms enabled, show comparison line chart
+      if (mdata$has_reforms && !is.null(mdata$reform_working_nmtr)) {
+        baseline_nmtr <- mdata$table_data %>%
+          filter(!is.na(net_marginal_tax_rate)) %>%
+          mutate(
+            nmtr_pct = net_marginal_tax_rate * 100,
+            scenario = "Baseline"
+          ) %>%
+          select(age, nmtr_pct, scenario)
+
+        reform_nmtr <- data.frame(
+          age = mdata$reform_working_nmtr$age,
+          nmtr_pct = mdata$reform_working_nmtr$net_marginal_tax_rate * 100,
+          scenario = mdata$reform_scenario
+        )
+
+        combined <- bind_rows(baseline_nmtr, reform_nmtr) %>%
+          filter(!is.na(nmtr_pct))
+
+        if (nrow(combined) == 0) return(NULL)
+
+        p <- ggplot(combined, aes(x = age, y = nmtr_pct, color = scenario, linetype = scenario)) +
+          geom_line(linewidth = 1.5) +
+          geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
+          geom_hline(yintercept = 12.4, color = CRFB_RED, linewidth = 0.8, linetype = "dashed") +
+          scale_y_continuous(labels = function(x) paste0(x, "%")) +
+          scale_x_continuous(breaks = seq(25, 65, by = 5)) +
+          scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
+                                         setNames(CRFB_ORANGE, mdata$reform_scenario))) +
+          scale_linetype_manual(values = c("Baseline" = "solid",
+                                            setNames("dashed", mdata$reform_scenario))) +
+          labs(x = "Age", y = "Net Marginal Tax Rate", color = NULL, linetype = NULL) +
+          annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
+                   color = CRFB_RED, size = 3, hjust = 1) +
+          chart_theme +
+          theme(legend.position = "top")
+
+      } else {
+        # Standard bar chart (baseline only)
+        nmtr_data <- mdata$table_data %>%
+          filter(!is.na(net_marginal_tax_rate)) %>%
+          mutate(
+            nmtr_pct = net_marginal_tax_rate * 100,
+            nmtr_pct_display = pmax(pmin(nmtr_pct, 20), -50)
+          )
+
+        if (nrow(nmtr_data) == 0) return(NULL)
+
+        p <- ggplot(nmtr_data, aes(x = age, y = nmtr_pct_display)) +
+          geom_col(width = 0.8, alpha = 0.85, fill = CRFB_TEAL) +
+          geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
+          geom_hline(yintercept = 12.4, color = CRFB_RED, linewidth = 0.8, linetype = "dashed") +
+          scale_y_continuous(labels = function(x) paste0(x, "%"),
+                             limits = c(-50, 20), oob = scales::squish) +
+          scale_x_continuous(breaks = seq(25, 65, by = 5)) +
+          labs(x = "Age", y = "Net Marginal Tax Rate") +
+          annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
+                   color = CRFB_RED, size = 3, hjust = 1) +
+          chart_theme
+      }
+
+      p
+    })
+
+    # Metric: Monthly benefit at claim
+    output$metric_monthly <- renderUI({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline <- data$baseline
+      claim_age <- unique(baseline$claim_age)[1]
+      baseline_ben <- baseline$ben[baseline$age == claim_age][1]
+
+      if (data$has_reforms && !is.null(data$reform)) {
+        reform_ben <- data$reform$ben[data$reform$age == claim_age][1]
+        pct_change <- (reform_ben / baseline_ben - 1) * 100
+
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", paste0("Monthly at ", claim_age)),
+          tags$div(
+            tags$span(class = "text-muted", format_currency(baseline_ben)),
+            tags$span(" \u2192 "),
+            tags$strong(class = if (pct_change < 0) "text-danger" else "text-success",
+                        format_currency(reform_ben))
+          ),
+          tags$small(class = if (pct_change < 0) "text-danger" else "text-success",
+                     sprintf("%+.1f%%", pct_change))
+        )
+      } else {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", paste0("Monthly at ", claim_age)),
+          tags$strong(class = "text-info", format_currency(baseline_ben))
+        )
+      }
+    })
+
+    # Metric: PV Benefits
+    output$metric_pv_benefits <- renderUI({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline_pv <- tryCatch({
+        pv_lifetime_benefits(data$baseline, data$assumptions)$pv_benefits[1]
+      }, error = function(e) NA_real_)
+
+      if (data$has_reforms && !is.null(data$reform)) {
+        reform_pv <- tryCatch({
+          pv_lifetime_benefits(data$reform, data$reform_assumptions)$pv_benefits[1]
+        }, error = function(e) NA_real_)
+
+        pct_change <- if (!is.na(baseline_pv) && !is.na(reform_pv) && baseline_pv > 0) {
+          (reform_pv / baseline_pv - 1) * 100
+        } else NA_real_
+
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Benefits"),
+          tags$div(
+            tags$span(class = "text-muted", format_currency(baseline_pv / 1000, suffix = "K")),
+            tags$span(" \u2192 "),
+            tags$strong(class = if (!is.na(pct_change) && pct_change < 0) "text-danger" else "text-success",
+                        format_currency(reform_pv / 1000, suffix = "K"))
+          ),
+          if (!is.na(pct_change)) {
+            tags$small(class = if (pct_change < 0) "text-danger" else "text-success",
+                       sprintf("%+.1f%%", pct_change))
+          }
+        )
+      } else {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Benefits"),
+          tags$strong(class = "text-success", format_currency(baseline_pv / 1000, suffix = "K"))
+        )
+      }
+    })
+
+    # Metric: PV Taxes
+    output$metric_pv_taxes <- renderUI({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline_pv_tax <- tryCatch({
+        pv_lifetime_taxes(data$baseline, data$assumptions)$pv_taxes[1]
+      }, error = function(e) NA_real_)
+
+      if (data$has_reforms && !is.null(data$reform)) {
+        reform_pv_tax <- tryCatch({
+          pv_lifetime_taxes(data$reform, data$reform_assumptions)$pv_taxes[1]
+        }, error = function(e) NA_real_)
+
+        pct_change <- if (!is.na(baseline_pv_tax) && !is.na(reform_pv_tax) && baseline_pv_tax > 0) {
+          (reform_pv_tax / baseline_pv_tax - 1) * 100
+        } else NA_real_
+
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Taxes"),
+          tags$div(
+            tags$span(class = "text-muted", format_currency(baseline_pv_tax / 1000, suffix = "K")),
+            tags$span(" \u2192 "),
+            tags$strong(class = "text-warning",
+                        format_currency(reform_pv_tax / 1000, suffix = "K"))
+          ),
+          if (!is.na(pct_change) && abs(pct_change) > 0.01) {
+            tags$small(class = "text-warning", sprintf("%+.1f%%", pct_change))
+          }
+        )
+      } else {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Taxes"),
+          tags$strong(class = "text-warning", format_currency(baseline_pv_tax / 1000, suffix = "K"))
+        )
+      }
+    })
+
+    # Metric: Benefit-Tax Ratio
+    output$metric_ratio <- renderUI({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline_pv <- tryCatch({
+        pv_lifetime_benefits(data$baseline, data$assumptions)$pv_benefits[1]
+      }, error = function(e) NA_real_)
+
+      baseline_pv_tax <- tryCatch({
+        pv_lifetime_taxes(data$baseline, data$assumptions)$pv_taxes[1]
+      }, error = function(e) NA_real_)
+
+      baseline_ratio <- if (!is.na(baseline_pv) && !is.na(baseline_pv_tax) && baseline_pv_tax > 0) {
+        baseline_pv / baseline_pv_tax
+      } else NA_real_
+
+      if (data$has_reforms && !is.null(data$reform)) {
+        reform_pv <- tryCatch({
+          pv_lifetime_benefits(data$reform, data$reform_assumptions)$pv_benefits[1]
+        }, error = function(e) NA_real_)
+
+        reform_pv_tax <- tryCatch({
+          pv_lifetime_taxes(data$reform, data$reform_assumptions)$pv_taxes[1]
+        }, error = function(e) NA_real_)
+
+        reform_ratio <- if (!is.na(reform_pv) && !is.na(reform_pv_tax) && reform_pv_tax > 0) {
+          reform_pv / reform_pv_tax
+        } else NA_real_
+
+        pct_change <- if (!is.na(baseline_ratio) && !is.na(reform_ratio) && baseline_ratio > 0) {
+          (reform_ratio / baseline_ratio - 1) * 100
+        } else NA_real_
+
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Benefit/Tax Ratio"),
+          tags$div(
+            tags$span(class = "text-muted", sprintf("%.2f", baseline_ratio)),
+            tags$span(" \u2192 "),
+            tags$strong(class = if (!is.na(reform_ratio) && reform_ratio >= 1) "text-success" else "text-danger",
+                        sprintf("%.2f", reform_ratio))
+          ),
+          if (!is.na(pct_change)) {
+            tags$small(class = if (pct_change < 0) "text-danger" else "text-success",
+                       sprintf("%+.1f%%", pct_change))
+          }
+        )
+      } else {
+        ratio_color <- if (!is.na(baseline_ratio) && baseline_ratio >= 1) "text-success" else "text-danger"
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Benefit/Tax Ratio"),
+          tags$strong(class = ratio_color,
+                      if (!is.na(baseline_ratio)) sprintf("%.2f", baseline_ratio) else "N/A")
+        )
+      }
+    })
+
+    # Metric: Mean NMTR
+    output$metric_mean_nmtr <- renderUI({
+      mdata <- marginal_data()
+      if (is.null(mdata)) return(NULL)
+
+      if (mdata$has_reforms && !is.na(mdata$reform_mean_nmtr)) {
+        baseline_color <- if (!is.na(mdata$mean_nmtr) && mdata$mean_nmtr < 0.062) "text-success" else "text-warning"
+        reform_color <- if (!is.na(mdata$reform_mean_nmtr) && mdata$reform_mean_nmtr < 0.062) "text-success" else "text-warning"
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Mean NMTR"),
+          tags$div(
+            tags$span(class = "text-muted",
+                      if (!is.na(mdata$mean_nmtr)) sprintf("%.1f%%", mdata$mean_nmtr * 100) else "N/A"),
+            tags$span(" \u2192 "),
+            tags$strong(class = reform_color,
+                        if (!is.na(mdata$reform_mean_nmtr)) sprintf("%.1f%%", mdata$reform_mean_nmtr * 100) else "N/A")
+          )
+        )
+      } else {
+        nmtr_color <- if (!is.na(mdata$mean_nmtr) && mdata$mean_nmtr < 0.062) "text-success" else "text-warning"
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Mean NMTR"),
+          tags$strong(class = nmtr_color,
+                      if (!is.na(mdata$mean_nmtr)) sprintf("%.1f%%", mdata$mean_nmtr * 100) else "N/A")
+        )
+      }
+    })
+
+    # Metric: IRR
+    output$metric_irr <- renderUI({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
+
+      baseline_irr <- tryCatch({
+        internal_rate_of_return(data$baseline, data$assumptions,
+                                include_employer = input$include_employer)$irr[1]
+      }, error = function(e) NA_real_)
+
+      tags$div(
+        class = "text-center p-2 rounded", style = "background: #1f3460;",
+        tags$small(class = "text-muted d-block", "Internal Rate of Return"),
+        tags$strong(class = "text-success",
+                    if (!is.na(baseline_irr)) sprintf("%.1f%%", baseline_irr * 100) else "N/A")
+      )
+    })
+
+    # Metric: Years in Top 35
+    output$metric_years_top35 <- renderUI({
+      mdata <- marginal_data()
+      if (is.null(mdata)) return(NULL)
+
+      tags$div(
+        class = "text-center p-2 rounded", style = "background: #1f3460;",
+        tags$small(class = "text-muted d-block", "Years in Top 35"),
+        tags$strong(class = "text-info", mdata$n_top_35)
+      )
+    })
+
+    # Benefits data table
+    output$benefits_table <- renderDT({
+      data <- chart_data()
+      if (is.null(data)) return(NULL)
+
+      table_data <- data %>%
+        filter(annual_ind > 0 & age < death_age) %>%
+        mutate(
+          bc_display = if ("bc" %in% names(.)) BC_LABELS[bc] else "Retired Worker",
+          annual_nominal = round(annual_nominal, 0),
+          annual_real = round(annual_real, 0)
+        ) %>%
+        select(scenario, year, age, bc_display, annual_nominal, annual_real) %>%
+        rename(
+          Scenario = scenario, Year = year, Age = age, Class = bc_display,
+          Nominal = annual_nominal, `Real 2025` = annual_real
+        )
+
+      datatable(table_data,
+                options = list(pageLength = 10, scrollX = TRUE, dom = 'tip'),
+                rownames = FALSE, class = "compact"
+      ) %>%
+        formatCurrency(c("Nominal", "Real 2025"), currency = "$", digits = 0)
+    })
+
+    # Marginal data table
+    output$marginal_table <- renderDT({
+      mdata <- marginal_data()
+      if (is.null(mdata) || is.null(mdata$table_data)) return(NULL)
+
+      df <- mdata$table_data %>%
+        mutate(
+          earnings = round(earnings, 0),
+          delta_pv_benefits = round(delta_pv_benefits, 0),
+          net_marginal_tax_rate = round(net_marginal_tax_rate * 100, 1),
+          marginal_irr = ifelse(marginal_irr == -1, NA, round(marginal_irr * 100, 1))
+        ) %>%
+        rename(
+          Age = age, Earnings = earnings, `Top 35` = in_top_35, Rank = indexed_rank,
+          `Delta PV` = delta_pv_benefits, `NMTR %` = net_marginal_tax_rate, `Marg IRR %` = marginal_irr
+        )
+
+      datatable(df,
+                options = list(pageLength = 10, dom = 'tip', scrollX = TRUE),
+                rownames = FALSE, class = "compact"
+      ) %>%
+        formatCurrency("Earnings", currency = "$", digits = 0) %>%
+        formatCurrency("Delta PV", currency = "$", digits = 0)
+    })
+
+    # Download handlers
+    output$download_benefits <- downloadHandler(
+      filename = function() paste0("individual_benefits_", Sys.Date(), ".csv"),
+      content = function(file) {
+        data <- chart_data()
+        if (!is.null(data)) {
+          export_data <- data %>%
+            filter(annual_ind > 0 & age < death_age) %>%
+            select(scenario, year, age, annual_nominal, annual_real)
+          write.csv(export_data, file, row.names = FALSE)
+        }
+      }
+    )
+
+    output$download_marginal <- downloadHandler(
+      filename = function() paste0("individual_marginal_", Sys.Date(), ".csv"),
+      content = function(file) {
+        mdata <- marginal_data()
+        if (!is.null(mdata) && !is.null(mdata$table_data)) {
+          write.csv(mdata$table_data, file, row.names = FALSE)
+        }
+      }
+    )
+
+  })
+}
