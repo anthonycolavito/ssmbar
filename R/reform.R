@@ -664,3 +664,177 @@ reform_benefit_cut <- function(cut_pct, effective_year, phase_in_years = 0) {
     phase_in_years = phase_in_years
   )
 }
+
+
+# -----------------------------------------------------------------------------
+# 8. Mutual Exclusivity
+# -----------------------------------------------------------------------------
+
+#' Mutual Exclusivity Groups for Reforms
+#'
+#' Defines groups of reforms that are mutually exclusive (cannot be combined).
+#' Each group represents reforms that modify the same underlying parameters
+#' in conflicting ways.
+#'
+#' @format A named list where each element is a character vector of reform names
+#'   that are mutually exclusive with each other.
+#'
+#' @details
+#' The following groups are mutually exclusive:
+#' \itemize{
+#'   \item \strong{PIA Formula (#2-4)}: Flat Benefit, Simpson-Bowles, Reduce fact3
+#'   \item \strong{NRA (#5-7)}: NRA to 68, Index NRA, NRA to 69 then Index
+#'   \item \strong{COLA Index (#8-10)}: Chained CPI, COLA Cap, CPI-E
+#'   \item \strong{Taxmax (#12-14)}: Taxmax 90%, Eliminate with Credit, Eliminate without Credit
+#' }
+#'
+#' @export
+REFORM_EXCLUSIVITY_GROUPS <- list(
+  pia_formula = c(
+    "Flat Benefit",         # matches "Flat Benefit Floor"
+    "Simpson-Bowles",       # matches "Simpson-Bowles 4-Bracket PIA"
+    "Modify Benefit Formula" # reform_reduce_fact3 uses reform_benefit_formula
+  ),
+  nra = c(
+    "Raise NRA to 68",
+    "Index NRA to Longevity",
+    "Raise NRA to 69"       # matches "Raise NRA to 69, Then Index"
+  ),
+  cola_index = c(
+    "Index COLAs to Chained CPI",
+    "Cap COLAs at Median PIA",
+    "Index COLAs to CPI-E"
+  ),
+  taxmax = c(
+    "Raise Taxmax to 90% Coverage",  # matches "Raise Taxmax to 90% Coverage with 5% Credit"
+    "Eliminate Taxmax with 15% Credit",
+    "Eliminate Taxmax without Credit"
+  )
+)
+
+
+#' Check if Reforms are Mutually Exclusive
+#'
+#' Checks if a list of reforms contains any mutually exclusive combinations
+#' and returns information about conflicts.
+#'
+#' @param reforms A list of Reform objects to check
+#'
+#' @return A list with:
+#'   \itemize{
+#'     \item \code{valid}: Logical, TRUE if no conflicts found
+#'     \item \code{conflicts}: Character vector describing any conflicts found
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' reform1 <- reform_nra_to_68(effective_year = 2030)
+#' reform2 <- reform_index_nra(effective_year = 2030)
+#' result <- check_reform_exclusivity(list(reform1, reform2))
+#' # result$valid = FALSE (both modify NRA)
+#' }
+#'
+#' @export
+check_reform_exclusivity <- function(reforms) {
+  if (!is.list(reforms)) {
+    stop("'reforms' must be a list of Reform objects")
+  }
+
+  # Get reform names
+  reform_names <- sapply(reforms, function(r) {
+    if (!inherits(r, "Reform")) {
+      stop("All elements of 'reforms' must be Reform objects")
+    }
+    r$name
+  })
+
+  conflicts <- character(0)
+
+  # Check each exclusivity group
+  for (group_name in names(REFORM_EXCLUSIVITY_GROUPS)) {
+    group_reforms <- REFORM_EXCLUSIVITY_GROUPS[[group_name]]
+
+    # Find which reforms from this group are in the list
+    matches <- reform_names[sapply(reform_names, function(name) {
+      any(sapply(group_reforms, function(pattern) grepl(pattern, name, fixed = TRUE)))
+    })]
+
+    if (length(matches) > 1) {
+      conflicts <- c(conflicts, sprintf(
+        "Mutually exclusive %s reforms: %s",
+        group_name,
+        paste(matches, collapse = " + ")
+      ))
+    }
+  }
+
+  list(
+    valid = length(conflicts) == 0,
+    conflicts = conflicts
+  )
+}
+
+
+#' Apply Multiple Reforms to Assumptions
+#'
+#' Applies a list of reforms to assumptions, checking for mutual exclusivity
+#' conflicts. Reforms are applied in order.
+#'
+#' @param assumptions Data frame of Social Security assumptions (e.g., tr2025)
+#' @param reforms A list of Reform objects to apply
+#' @param check_exclusivity Logical, whether to check for mutual exclusivity
+#'   conflicts. Default is TRUE.
+#'
+#' @return Modified assumptions data frame with all reforms applied
+#'
+#' @details
+#' When \code{check_exclusivity = TRUE} (default), the function will stop with
+#' an error if any mutually exclusive reforms are detected. The mutual
+#' exclusivity groups are:
+#' \itemize{
+#'   \item PIA Formula reforms (#2-4)
+#'   \item NRA reforms (#5-7)
+#'   \item COLA Index reforms (#8-10)
+#'   \item Taxmax reforms (#12-14)
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' reforms <- list(
+#'   reform_reduce_benefits(multiplier = 0.95, effective_year = 2030),
+#'   reform_chained_cpi(effective_year = 2030),
+#'   reform_nra_to_68(effective_year = 2030)
+#' )
+#' reformed <- apply_reforms(tr2025, reforms)
+#' }
+#'
+#' @export
+apply_reforms <- function(assumptions, reforms, check_exclusivity = TRUE) {
+  if (!is.list(reforms)) {
+    stop("'reforms' must be a list of Reform objects")
+  }
+
+  if (length(reforms) == 0) {
+    return(assumptions)
+  }
+
+  # Check for mutual exclusivity if requested
+  if (check_exclusivity) {
+    exclusivity_check <- check_reform_exclusivity(reforms)
+    if (!exclusivity_check$valid) {
+      stop(paste(
+        "Cannot apply reforms due to mutual exclusivity conflicts:\n",
+        paste("  -", exclusivity_check$conflicts, collapse = "\n"),
+        "\nUse check_exclusivity = FALSE to override (not recommended)."
+      ))
+    }
+  }
+
+  # Apply reforms in order
+  result <- assumptions
+  for (reform in reforms) {
+    result <- apply_reform(result, reform)
+  }
+
+  result
+}

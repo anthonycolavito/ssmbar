@@ -381,3 +381,90 @@ test_that("apply_reform() works with RET repeal", {
   post_reform <- reformed[reformed$year >= 2030, "ret_enabled"]
   expect_true(all(post_reform == FALSE))
 })
+
+
+# -----------------------------------------------------------------------------
+# Test Mutual Exclusivity Enforcement
+# -----------------------------------------------------------------------------
+
+test_that("check_reform_exclusivity() detects NRA conflicts", {
+  reform1 <- reform_nra_to_68(effective_year = 2030)
+  reform2 <- reform_index_nra(effective_year = 2030)
+
+  result <- check_reform_exclusivity(list(reform1, reform2))
+  expect_false(result$valid)
+  expect_length(result$conflicts, 1)
+  expect_match(result$conflicts[1], "nra")
+})
+
+test_that("check_reform_exclusivity() detects COLA index conflicts", {
+  reform1 <- reform_chained_cpi(effective_year = 2030)
+  reform2 <- reform_cpi_e(effective_year = 2030)
+
+  result <- check_reform_exclusivity(list(reform1, reform2))
+  expect_false(result$valid)
+  expect_match(result$conflicts[1], "cola_index")
+})
+
+test_that("check_reform_exclusivity() detects taxmax conflicts", {
+  reform1 <- reform_taxmax_90_pct(effective_year = 2030)
+  reform2 <- reform_eliminate_taxmax(effective_year = 2030)
+
+  result <- check_reform_exclusivity(list(reform1, reform2))
+  expect_false(result$valid)
+  expect_match(result$conflicts[1], "taxmax")
+})
+
+test_that("check_reform_exclusivity() allows non-conflicting reforms", {
+  reform1 <- reform_nra_to_68(effective_year = 2030)
+  reform2 <- reform_chained_cpi(effective_year = 2030)
+  reform3 <- reform_reduce_benefits(multiplier = 0.95, effective_year = 2030)
+
+  result <- check_reform_exclusivity(list(reform1, reform2, reform3))
+  expect_true(result$valid)
+  expect_length(result$conflicts, 0)
+})
+
+test_that("apply_reforms() errors on conflicting reforms", {
+  skip_if_not_installed("ssmbar")
+  data(tr2025, package = "ssmbar")
+
+  reform1 <- reform_nra_to_68(effective_year = 2030)
+  reform2 <- reform_nra_to_69_index(effective_year = 2030)
+
+  expect_error(
+    apply_reforms(tr2025, list(reform1, reform2)),
+    "mutual exclusivity"
+  )
+})
+
+test_that("apply_reforms() can bypass exclusivity check", {
+  skip_if_not_installed("ssmbar")
+  data(tr2025, package = "ssmbar")
+
+  reform1 <- reform_nra_to_68(effective_year = 2030)
+  reform2 <- reform_index_nra(effective_year = 2030)
+
+  # Should not error when check_exclusivity = FALSE
+  expect_no_error(
+    apply_reforms(tr2025, list(reform1, reform2), check_exclusivity = FALSE)
+  )
+})
+
+test_that("apply_reforms() works with valid combinations", {
+  skip_if_not_installed("ssmbar")
+  data(tr2025, package = "ssmbar")
+
+  reforms <- list(
+    reform_reduce_benefits(multiplier = 0.95, effective_year = 2030),
+    reform_nra_to_68(effective_year = 2030),
+    reform_chained_cpi(effective_year = 2030),
+    reform_change_tax_rate(rate_change = 1.0, effective_year = 2030)
+  )
+
+  reformed <- apply_reforms(tr2025, reforms)
+  expect_s3_class(reformed, "data.frame")
+
+  # Verify each reform took effect
+  expect_equal(reformed[reformed$year == 2035, "pia_multiplier"], 0.95)
+})
