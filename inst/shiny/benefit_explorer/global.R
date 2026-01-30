@@ -135,10 +135,138 @@ format_percent <- function(x, digits = 1) {
 paste0(format(round(x * 100, digits), nsmall = digits), "%")
 }
 
+# =============================================================================
+# Reform Configuration
+# =============================================================================
+
+# Available reforms organized by category
+# Each reform is a function that creates a Reform object
+AVAILABLE_REFORMS <- list(
+  "Benefit Changes" = list(
+    "5% Benefit Cut" = list(
+      fn = function() reform_reduce_benefits(0.95, 2030),
+      desc = "Reduce all benefits by 5%"
+    ),
+    "10% Benefit Cut" = list(
+      fn = function() reform_reduce_benefits(0.90, 2030),
+      desc = "Reduce all benefits by 10%"
+    )
+  ),
+  "NRA Changes" = list(
+    "Raise NRA to 68" = list(
+      fn = function() reform_nra_to_68(2030),
+      desc = "Gradually raise Normal Retirement Age to 68",
+      group = "nra"
+    ),
+    "Index NRA to Longevity" = list(
+      fn = function() reform_index_nra(2030),
+      desc = "Index NRA to life expectancy (no cap)",
+      group = "nra"
+    ),
+    "NRA to 69, then Index" = list(
+      fn = function() reform_nra_to_69_index(2030),
+      desc = "Raise to 69, then index to longevity",
+      group = "nra"
+    )
+  ),
+  "COLA Indexing" = list(
+    "Chained CPI" = list(
+      fn = function() reform_chained_cpi(2030),
+      desc = "Index COLAs to Chained CPI (-0.3pp)",
+      group = "cola"
+    ),
+    "Cap COLAs at Median" = list(
+      fn = function() reform_cola_cap(2030),
+      desc = "Cap dollar COLA increase at median PIA",
+      group = "cola"
+    ),
+    "CPI-E (Higher)" = list(
+      fn = function() reform_cpi_e(2030),
+      desc = "Index COLAs to CPI-E (+0.2pp)",
+      group = "cola"
+    )
+  ),
+  "Tax Max Changes" = list(
+    "90% Coverage + 5% Credit" = list(
+      fn = function() reform_taxmax_90_pct(2030),
+      desc = "Raise taxmax to cover 90% of earnings",
+      group = "taxmax"
+    ),
+    "Eliminate + 15% Credit" = list(
+      fn = function() reform_eliminate_taxmax(2030),
+      desc = "Eliminate taxmax with 15% benefit credit",
+      group = "taxmax"
+    ),
+    "Eliminate, No Credit" = list(
+      fn = function() reform_eliminate_taxmax_no_credit(2030),
+      desc = "Eliminate taxmax for taxes only",
+      group = "taxmax"
+    )
+  ),
+  "Other Reforms" = list(
+    "40-Year Averaging" = list(
+      fn = function() reform_40_year_averaging(2030),
+      desc = "Phase out dropout years (35 to 40 year average)"
+    ),
+    "Repeal RET" = list(
+      fn = function() reform_repeal_ret(2030),
+      desc = "Repeal the Retirement Earnings Test"
+    ),
+    "Phase Out Spousal" = list(
+      fn = function() reform_phase_out_spousal(2030),
+      desc = "Phase out spousal benefits over 10 years"
+    ),
+    "Basic Minimum Benefit" = list(
+      fn = function() reform_basic_minimum(900, 1342, 2030),
+      desc = "Add minimum benefit floor ($900/$1,342)"
+    )
+  )
+)
+
+# Flatten reform list for easy lookup
+REFORM_LOOKUP <- list()
+for (category in names(AVAILABLE_REFORMS)) {
+  for (reform_name in names(AVAILABLE_REFORMS[[category]])) {
+    REFORM_LOOKUP[[reform_name]] <- AVAILABLE_REFORMS[[category]][[reform_name]]
+  }
+}
+
+# Get all reform names as choices for UI
+get_reform_choices <- function() {
+  choices <- list()
+  for (category in names(AVAILABLE_REFORMS)) {
+    choices[[category]] <- names(AVAILABLE_REFORMS[[category]])
+  }
+  choices
+}
+
+# Check for mutual exclusivity conflicts
+check_ui_exclusivity <- function(selected_reforms) {
+  groups <- list(
+    nra = c("Raise NRA to 68", "Index NRA to Longevity", "NRA to 69, then Index"),
+    cola = c("Chained CPI", "Cap COLAs at Median", "CPI-E (Higher)"),
+    taxmax = c("90% Coverage + 5% Credit", "Eliminate + 15% Credit", "Eliminate, No Credit")
+  )
+
+  conflicts <- list()
+  for (group_name in names(groups)) {
+    group_reforms <- groups[[group_name]]
+    selected_in_group <- intersect(selected_reforms, group_reforms)
+    if (length(selected_in_group) > 1) {
+      conflicts[[group_name]] <- selected_in_group
+    }
+  }
+  conflicts
+}
+
+# =============================================================================
 # Load Shiny modules
+# =============================================================================
+
 source("modules/mod_worker_input.R")
 source("modules/mod_benefits.R")
 source("modules/mod_replacement.R")
 source("modules/mod_lifetime.R")
 source("modules/mod_ratios.R")
 source("modules/mod_marginal.R")
+source("modules/mod_reform_summary.R")

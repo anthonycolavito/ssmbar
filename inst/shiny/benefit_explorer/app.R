@@ -53,6 +53,12 @@ ui <- page_navbar(
     marginal_ui("marginal")
   ),
 
+  nav_panel(
+    title = "Reform Summary",
+    icon = icon("balance-scale"),
+    reform_summary_ui("reform_summary")
+  ),
+
   # Footer with package info
   nav_spacer(),
   nav_item(
@@ -78,6 +84,7 @@ server <- function(input, output, session) {
   lifetime_server("lifetime", worker_data)
   ratios_server("ratios", worker_data)
   marginal_server("marginal", worker_data)
+  reform_summary_server("reform_summary", worker_data)
 
 }
 
