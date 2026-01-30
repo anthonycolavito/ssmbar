@@ -61,6 +61,32 @@ join_all_assumptions <- function(worker, assumptions) {
 
 
 # =============================================================================
+# SECTION 0.5: Rounding Helper
+# =============================================================================
+# Per 42 USC 415(a)(2)(C) and 415(i)(2)(A)(ii), PIA and COLA-adjusted amounts
+# are rounded to the next lower multiple of $0.10 (dime). This helper function
+# applies consistent dime rounding across all benefit calculations.
+
+#' Floor to Next Lower Dime
+#'
+#' Rounds a dollar amount down to the next lower multiple of $0.10, per
+#' 42 USC 415(a)(2)(C) (PIA rounding) and 42 USC 415(i)(2)(A)(ii) (COLA rounding).
+#'
+#' @param x Numeric value(s) representing dollar amounts
+#'
+#' @return Numeric value(s) rounded down to the nearest $0.10
+#'
+#' @examples
+#' floor_dime(1234.56)  # Returns 1234.50
+#' floor_dime(1234.99)  # Returns 1234.90
+#'
+#' @keywords internal
+floor_dime <- function(x) {
+  floor(x * 10) / 10
+}
+
+
+# =============================================================================
 # SECTION 1: Actuarial Adjustment Helper
 # =============================================================================
 # This helper function is used by worker_benefit(), spouse_benefit(), and ret()
@@ -275,8 +301,9 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       fact1_elig = fact1[which(age == first(elig_age))], # First replacement factor (90%)
       fact2_elig = fact2[which(age == first(elig_age))], # Second replacement factor (32%)
       fact3_elig = fact3[which(age == first(elig_age))], # Third replacement factor (15%)
+      # PIA per 42 USC 415(a)(2)(C): round to next lower $0.10
       basic_pia = case_when(
-      age >= elig_age ~ floor(case_when( # PIA Calculation -- only occurs in and after a worker's eligibility age
+      age >= elig_age ~ floor_dime(case_when( # PIA Calculation -- only occurs in and after a worker's eligibility age
                         aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
                         aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
                         TRUE ~ fact1_elig * aime
@@ -379,7 +406,8 @@ cola <- function (worker, assumptions, debugg = FALSE) {
           cola_basic_pia_vals[i] <- basic_pia[i]
         } else {
           # After eligibility: multiply previous year's rounded PIA by current COLA factor
-          cola_basic_pia_vals[i] <- floor(cola_basic_pia_vals[i-1] * cola_factor[i])
+          # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
+          cola_basic_pia_vals[i] <- floor_dime(cola_basic_pia_vals[i-1] * cola_factor[i])
         }
       }
 
