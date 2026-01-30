@@ -51,11 +51,11 @@ marginal_ui <- function(id) {
         card_body(
           class = "p-2",
           tags$small(
-            tags$strong("NMTR:"), " Net Marginal Tax Rate = (Tax - PV Marginal Benefits) / Earnings.", tags$br(),
-            tags$strong("12.4%:"), " No benefit accrual (years outside top 35).", tags$br(),
+            tags$strong("NMTR:"), " Net Marginal Tax Rate = (Tax - Delta PV Benefits) / Earnings.", tags$br(),
+            tags$strong("Delta PV:"), " Change in PV of lifetime benefits from working that year.", tags$br(),
+            tags$strong("12.4%:"), " No benefit accrual (years 1-9 before eligibility, or outside top 35).", tags$br(),
             tags$strong("Near 0%:"), " Benefits roughly offset taxes.", tags$br(),
-            tags$strong("Negative:"), " Benefits exceed taxes (subsidy for low earners).", tags$br(),
-            tags$strong("PIA Bracket:"), " Marginal rate in PIA formula (90%, 32%, or 15%)."
+            tags$strong("Negative:"), " Benefits exceed taxes (large negative at year 10 = eligibility transition)."
           )
         )
       )
@@ -96,10 +96,10 @@ marginal_server <- function(id, worker_data) {
         working_nmtr <- nmtr[nmtr$age >= 21 & nmtr$age <= 64, ]
         working_mirr <- mirr[mirr$age >= 21 & mirr$age <= 64, ]
 
-        pia_rate <- unique(working_marginal$marginal_pia_rate[!is.na(working_marginal$marginal_pia_rate)])
         mean_nmtr <- mean(working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
-        mean_mirr_top35 <- mean(working_mirr$marginal_irr[working_mirr$in_top_35], na.rm = TRUE)
+        mean_mirr_top35 <- mean(working_mirr$marginal_irr[working_mirr$in_top_35 & working_mirr$marginal_irr > -1], na.rm = TRUE)
         n_top_35 <- sum(working_marginal$in_top_35, na.rm = TRUE)
+        eligibility_year <- min(working_marginal$age[working_marginal$eligible], na.rm = TRUE)
 
         table_data <- data.frame(
           age = working_marginal$age,
@@ -112,7 +112,7 @@ marginal_server <- function(id, worker_data) {
         )
 
         result <- list(
-          marginal_pia_rate = pia_rate[1],
+          eligibility_age = eligibility_year,
           mean_nmtr = mean_nmtr,
           mean_mirr_top35 = mean_mirr_top35,
           n_top_35 = n_top_35,
@@ -134,10 +134,8 @@ marginal_server <- function(id, worker_data) {
           reform_working_nmtr <- reform_nmtr[reform_nmtr$age >= 21 & reform_nmtr$age <= 64, ]
 
           reform_mean_nmtr <- mean(reform_working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
-          reform_pia_rate <- unique(reform_working_marginal$marginal_pia_rate[!is.na(reform_working_marginal$marginal_pia_rate)])
 
           result$reform_mean_nmtr <- reform_mean_nmtr
-          result$reform_pia_rate <- reform_pia_rate[1]
           result$reform_working_nmtr <- reform_working_nmtr
           result$reform_scenario <- unique(reform$scenario)[1]
           result$has_reforms <- TRUE
@@ -236,11 +234,11 @@ marginal_server <- function(id, worker_data) {
           tags$strong(class = "text-warning", mdata$reform_scenario)
         )
       } else {
-        bracket <- if (!is.na(mdata$marginal_pia_rate)) sprintf("%.0f%%", mdata$marginal_pia_rate * 100) else "N/A"
+        elig_age <- if (!is.na(mdata$eligibility_age) && is.finite(mdata$eligibility_age)) mdata$eligibility_age else "N/A"
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "PIA Bracket"),
-          tags$strong(class = "text-info", bracket)
+          tags$small(class = "text-muted d-block", "Eligible at Age"),
+          tags$strong(class = "text-info", elig_age)
         )
       }
     })
@@ -305,13 +303,13 @@ marginal_server <- function(id, worker_data) {
       df <- mdata$table_data %>%
         mutate(
           earnings = round(earnings, 0),
-          delta_pv_benefits = round(delta_pv_benefits * 100, 2),
+          delta_pv_benefits = round(delta_pv_benefits, 0),
           net_marginal_tax_rate = round(net_marginal_tax_rate * 100, 1),
           marginal_irr = ifelse(marginal_irr == -1, NA, round(marginal_irr * 100, 1))
         ) %>%
         rename(
           Age = age, Earnings = earnings, `Top 35` = in_top_35, Rank = indexed_rank,
-          `Delta PV %` = delta_pv_benefits, `NMTR %` = net_marginal_tax_rate, `Marg IRR %` = marginal_irr
+          `Delta PV` = delta_pv_benefits, `NMTR %` = net_marginal_tax_rate, `Marg IRR %` = marginal_irr
         )
 
       datatable(df,
@@ -319,6 +317,7 @@ marginal_server <- function(id, worker_data) {
         rownames = FALSE, class = "compact"
       ) %>%
         formatCurrency("Earnings", currency = "$", digits = 0) %>%
+        formatCurrency("Delta PV", currency = "$", digits = 0) %>%
         formatStyle("Top 35", backgroundColor = styleEqual(c(TRUE, FALSE), c("#2d5a3d", "#5a2d2d")))
     })
   })
