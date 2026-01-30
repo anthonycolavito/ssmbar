@@ -74,7 +74,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Verification**:
 - [x] Tests pass (452 total: 0 failures, 1 warning, 2 skipped empty tests)
-- [ ] Validation scripts pass (pending V.C7 comparison)
+- [x] Validation scripts pass (V.C7 comparison: 1.36% avg difference, see Validation History)
 - [ ] Manual inspection complete (pending)
 
 **Commits**:
@@ -142,11 +142,33 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Documentation Flags
 
-*SUGGESTED comments awaiting user verification.*
+*SUGGESTED comments and documentation issues awaiting user verification.*
 
-| File | Line | Suggested Comment | Verified |
-|------|------|-------------------|----------|
-| [File] | [~Line] | [Comment text] | ☐ |
+### High Priority
+
+| File | Function/Location | Issue | Verified |
+|------|-------------------|-------|----------|
+| analytic_functions.R | `rep_rates()` | Missing roxygen2 documentation header entirely | ☐ |
+| survivor.R | `widow_benefit()` lines 334-354 | Unresolved TODO block - add POMS RS 00615.301 citations for widow reduction factors | ☐ |
+| benefit_calculations.R | `family_maximum()` | Missing @examples section | ☐ |
+
+### Medium Priority
+
+| File | Function/Location | Issue | Verified |
+|------|-------------------|-------|----------|
+| child.R | `child_pia()` | Missing @examples section | ☐ |
+| child.R | `child_benefit()` | Missing @examples section | ☐ |
+| survivor.R | `widow_benefit()` line 276 | Verify w_rf formula (0.285 constant = 28.5% max reduction) against POMS RS 00615.301 | ☐ |
+| earnings.R | line 309 | TODO: Add citation to Trustees Report methodology for scaled earnings factors | ☐ |
+
+### Low Priority
+
+| File | Function/Location | Issue | Verified |
+|------|-------------------|-------|----------|
+| assumptions_prep.R | line 21 | TODO: Add specific handbook section citations for parameter projection formulas | ☐ |
+| earnings.R | line 252 | TODO: Document how sex affects benefit calculations (life expectancy lookup) | ☐ |
+| spousal.R | line 52 | TODO: Explain custom earnings parsing regex pattern | ☐ |
+| data.R | tr2025 | Verify le_m and le_f data source citations | ☐ |
 
 ---
 
@@ -285,6 +307,40 @@ This stems from cumulative small rounding differences in `scaled_factor × AWI` 
 - `validate_all_workers_deflated.R` — Proper validation with CPI-W deflation
 - `trace_medium_earner.R` — Detailed calculation trace
 - `compare_table4_earnings.R` — Earnings comparison with Actuarial Note
+- `validate_vc7_2025.R` — V.C7 validation for birth years 1960-1970
+
+### Table V.C7 Re-Validation After Rounding Changes (January 29, 2026)
+
+After implementing child benefits and family maximum (which included rounding fixes throughout the pipeline), V.C7 validation was re-run for birth years 1960-1970.
+
+**Updated Results (Birth Years 1960-1970, Turning 65 in 2025-2035)**:
+
+| Worker Type | Avg % Diff | Min %   | Max %  |
+|-------------|-----------|---------|--------|
+| medium      | **0.06%** | -0.14%  | 0.87%  |
+| low         | 1.19%     | 0.86%   | 2.85%  |
+| max         | 1.42%     | 1.09%   | 3.24%  |
+| high        | 1.96%     | 1.53%   | 4.26%  |
+| very_low    | 2.06%     | 1.54%   | 4.42%  |
+
+**Overall: 1.36% average difference**
+
+**Comparison to Previous Validation**:
+
+| Worker Type | Previous  | Current   | Improvement |
+|-------------|-----------|-----------|-------------|
+| very_low    | 3.47%     | 2.06%     | -1.41%      |
+| low         | 2.26%     | 1.19%     | -1.07%      |
+| medium      | 0.73%     | **0.06%** | -0.67%      |
+| high        | 3.42%     | 1.96%     | -1.46%      |
+| max         | 2.66%     | 1.42%     | -1.24%      |
+| **Overall** | **2.51%** | **1.36%** | **-1.15%**  |
+
+**Key Observations**:
+1. Medium earner now nearly perfect at 0.06% average difference
+2. Overall accuracy improved by ~46% (from 2.51% to 1.36%)
+3. All worker types now under 2.1% average difference
+4. Year 2025 (birth year 1960) consistently shows larger differences (~4%) across worker types, likely due to CPI-W base year indexing
 
 ---
 
