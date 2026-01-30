@@ -32,7 +32,7 @@ Data frame with columns:
 \item \code{earnings}: Nominal earnings
 \item \code{ss_tax}: Social Security tax paid
 \item \code{delta_pv_benefits}: PV of marginal benefit accrual
-\item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
+\item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits_total) / earnings
 }
 }
 \description{
@@ -42,14 +42,18 @@ additional earnings.
 }
 \details{
 The net marginal tax rate is calculated as:
-\deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits}{earnings}}
+\deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits\_total}{earnings}}
+
+Where \code{delta_pv_benefits_total} is the present value of additional lifetime
+benefits from this year's earnings (computed as \code{delta_pv_benefits × earnings},
+where \code{delta_pv_benefits} from \code{marginal_benefit_analysis()} is per-dollar).
 
 Interpretation:
 \itemize{
-\item Value near 0.124 (12.4\%) means no benefit accrual — pure tax
+\item Value near 0.062 (6.2\%) or 0.124 (12.4\% with employer) means no benefit accrual — pure tax
 \item Value near 0 means benefits offset most of the tax
-\item Negative value means benefits exceed taxes (possible for low earners
-in years where the marginal AIME falls in the 90\% bracket)
+\item Negative value means benefits exceed taxes (common for workers in the
+90\% or 32\% PIA brackets where marginal benefits are substantial)
 }
 }
 \examples{

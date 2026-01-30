@@ -16,9 +16,9 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: January 29, 2026
+**Last Updated**: January 30, 2026
 
-**Active Work**: Implementation complete - Child Benefits and Family Maximum
+**Active Work**: Analytical measures implementation complete; Shiny integration pending
 
 **Blocked On**: None
 
@@ -27,6 +27,83 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### January 30, 2026 — Analytical Measures and AIME Optimization
+
+**Task**: Implement new analytical functions per approved plan (Phases 1-5 from plan file).
+
+**Changes Made**:
+
+**Phase 1: File Rename**
+- Renamed `R/CL_benefit_calculator.R` → `R/calculate_benefits.R` for cleaner naming
+- Updated all internal references (4 files)
+
+**Phase 3: Lifetime Internal Rate of Return**
+- Added `internal_rate_of_return(worker, assumptions, include_employer = FALSE)` to `R/pv_functions.R`
+- Solves for discount rate where PV(taxes) = PV(benefits) using `uniroot()`
+- Returns NA if no solution exists in [-0.99, 1.0] range
+
+**Phase 4: Marginal Analysis Functions**
+Added three new functions to `R/analytic_functions.R`:
+
+1. **`marginal_benefit_analysis(worker, assumptions, base_year = 2025)`**
+   - Identifies top 35 indexed earning years
+   - Calculates marginal PIA rate (0.90, 0.32, or 0.15 depending on AIME bracket)
+   - Computes delta_aime_per_dollar, delta_pia_per_dollar, delta_pv_benefits
+
+2. **`net_marginal_tax_rate(worker, assumptions, include_employer = FALSE)`**
+   - Formula: `NMTR = (ss_tax - delta_pv_benefits_total) / earnings`
+   - Shows effective tax rate after accounting for benefit accrual
+   - Low earners have lower (or negative) NMTR due to progressive formula
+
+3. **`marginal_irr(worker, assumptions, include_employer = FALSE)`**
+   - IRR on each year's tax contribution
+   - Returns -1 for years not in top 35 (100% loss)
+   - Uses numerical solver for top 35 years
+
+**Phase 5: AIME Optimization**
+- Pre-computed eligibility flags in `aime()` function
+- Added early exit to skip years before first eligibility
+- Cleaner code structure
+
+**Other Changes**:
+- Added roxygen2 documentation to `rep_rates()` function
+- Updated `R/ssmbar-package.R` with new global variables
+- Created test scripts: `scripts/test_new_functions.R`, `scripts/test_progressivity.R`
+
+**Test Coverage**:
+- Added 5 IRR tests to `test-pv_functions.R`
+- Created `test-marginal.R` with 32 tests for marginal functions
+- Total tests: 495 (was 452)
+
+**Verification Results**:
+
+Progressivity test (1960 birth cohort, claim at 67):
+| Type      | IRR (emp) | IRR (total) | Marg PIA | Mean NMTR | Mean mIRR |
+|-----------|-----------|-------------|----------|-----------|-----------|
+| very_low  | 8.69%     | 4.94%       | 0.90     | -25.27%   | 27.87%    |
+| low       | 7.66%     | 4.30%       | 0.90     | -18.79%   | 21.67%    |
+| medium    | 6.66%     | 3.66%       | 0.32     | -3.98%    | 10.76%    |
+| high      | 6.14%     | 3.33%       | 0.15     | 0.93%     | 8.40%     |
+| max       | 5.06%     | 2.68%       | 0.15     | 4.66%     | 5.42%     |
+
+All progressivity checks pass:
+- Lifetime IRR decreases with earnings ✓
+- IRR with employer < IRR employee only ✓
+- Marginal PIA rate decreases with earnings ✓
+- Mean NMTR increases with earnings ✓
+- Mean marginal IRR decreases with earnings ✓
+
+**Bug Fix**:
+- NMTR formula initially had incorrect units; fixed to properly convert delta_pv_benefits (per-dollar) to total dollars before subtraction
+
+**Commits**:
+- `5791416`: Add analytical measures and optimize AIME calculation
+- `c65570a`: Fix NMTR formula and add rep_rates() documentation
+
+**Open Questions**: None
+
+---
 
 ### January 29, 2026 — SSA Max Benefit Table Investigation
 
@@ -189,7 +266,6 @@ ssmbar's methodology is **correct per statute**. The SSA max benefit table may u
 
 | File | Function/Location | Issue | Verified |
 |------|-------------------|-------|----------|
-| analytic_functions.R | `rep_rates()` | Missing roxygen2 documentation header entirely | ☐ |
 | survivor.R | `widow_benefit()` lines 334-354 | Unresolved TODO block - add POMS RS 00615.301 citations for widow reduction factors | ☐ |
 | benefit_calculations.R | `family_maximum()` | Missing @examples section | ☐ |
 
@@ -403,14 +479,16 @@ After implementing child benefits and family maximum (which included rounding fi
 
 ## Test Suite Reference
 
-All 452 tests pass (as of January 29, 2026):
+All 495 tests pass (as of January 30, 2026):
 - 256 regression tests
 - 67 reform tests
-- 46 PV function tests
+- 51 PV function tests (includes 5 IRR tests)
+- 32 marginal analysis tests (new)
 - 29 child benefit tests
 - 22 family maximum tests
 - 19 special minimum PIA tests
 - 13 actuarial tests
+- 6 other tests
 
 ---
 

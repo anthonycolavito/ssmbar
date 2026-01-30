@@ -47,6 +47,12 @@ ui <- page_navbar(
     ratios_ui("ratios")
   ),
 
+  nav_panel(
+    title = "Marginal",
+    icon = icon("chart-bar"),
+    marginal_ui("marginal")
+  ),
+
   # Footer with package info
   nav_spacer(),
   nav_item(
@@ -71,6 +77,7 @@ server <- function(input, output, session) {
   replacement_server("replacement", worker_data)
   lifetime_server("lifetime", worker_data)
   ratios_server("ratios", worker_data)
+  marginal_server("marginal", worker_data)
 
 }
 

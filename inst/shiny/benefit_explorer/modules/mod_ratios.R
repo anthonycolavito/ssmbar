@@ -5,12 +5,13 @@
 
 # Module UI
 ratios_ui <- function(id) {
+
   ns <- NS(id)
 
   layout_columns(
-    col_widths = c(12, 6, 6),
+    col_widths = c(6, 6, 6, 6),
 
-    # Top - Main ratio display
+    # Top left - Main ratio display
     card(
       card_header(
         class = "bg-primary text-white",
@@ -23,6 +24,17 @@ ratios_ui <- function(id) {
           value = TRUE
         ),
         uiOutput(ns("ratio_display"))
+      )
+    ),
+
+    # Top right - IRR display
+    card(
+      card_header(
+        class = "bg-info text-white",
+        "Internal Rate of Return"
+      ),
+      card_body(
+        uiOutput(ns("irr_display"))
       )
     ),
 
@@ -123,10 +135,88 @@ ratios_server <- function(id, worker_data) {
           result$shared_ratio <- shared_ratio
         }
 
+        # Calculate IRR for worker
+        worker_irr <- tryCatch({
+          irr_result <- internal_rate_of_return(primary, assumptions,
+                                                 include_employer = input$include_employer_ratio)
+          irr_result$irr[1]
+        }, error = function(e) NA)
+
+        result$worker_irr <- worker_irr
+
+        # Add spouse IRR if applicable
+        if (data$has_spouse && !is.null(spouse)) {
+          spouse_irr <- tryCatch({
+            irr_result <- internal_rate_of_return(spouse, assumptions,
+                                                   include_employer = input$include_employer_ratio)
+            irr_result$irr[1]
+          }, error = function(e) NA)
+          result$spouse_irr <- spouse_irr
+        }
+
         result
       }, error = function(e) {
         NULL
       })
+    })
+
+    # IRR display
+    output$irr_display <- renderUI({
+      ratios <- ratio_data()
+      if (is.null(ratios)) {
+        return(helpText("Calculate benefits to see IRR"))
+      }
+
+      # Format IRR with color
+      format_irr <- function(r) {
+        if (is.na(r)) return(tags$span(class = "text-muted", "N/A"))
+        color <- if (r >= 0) "text-success" else "text-danger"
+        tags$span(class = color, sprintf("%.2f%%", r * 100))
+      }
+
+      # Worker IRR card
+      worker_irr_card <- tags$div(
+        class = "text-center",
+        tags$h6(class = "text-muted", "Primary Worker"),
+        tags$h2(format_irr(ratios$worker_irr)),
+        tags$p(
+          class = "small text-muted mb-0",
+          "Real rate of return on SS taxes"
+        )
+      )
+
+      if (!ratios$has_spouse || is.null(ratios$spouse_irr)) {
+        return(tagList(
+          worker_irr_card,
+          tags$hr(),
+          tags$p(
+            class = "small text-muted",
+            "IRR = discount rate where PV(benefits) = PV(taxes). ",
+            "Higher values indicate better returns. ",
+            "Progressive benefit formula leads to higher IRR for lower earners."
+          )
+        ))
+      }
+
+      # With spouse
+      spouse_irr_card <- tags$div(
+        class = "text-center",
+        tags$h6(class = "text-muted", "Spouse"),
+        tags$h2(format_irr(ratios$spouse_irr))
+      )
+
+      tagList(
+        tags$div(
+          class = "row",
+          tags$div(class = "col-6", worker_irr_card),
+          tags$div(class = "col-6", spouse_irr_card)
+        ),
+        tags$hr(),
+        tags$p(
+          class = "small text-muted",
+          "IRR = discount rate where PV(benefits) = PV(taxes). Higher = better returns."
+        )
+      )
     })
 
     # Main ratio display
