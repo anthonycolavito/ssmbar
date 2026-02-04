@@ -4,11 +4,17 @@
 #
 # This file contains functions for calculating widow(er) Social Security benefits.
 # These functions handle:
-#   - Computing survivor PIA from deceased spouse's earnings record
-#   - Applying widow(er) actuarial adjustments
+#   - Computing survivor PIA from deceased spouse's earnings record (widow_pia)
+#   - Applying widow(er) actuarial adjustments (widow_benefit)
 #
-# Functions are called by calculate_benefits() in calculate_benefits.R
-# after spousal benefit calculations and before RET.
+# Baseline function:
+#   - widow_benefit(): Current law widow benefit calculation
+#
+# Shared function (no reform logic):
+#   - widow_pia(): Computes survivor PIA from deceased spouse's record
+#
+# For REFORM-CAPABLE widow benefit with Reform #28 (75% combined benefit), see:
+#   - widow_benefit_reform() in reform_functions.R
 #
 # Reference: SSA Handbook Chapter 4 (Survivors Insurance)
 # https://www.ssa.gov/OP_Home/handbook/handbook.04/handbook-toc04.html
@@ -17,7 +23,7 @@
 
 
 # -----------------------------------------------------------------------------
-# 4.1 Widow(er) PIA Calculation
+# 1. Widow(er) PIA Calculation (Shared)
 # -----------------------------------------------------------------------------
 
 #' Widow(er) PIA Calculation
@@ -218,21 +224,27 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
   return(worker)
 }
 
+
 # -----------------------------------------------------------------------------
-# 4.2 Widow Benefit Calculation
+# 2. Widow Benefit Calculation (Baseline)
 # -----------------------------------------------------------------------------
 
-#' Widow Benefit Calculation
+#' Widow Benefit Calculation (Baseline - Current Law)
 #'
-#' Function that calculates a widow's benefit based on the deceased spouse's earnings record.
-#' For disabled widow(er)s (age 50-59), the actuarial reduction is calculated as if they
-#' claimed at age 60, per SSA rules.
+#' Function that calculates a widow's benefit based on the deceased spouse's earnings record
+#' using current statutory rules. For disabled widow(er)s (age 50-59), the actuarial
+#' reduction is calculated as if they claimed at age 60, per SSA rules.
+#'
+#' This is the baseline version. For reform-capable widow benefit calculation (with
+#' options for the 75% combined widow benefit), see \code{\link{widow_benefit_reform}}.
 #'
 #' @param worker Dataframe with a worker's COLA-adjusted retired worker PIA by age
 #' @param assumptions Dataframe with the Social Security Trustees historical and projected economic variables and program parameters
 #' @param debugg Boolean value that directs function to output additional variables if set to true
 #'
 #' @return worker Dataframe with a worker's survivor benefit by age
+#'
+#' @seealso \code{\link{widow_benefit_reform}} for the reform-capable version
 #'
 #' @export
 widow_benefit <- function(worker, assumptions, debugg = FALSE) {
@@ -251,7 +263,7 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
 
   # Skip join if columns already present (from join_all_assumptions)
-  cols_needed <- c("nra", "elig_age_retired", "widow_75_pct_active")
+  cols_needed <- c("nra","elig_age_retired")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -309,39 +321,9 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
         actual_widow_claim_age
       ),
 
-      # Current law survivor benefit
-      survivor_ben_current_law = case_when(
+      survivor_ben = case_when(
         age >= benefit_start_age & survivor_pia > 0 ~ floor(survivor_pia * w_act_factor),
         TRUE ~ 0
-      ),
-
-      # Reform #28: 75% Combined Widow Benefit
-      # Alternative = min(75% * (survivor_wrk_ben + deceased_wrk_ben), medium_worker_pia_cap)
-      # For simplicity, use the survivor's cola_basic_pia * 1.5 as the medium worker cap proxy
-      # (A full implementation would pre-calculate medium worker PIAs)
-      widow_75_active = !is.na(widow_75_pct_active[1]) & widow_75_pct_active[1] == TRUE,
-
-      # Need wrk_ben from the calculation. If not available, use cola_basic_pia * w_act_factor
-      own_wrk_ben = if ("wrk_ben" %in% names(.)) wrk_ben else floor(cola_basic_pia * w_act_factor),
-
-      # deceased_wrk_ben comes from survivor_pia + own_pia offset
-      # survivor_pia is already the excess (deceased - own), so deceased_ben = survivor_pia + own_pia
-      # We need the deceased's benefit which is approximated by survivor_pia / w_act_factor for the deceased
-
-      # Alternative widow benefit: 75% of combined benefits, capped
-      # Note: This is a simplified implementation. The deceased's benefit should come from spouse_data
-      survivor_ben_alternative = case_when(
-        age >= benefit_start_age & widow_75_active ~ floor(pmin(
-          0.75 * (own_wrk_ben + survivor_pia * w_act_factor / 0.825),  # 0.825 is the minimum widow RIB-LIM
-          cola_basic_pia * 1.5  # Medium worker PIA cap (proxy)
-        )),
-        TRUE ~ 0
-      ),
-
-      # Final survivor benefit: max of current law or 75% alternative
-      survivor_ben = case_when(
-        widow_75_active ~ pmax(survivor_ben_current_law, survivor_ben_alternative),
-        TRUE ~ survivor_ben_current_law
       )) %>% select(-claim_age) %>% ungroup()
 
   if (debugg) {
@@ -360,6 +342,7 @@ widow_benefit <- function(worker, assumptions, debugg = FALSE) {
   return(worker)
 
 }
+
 
 # =============================================================================
 # TODO - Documentation Review Needed

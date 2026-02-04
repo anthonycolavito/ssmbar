@@ -225,8 +225,8 @@ compare_reform_scenarios <- function(birth_yr, sex, type, age_claim,
     # Apply reform to assumptions
     reformed_assumptions <- apply_reform(assumptions, reform)
 
-    # Calculate benefits under reform
-    reform_worker <- calculate_benefits(
+    # Calculate benefits under reform using reform-capable pipeline
+    reform_worker <- calculate_benefits_reform(
       birth_yr = birth_yr, sex = sex, type = type, age_claim = age_claim,
       factors = factors, assumptions = reformed_assumptions,
       spouse_type = spouse_type, spouse_sex = spouse_sex,

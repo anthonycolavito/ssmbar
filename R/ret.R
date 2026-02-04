@@ -1,11 +1,23 @@
-
 # =============================================================================
 # RETIREMENT EARNINGS TEST (RET) CALCULATIONS
 # =============================================================================
 #
-# This file contains the Retirement Earnings Test function and its helpers.
-# RET reduces benefits for workers who have earnings above the exempt amount
-# between their claiming age and Normal Retirement Age.
+# This file contains the baseline (current law) Retirement Earnings Test function
+# (ret) and its helper functions.
+#
+# Baseline function:
+#   - ret(): Current law RET calculation
+#
+# Helper functions (used by both baseline and reform versions):
+#   - calculate_excess_earnings(): Calculates excess earnings above RET threshold
+#   - calculate_ret_reduction(): Calculates benefit reduction from excess earnings
+#   - allocate_ret_reduction(): Allocates reduction between worker and spouse benefits
+#   - calculate_months_withheld(): Calculates months of benefits withheld
+#   - calculate_drc_payback(): Recalculates actuarial factors at NRA
+#   - calculate_spouse_ret_effect(): Calculates spouse's RET effect on worker's benefit
+#
+# For REFORM-CAPABLE RET with Reform #23 (RET repeal), see:
+#   - ret_reform() in reform_functions.R
 #
 # Reference: SSA Handbook Chapter 18
 # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
@@ -69,6 +81,7 @@ calculate_ret_reduction <- function(excess_earnings, phaseout_rate, total_monthl
 #' @param wrk_ben Numeric vector of worker's own monthly benefit
 #' @param spouse_ben Numeric vector of worker's spousal monthly benefit
 #' @param spouse_dep_ben Numeric vector of spouse's dependent monthly benefit
+#' @param s_pia_share Numeric, spousal PIA share (typically 0.5)
 #' @return List with wrk_ben_reduced and spouse_ben_reduced (monthly)
 #' @keywords internal
 
@@ -284,14 +297,17 @@ calculate_spouse_ret_effect <- function(worker_data, spouse_df, assumptions, s_p
 
 
 # -----------------------------------------------------------------------------
-# 2. Main RET Function
+# 2. Main RET Function (Baseline)
 # -----------------------------------------------------------------------------
 
-#' Retirement Earnings Test Calculation
+#' Retirement Earnings Test Calculation (Baseline - Current Law)
 #'
 #' Function that reduces an individual's benefits if their earnings exceed the
-#' exempt amounts in the Retirement Earnings Test. Also calculates DRC payback
-#' at NRA to account for months of benefits withheld.
+#' exempt amounts in the Retirement Earnings Test, using current statutory rules.
+#' Also calculates DRC payback at NRA to account for months of benefits withheld.
+#'
+#' This is the baseline version. For reform-capable RET calculation (with
+#' options for RET repeal), see \code{\link{ret_reform}}.
 #'
 #' The RET reduces benefits for workers who have earnings above the exempt amount
 #' (ret1) in years between their claiming age and Normal Retirement Age.
@@ -314,18 +330,12 @@ calculate_spouse_ret_effect <- function(worker_data, spouse_df, assumptions, s_p
 #'
 #' @return worker Dataframe with RET-adjusted benefits
 #'
+#' @seealso \code{\link{ret_reform}} for the reform-capable version
+#'
 #' @export
 ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg = FALSE) {
   # RET is described in Chapter 18 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
-
-  # Reform #23: Check if RET is enabled
-  # If ret_enabled is FALSE in assumptions, skip all RET calculations and return unchanged
-  ret_enabled_val <- assumptions$ret_enabled[1]
-  if (!is.na(ret_enabled_val) && ret_enabled_val == FALSE) {
-    # RET is repealed - return worker data unchanged
-    return(worker)
-  }
 
   # Generate spouse_data on-the-fly if needed
   has_spouse_spec <- "spouse_spec" %in% names(worker) && any(!is.na(worker$spouse_spec))

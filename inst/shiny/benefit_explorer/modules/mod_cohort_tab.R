@@ -292,7 +292,7 @@ cohort_tab_server <- function(id, reform_state) {
           reform_irr <- NA_real_
 
           if (has_reforms && !is.null(reform_assumptions)) {
-            reform <- calculate_benefits(
+            reform <- calculate_benefits_reform(
               birth_yr = by,
               sex = input$sex,
               type = input$worker_type,

@@ -22,34 +22,59 @@ These files contain binding rules and essential context. Do not proceed without 
 
 2. **Distributional Analysis**: Analyze replacement rates and benefit adequacy across worker types and birth cohorts.
 
-3. **Policy Reform Modeling** (Future): Model hypothetical Social Security reforms and analyze their distributional impact.
+3. **Policy Reform Modeling**: Model hypothetical Social Security reforms (~20 reform templates) and analyze their distributional impact using `calculate_benefits_reform()`.
 
 ---
 
 ## Technical Implementation
 
-### The Benefit Calculation Pipeline
+### The Benefit Calculation Pipelines
 
+The package provides two parallel pipelines:
+
+**Baseline Pipeline** (current law, no reform parameters):
 ```
-Earnings → AIME → PIA → COLA Adjustment → Actuarial Adjustment → Final Benefit
+Earnings → aime() → pia() → cola() → worker_benefit() → spousal_pia()
+→ spouse_benefit() → child_pia() → child_benefit() → family_maximum()
+→ widow_pia() → widow_benefit() → ret() → final_benefit()
 ```
 
-| Step | Function | What It Does |
-|------|----------|--------------|
-| 1 | `earnings_generator()` | Creates lifetime earnings using Trustees' scaled earnings factors |
-| 2 | `aime()` | Computes Average Indexed Monthly Earnings (indexes to age 60, caps at taxmax, averages highest 35 years) |
-| 3 | `pia()` | Computes Primary Insurance Amount using bend point formula (90/32/15) |
-| 4 | `spousal_pia()` | Calculates spousal benefit (50% of spouse's PIA minus own PIA) |
-| 5 | `widow_pia()` | Calculates widow(er) benefit based on deceased spouse's PIA |
-| 6 | `cola()` | Applies Cost-of-Living Adjustments using CPI-W |
-| 7 | `worker_benefit()` | Applies early retirement reduction factors or delayed retirement credits |
-| 8 | `spouse_benefit()` | Applies actuarial adjustments to spousal benefits |
-| 9 | `widow_benefit()` | Applies actuarial adjustments to widow(er) benefits |
-| 10 | `final_benefit()` | Combines worker + spousal/widow(er) benefits |
+**Reform Pipeline** (supports policy reform modeling):
+```
+Earnings → aime_reform() → pia_reform() → cola_reform() → worker_benefit()
+→ basic_minimum_benefit() → spousal_pia() → spouse_benefit() → child_pia()
+→ child_benefit() → family_maximum() → widow_pia() → widow_benefit_reform()
+→ ret_reform() → final_benefit()
+```
 
-### Convenience Function
+| Function | Baseline | Reform-Capable | What It Does |
+|----------|----------|----------------|--------------|
+| `earnings_generator()` | Shared | Shared | Creates lifetime earnings using Trustees' scaled earnings factors |
+| `aime()` / `aime_reform()` | ✓ | ✓ | Computes AIME. Reform version supports taxmax split (#14), child care credit (#29) |
+| `pia()` / `pia_reform()` | ✓ | ✓ | Computes PIA using 90/32/15. Reform supports multipliers, flat benefit, 4th bracket |
+| `cola()` / `cola_reform()` | ✓ | ✓ | Applies COLAs. Reform version supports COLA cap (#9) |
+| `worker_benefit()` | Shared | Shared | Applies actuarial adjustments (no reform logic) |
+| `spousal_pia()` | Shared | Shared | Calculates spousal benefit (50% of spouse's PIA minus own PIA) |
+| `widow_pia()` | Shared | Shared | Calculates widow(er) benefit based on deceased spouse's PIA |
+| `widow_benefit()` / `widow_benefit_reform()` | ✓ | ✓ | Reform version supports 75% combined benefit (#28) |
+| `ret()` / `ret_reform()` | ✓ | ✓ | Retirement Earnings Test. Reform version supports RET repeal (#23) |
+| `final_benefit()` | Shared | Shared | Combines worker + spousal/widow(er) benefits |
 
-`calculate_benefits()` chains all steps together for easy single-call benefit calculation.
+### Convenience Functions
+
+- `calculate_benefits()` — Chains **baseline** functions for current-law benefit calculation
+- `calculate_benefits_reform()` — Chains **reform-capable** functions for policy analysis
+
+### Code Organization
+
+| File | Contents |
+|------|----------|
+| `R/baseline_benefit_calculations.R` | Baseline `aime()`, `pia()`, `cola()` |
+| `R/baseline_ret.R` | Baseline `ret()` |
+| `R/baseline_survivor.R` | Baseline `widow_benefit()` |
+| `R/benefit_calculations.R` | Reform-capable `aime_reform()`, `pia_reform()`, `cola_reform()` + shared functions |
+| `R/ret.R` | Reform-capable `ret_reform()` |
+| `R/survivor.R` | Reform-capable `widow_benefit_reform()` + shared `widow_pia()` |
 
 ### Present Value Functions
 

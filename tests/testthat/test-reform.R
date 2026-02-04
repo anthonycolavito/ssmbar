@@ -378,10 +378,10 @@ test_that("reform_benefit_cut() validates cut_pct range", {
 
 
 # -----------------------------------------------------------------------------
-# Test integration with calculate_benefits()
+# Test integration with calculate_benefits_reform()
 # -----------------------------------------------------------------------------
 
-test_that("calculate_benefits() accepts reform parameter", {
+test_that("calculate_benefits_reform() accepts reform parameter", {
   reform <- create_reform(
     name = "NRA 68",
     description = "Raise NRA to 68",
@@ -391,7 +391,7 @@ test_that("calculate_benefits() accepts reform parameter", {
   )
 
   # This should run without error
-  result <- calculate_benefits(
+  result <- calculate_benefits_reform(
     birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
     factors = sef2025, assumptions = tr2025, reform = reform
   )
@@ -401,7 +401,7 @@ test_that("calculate_benefits() accepts reform parameter", {
 })
 
 test_that("Reform affects benefit calculations", {
-  # Calculate baseline
+  # Calculate baseline using baseline calculate_benefits()
   baseline <- calculate_benefits(
     birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
     factors = sef2025, assumptions = tr2025
@@ -410,8 +410,8 @@ test_that("Reform affects benefit calculations", {
   # Create reform that cuts benefits by 20%
   reform <- reform_benefit_cut(cut_pct = 0.20, effective_year = 2025)
 
-  # Calculate with reform
-  reformed <- calculate_benefits(
+  # Calculate with reform using calculate_benefits_reform()
+  reformed <- calculate_benefits_reform(
     birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
     factors = sef2025, assumptions = tr2025, reform = reform
   )

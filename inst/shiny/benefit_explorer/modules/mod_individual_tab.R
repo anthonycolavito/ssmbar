@@ -279,11 +279,13 @@ individual_tab_server <- function(id, reform_state) {
         }
 
         # Calculate REFORM benefits (if reforms selected)
+        # Uses calculate_benefits_reform() which has reform-capable functions
+        # (aime_reform, pia_reform, cola_reform, etc.) that process reform parameters
         reform_data <- NULL
         reform_assumptions <- reform_state$reform_assumptions()
 
         if (reform_state$has_reforms() && !is.null(reform_assumptions)) {
-          reform_data <- calculate_benefits(
+          reform_data <- calculate_benefits_reform(
             birth_yr = input$birth_year,
             sex = input$sex,
             type = input$worker_type,
