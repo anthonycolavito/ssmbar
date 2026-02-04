@@ -2,7 +2,7 @@
 % Please edit documentation in R/benefit_calculations.R
 \name{aime}
 \alias{aime}
-\title{AIME Calculation}
+\title{AIME Calculation (Baseline - Current Law)}
 \usage{
 aime(worker, assumptions, debugg = FALSE)
 }
@@ -18,4 +18,12 @@ worker Dataframe with a worker's AIME by year and age
 }
 \description{
 Function that computes a worker's Average Indexed Monthly Earnings by age
+using current statutory rules without any reform parameters.
+}
+\details{
+This is the baseline version. For reform-capable AIME calculation, see
+\code{\link{aime_reform}}.
+}
+\seealso{
+\code{\link{aime_reform}} for the reform-capable version
 }

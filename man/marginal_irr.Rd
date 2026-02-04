@@ -27,24 +27,32 @@ Data frame with columns:
 \item \code{earnings}: Nominal earnings
 \item \code{ss_tax}: Social Security tax paid
 \item \code{in_top_35}: Whether year is in top 35 indexed earnings
+\item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
 \item \code{marginal_irr}: IRR on this year's tax contribution
 }
 }
 \description{
 Computes the marginal IRR for each working year. This is the IRR on that
 year's tax contribution, considering only the marginal benefit accrual
-from that year's earnings.
+from that year's work using the cumulative stopping-point method.
 }
 \details{
-For each working year, the marginal IRR is the rate r that solves:
-\deqn{tax_t = \sum_{y} \frac{\Delta benefit_y}{(1+r)^{(y - t)}}}
+The marginal IRR is computed using delta_pv_benefits from the cumulative
+stopping-point method. Since delta_pv_benefits is already the present value
+of additional lifetime benefits (discounted to age 65), the IRR is the rate
+that makes the tax contribution grow to equal this benefit gain:
 
-When the year is NOT in the top 35 indexed earnings (marginal benefit = 0),
-the marginal IRR is -1 (representing -100\% return — complete loss of the
-tax contribution).
+\deqn{tax_t \times (1 + r)^{(65 - t)} = \Delta PV\_benefits}
 
-This calculation can be slow for many workers as it requires solving for r
-numerically for each working year.
+Solving for r:
+\deqn{r = (\Delta PV\_benefits / tax_t)^{1/(65-t)} - 1}
+
+Special cases:
+\itemize{
+\item Years 1-9 (not yet eligible): delta_pv = 0, so IRR = -1 (-100\%)
+\item Year 10 (eligibility transition): Very high IRR (large delta_pv)
+\item Years 36+ outside top 35: IRR = -1 (-100\%)
+}
 }
 \examples{
 \dontrun{
@@ -53,6 +61,9 @@ worker <- calculate_benefits(
   factors = sef2025, assumptions = tr2025, debugg = TRUE
 )
 mirr <- marginal_irr(worker, tr2025)
+
+# Check pattern - year 10 should have very high IRR
+mirr[mirr$age \%in\% 25:35, c("age", "delta_pv_benefits", "marginal_irr")]
 }
 
 }

@@ -143,7 +143,21 @@ See `PROGRESS.md` for complete validation history and methodology.
 
 ---
 
+## Development Environment
+
+**R Installation Path:**
+```
+C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe
+```
+
+To run tests from command line:
+```powershell
+& 'C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe' -e "devtools::test()"
+```
+
+---
+
 ## Owner
 
-Anthony Colavito (colavito@crfb.org)  
+Anthony Colavito (colavito@crfb.org)
 Committee for a Responsible Federal Budget

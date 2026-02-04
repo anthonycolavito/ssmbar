@@ -2,7 +2,7 @@
 % Please edit documentation in R/benefit_calculations.R
 \name{pia}
 \alias{pia}
-\title{PIA Calculation}
+\title{PIA Calculation (Baseline - Current Law)}
 \usage{
 pia(worker, assumptions, debugg = FALSE)
 }
@@ -17,7 +17,16 @@ pia(worker, assumptions, debugg = FALSE)
 worker dataframe with a worker's retired worker PIA by age
 }
 \description{
-Function that computes a worker's Primary Insurance Amount by age.
-Compares the regular PIA (bend point formula) with the special minimum PIA
-per 42 USC 415(a)(1)(C) and returns the higher of the two.
+Function that computes a worker's Primary Insurance Amount by age using
+the standard 90/32/15 bend point formula per current statutory rules.
+Compares the regular PIA with the special minimum PIA per 42 USC 415(a)(1)(C)
+and returns the higher of the two.
+}
+\details{
+This is the baseline version. For reform-capable PIA calculation (with
+options for PIA multipliers, flat benefits, 4-bracket formulas, etc.),
+see \code{\link{pia_reform}}.
+}
+\seealso{
+\code{\link{pia_reform}} for the reform-capable version
 }

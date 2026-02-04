@@ -47,12 +47,15 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 Added three new functions to `R/analytic_functions.R`:
 
 1. **`marginal_benefit_analysis(worker, assumptions, base_year = 2025)`**
-   - Identifies top 35 indexed earning years
-   - Calculates marginal PIA rate (0.90, 0.32, or 0.15 depending on AIME bracket)
-   - Computes delta_aime_per_dollar, delta_pia_per_dollar, delta_pv_benefits
+   - Uses **cumulative stopping-point method**: computes PV of lifetime benefits if worker stopped after t years vs t-1 years
+   - Returns: cumulative_aime, cumulative_pia, cumulative_pv, delta_pv_benefits, in_top_35, indexed_rank
+   - Years 1-9: delta_pv = 0 (not yet eligible)
+   - Year 10: Large positive delta_pv (eligibility transition)
+   - Years 11-35: Each year adds to AIME numerator
+   - Years 36+: Only adds value if displacing a lower-earning year from top 35
 
 2. **`net_marginal_tax_rate(worker, assumptions, include_employer = FALSE)`**
-   - Formula: `NMTR = (ss_tax - delta_pv_benefits_total) / earnings`
+   - Formula: `NMTR = (ss_tax - delta_pv_benefits) / earnings`
    - Shows effective tax rate after accounting for benefit accrual
    - Low earners have lower (or negative) NMTR due to progressive formula
 
@@ -79,23 +82,24 @@ Added three new functions to `R/analytic_functions.R`:
 **Verification Results**:
 
 Progressivity test (1960 birth cohort, claim at 67):
-| Type      | IRR (emp) | IRR (total) | Marg PIA | Mean NMTR | Mean mIRR |
-|-----------|-----------|-------------|----------|-----------|-----------|
-| very_low  | 8.69%     | 4.94%       | 0.90     | -25.27%   | 27.87%    |
-| low       | 7.66%     | 4.30%       | 0.90     | -18.79%   | 21.67%    |
-| medium    | 6.66%     | 3.66%       | 0.32     | -3.98%    | 10.76%    |
-| high      | 6.14%     | 3.33%       | 0.15     | 0.93%     | 8.40%     |
-| max       | 5.06%     | 2.68%       | 0.15     | 4.66%     | 5.42%     |
+| Type      | IRR (emp) | IRR (total) | Mean NMTR | Mean mIRR |
+|-----------|-----------|-------------|-----------|-----------|
+| very_low  | 8.69%     | 4.94%       | -25.27%   | 27.87%    |
+| low       | 7.66%     | 4.30%       | -18.79%   | 21.67%    |
+| medium    | 6.66%     | 3.66%       | -3.98%    | 10.76%    |
+| high      | 6.14%     | 3.33%       | 0.93%     | 8.40%     |
+| max       | 5.06%     | 2.68%       | 4.66%     | 5.42%     |
 
 All progressivity checks pass:
 - Lifetime IRR decreases with earnings ✓
 - IRR with employer < IRR employee only ✓
-- Marginal PIA rate decreases with earnings ✓
 - Mean NMTR increases with earnings ✓
 - Mean marginal IRR decreases with earnings ✓
 
-**Bug Fix**:
-- NMTR formula initially had incorrect units; fixed to properly convert delta_pv_benefits (per-dollar) to total dollars before subtraction
+**Implementation Note** (corrected):
+- Originally attempted per-dollar marginal approach (marginal_pia_rate, delta_aime_per_dollar, delta_pia_per_dollar)
+- Replaced with cumulative stopping-point method: computes delta_pv = PV(benefits after t years) - PV(benefits after t-1 years)
+- This correctly answers "what is the value of working year t?"
 
 **Commits**:
 - `5791416`: Add analytical measures and optimize AIME calculation

@@ -20,6 +20,8 @@ allocate_ret_reduction(
 \item{spouse_ben}{Numeric vector of worker's spousal monthly benefit}
 
 \item{spouse_dep_ben}{Numeric vector of spouse's dependent monthly benefit}
+
+\item{s_pia_share}{Numeric, spousal PIA share (typically 0.5)}
 }
 \value{
 List with wrk_ben_reduced and spouse_ben_reduced (monthly)

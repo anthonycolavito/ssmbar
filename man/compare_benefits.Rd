@@ -38,8 +38,8 @@ baseline <- calculate_benefits(
 # Apply reform
 reformed_assumptions <- apply_reform(tr2025, my_reform)
 
-# Calculate reformed benefits
-reformed <- calculate_benefits(
+# Calculate reformed benefits using reform-capable pipeline
+reformed <- calculate_benefits_reform(
   birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
   factors = sef2025, assumptions = reformed_assumptions
 )

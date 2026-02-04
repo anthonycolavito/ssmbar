@@ -10,50 +10,69 @@ marginal_benefit_analysis(worker, assumptions, base_year = 2025)
 \item{worker}{Data frame with calculated benefits. Must contain columns from
 \code{calculate_benefits()} run with \code{debugg = TRUE}: \code{id}, \code{year},
 \code{age}, \code{earnings}, \code{indexed_earn}, \code{index_factor}, \code{aime},
-\code{claim_age}, \code{death_age}, \code{bp1_elig}, \code{bp2_elig}, \code{comp_period}.}
+\code{claim_age}, \code{death_age}, \code{bp1_elig}, \code{bp2_elig}.}
 
 \item{assumptions}{Data frame with the prepared Trustees assumptions.
-Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df}.}
+Must contain columns: \code{year}, \code{gdp_pi}, \code{real_df}, \code{cola}.}
 
 \item{base_year}{Numeric value specifying the year for real dollar conversion.
 Default is 2025.}
 }
 \value{
-Data frame with the worker data plus additional columns:
+Data frame with columns for each working year:
 \itemize{
-\item \code{in_top_35}: Logical, is this year in the worker's top 35 indexed earning years?
-\item \code{indexed_rank}: Rank of this year's indexed earnings (1 = highest)
-\item \code{marginal_pia_rate}: PIA bracket rate for marginal AIME (0.90, 0.32, or 0.15)
-\item \code{delta_aime_per_dollar}: AIME increase per additional dollar (index_factor / 420, or 0)
-\item \code{delta_pia_per_dollar}: PIA increase per additional dollar of earnings
-\item \code{delta_pv_benefits}: PV of lifetime benefit increase from $1 more earnings
+\item \code{id}: Worker identifier
+\item \code{year}: Calendar year
+\item \code{age}: Worker's age
+\item \code{earnings}: Nominal earnings that year
+\item \code{indexed_earn}: Indexed earnings for AIME calculation
+\item \code{years_worked}: Cumulative years of work (1 to 44)
+\item \code{qcs}: Cumulative quarters of coverage (4 per year)
+\item \code{eligible}: Whether worker is eligible for benefits (QCs >= 40)
+\item \code{cumulative_aime}: AIME if worker stopped at this year
+\item \code{cumulative_pia}: PIA if worker stopped at this year
+\item \code{cumulative_pv}: PV of lifetime benefits if stopped at this year
+\item \code{delta_pv_benefits}: Change in PV from working this year
+\item \code{in_top_35}: Whether this year is in top 35 indexed earnings
+\item \code{indexed_rank}: Rank of indexed earnings (1 = highest)
 }
 }
 \description{
-Computes per-year marginal benefit analysis for a worker. For each working year,
-calculates whether the year is in the top 35 indexed earnings years, the marginal
-AIME rate, the marginal PIA rate, and the present value of additional lifetime
-benefits from an additional dollar of earnings.
+Computes per-year marginal benefit analysis for a worker using the cumulative
+stopping-point method. For each working year t, calculates the change in
+present value of lifetime benefits from working t years vs t-1 years.
 }
 \details{
-The marginal analysis answers: "If I earn $1 more this year, how much more
-will I receive in lifetime Social Security benefits?"
+This function answers: "What is the value of working year t, given that I've
+already worked years 1 through t-1?"
+
+The calculation compares two hypothetical workers identical in every way except
+one worked t years and the other worked t-1 years. The marginal value is the
+difference in their lifetime PV of benefits.
 
 Key insights:
 \itemize{
-\item Years not in the top 35 indexed earnings have zero marginal benefit
-\item Marginal AIME = index_factor / (35 × 12) = index_factor / 420
-\item Marginal PIA depends on which PIA bracket the marginal AIME falls into
-\item Delta PV benefits = delta_monthly_pia × actuarial_factor × months_of_benefits × discount_factor
+\item Years 1-9: Worker not yet eligible (< 40 QCs), so delta_pv = 0
+\item Year 10: Worker becomes eligible, large positive delta_pv
+\item Years 11-35: Each year adds to AIME numerator (denominator fixed at 420)
+\item Years 36+: Only adds value if displacing a lower-earning year from top 35
 }
+
+The computation period (35 years) is fixed based on eligibility age, NOT on
+years worked. AIME = sum(top 35 indexed earnings, with zeros if < 35 years) / 420.
 }
 \examples{
 \dontrun{
 worker <- calculate_benefits(
-  birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+  birth_yr = 1960, sex = "male", type = "max", age_claim = 67,
   factors = sef2025, assumptions = tr2025, debugg = TRUE
 )
 marginal <- marginal_benefit_analysis(worker, tr2025)
+
+# Check pattern for max earner:
+# Years 1-9: delta_pv should be 0 (not eligible)
+# Year 10: delta_pv should be large (eligibility transition)
+marginal[marginal$age \%in\% 21:35, c("age", "years_worked", "qcs", "eligible", "delta_pv_benefits")]
 }
 
 }

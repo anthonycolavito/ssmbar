@@ -33,19 +33,27 @@ create_debug_worker <- function(birth_yr = 1960, type = "medium", age_claim = 67
 # =============================================================================
 
 test_that("marginal_benefit_analysis returns correct structure", {
+
   worker <- create_debug_worker()
 
   result <- marginal_benefit_analysis(worker, tr2025)
 
-  # Check structure
+  # Check structure - stopping-point method columns
   expect_true(is.data.frame(result))
   expect_true("id" %in% names(result))
+  expect_true("year" %in% names(result))
+  expect_true("age" %in% names(result))
+  expect_true("earnings" %in% names(result))
+  expect_true("years_worked" %in% names(result))
+
+  expect_true("qcs" %in% names(result))
+  expect_true("eligible" %in% names(result))
+  expect_true("cumulative_aime" %in% names(result))
+  expect_true("cumulative_pia" %in% names(result))
+  expect_true("cumulative_pv" %in% names(result))
+  expect_true("delta_pv_benefits" %in% names(result))
   expect_true("in_top_35" %in% names(result))
   expect_true("indexed_rank" %in% names(result))
-  expect_true("marginal_pia_rate" %in% names(result))
-  expect_true("delta_aime_per_dollar" %in% names(result))
-  expect_true("delta_pia_per_dollar" %in% names(result))
-  expect_true("delta_pv_benefits" %in% names(result))
 })
 
 test_that("marginal_benefit_analysis identifies top 35 years correctly", {
@@ -56,39 +64,41 @@ test_that("marginal_benefit_analysis identifies top 35 years correctly", {
   # Filter to working years
   working_years <- result[result$age >= 21 & result$age <= 64, ]
 
-  # Should have exactly 35 years in_top_35 (or fewer if worker has < 35 working years)
+  # Should have exactly 35 years in_top_35 (worker has 44 working years)
   num_top_35 <- sum(working_years$in_top_35, na.rm = TRUE)
-  expect_lte(num_top_35, 35)
+  expect_equal(num_top_35, 35)
 
-  # Years not in top 35 should have zero delta_pv_benefits
-  non_top_35 <- working_years[!working_years$in_top_35, ]
-  if (nrow(non_top_35) > 0) {
-    expect_true(all(non_top_35$delta_pv_benefits == 0, na.rm = TRUE))
-  }
+  # indexed_rank should range from 1 to 44 (all working years ranked)
+  expect_equal(min(working_years$indexed_rank, na.rm = TRUE), 1)
+  expect_equal(max(working_years$indexed_rank, na.rm = TRUE), 44)
+
+  # in_top_35 should be TRUE iff indexed_rank <= 35
+  expect_true(all(working_years$in_top_35 == (working_years$indexed_rank <= 35), na.rm = TRUE))
 })
 
-test_that("marginal_benefit_analysis calculates correct marginal PIA rates", {
-  worker_low <- create_debug_worker(type = "low")
-  worker_med <- create_debug_worker(type = "medium")
-  worker_high <- create_debug_worker(type = "high")
+test_that("marginal_benefit_analysis follows correct stopping-point pattern", {
+  worker <- create_debug_worker()
 
-  result_low <- marginal_benefit_analysis(worker_low, tr2025)
-  result_med <- marginal_benefit_analysis(worker_med, tr2025)
-  result_high <- marginal_benefit_analysis(worker_high, tr2025)
+  result <- marginal_benefit_analysis(worker, tr2025)
 
-  # Get marginal PIA rates (should be same for all years within a worker)
-  pia_rate_low <- unique(result_low$marginal_pia_rate[!is.na(result_low$marginal_pia_rate)])
-  pia_rate_med <- unique(result_med$marginal_pia_rate[!is.na(result_med$marginal_pia_rate)])
-  pia_rate_high <- unique(result_high$marginal_pia_rate[!is.na(result_high$marginal_pia_rate)])
+  # Filter to working years
+  working_years <- result[result$age >= 21 & result$age <= 64, ]
 
-  # All rates should be valid (0.90, 0.32, or 0.15)
-  expect_true(all(pia_rate_low %in% c(0.90, 0.32, 0.15)))
-  expect_true(all(pia_rate_med %in% c(0.90, 0.32, 0.15)))
-  expect_true(all(pia_rate_high %in% c(0.90, 0.32, 0.15)))
+  # Years 1-9 (age 21-29): Not yet eligible (< 40 QCs), delta_pv should be 0
+  pre_eligible <- working_years[working_years$years_worked < 10, ]
+  expect_true(all(pre_eligible$delta_pv_benefits == 0, na.rm = TRUE))
+  expect_true(all(pre_eligible$eligible == FALSE, na.rm = TRUE))
 
-  # Low earner should have higher marginal rate (90% bracket)
-  # High earner should have lower marginal rate (15% bracket)
-  expect_gte(pia_rate_low[1], pia_rate_high[1])
+  # Year 10 (age 30): Becomes eligible, should have large positive delta_pv
+  year_10 <- working_years[working_years$years_worked == 10, ]
+  expect_true(year_10$eligible)
+  expect_gt(year_10$delta_pv_benefits, 0)
+
+  # Cumulative values should be monotonically non-decreasing for eligible years
+  eligible_years <- working_years[working_years$eligible == TRUE, ]
+  expect_true(all(diff(eligible_years$cumulative_aime) >= -0.01, na.rm = TRUE))
+  expect_true(all(diff(eligible_years$cumulative_pia) >= -0.01, na.rm = TRUE))
+  expect_true(all(diff(eligible_years$cumulative_pv) >= -0.01, na.rm = TRUE))
 })
 
 test_that("marginal_benefit_analysis requires debugg = TRUE output", {
@@ -126,7 +136,7 @@ test_that("net_marginal_tax_rate returns correct structure", {
   expect_true("net_marginal_tax_rate" %in% names(result))
 })
 
-test_that("net_marginal_tax_rate is in expected range", {
+test_that("net_marginal_tax_rate follows expected patterns", {
   worker <- create_debug_worker()
 
   result <- net_marginal_tax_rate(worker, tr2025)
@@ -134,14 +144,23 @@ test_that("net_marginal_tax_rate is in expected range", {
   # Filter to working years
   working_years <- result[result$age >= 21 & result$age <= 64, ]
 
-  # Net marginal tax rate = tax_rate - delta_pv_benefits
-  # For workers in 32% PIA bracket: NMTR can be quite negative (-20% to -10%)
-  # For workers in 15% PIA bracket: NMTR is closer to 0 or slightly positive
-  # Range: approximately -30% to +6.2% (employee rate)
-  valid_rates <- working_years$net_marginal_tax_rate[!is.na(working_years$net_marginal_tax_rate)]
-  expect_true(all(valid_rates >= -0.35))  # Can be negative for high-benefit workers
+  # With cumulative stopping-point method:
+  # - Years 1-9: NMTR ≈ 6.2% (not eligible, pure tax with no benefit accrual)
+  # - Year 10: Very large negative NMTR (eligibility transition, huge delta_pv)
+  # - Years 11-35: Negative NMTR (benefit accrual exceeds tax)
+  # - Years 36+: NMTR closer to full tax rate if year doesn't enter top 35
 
-  expect_true(all(valid_rates <= 0.124))   # Max is full tax rate if no benefit accrual
+  # Pre-eligibility years should have positive NMTR (pure tax)
+  pre_eligible <- working_years[working_years$years_worked < 10, ]
+  expect_true(all(pre_eligible$net_marginal_tax_rate > 0, na.rm = TRUE))
+
+  # Eligibility transition year should have strongly negative NMTR
+  year_10 <- working_years[working_years$years_worked == 10, ]
+  expect_lt(year_10$net_marginal_tax_rate, -1)  # Should be very negative
+
+  # Max NMTR should not exceed full tax rate (6.2%)
+  valid_rates <- working_years$net_marginal_tax_rate[!is.na(working_years$net_marginal_tax_rate)]
+  expect_true(all(valid_rates <= 0.124))
 })
 
 test_that("net_marginal_tax_rate varies by worker type", {

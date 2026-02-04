@@ -2,7 +2,7 @@
 % Please edit documentation in R/survivor.R
 \name{widow_benefit}
 \alias{widow_benefit}
-\title{Widow Benefit Calculation}
+\title{Widow Benefit Calculation (Baseline - Current Law)}
 \usage{
 widow_benefit(worker, assumptions, debugg = FALSE)
 }
@@ -17,7 +17,14 @@ widow_benefit(worker, assumptions, debugg = FALSE)
 worker Dataframe with a worker's survivor benefit by age
 }
 \description{
-Function that calculates a widow's benefit based on the deceased spouse's earnings record.
-For disabled widow(er)s (age 50-59), the actuarial reduction is calculated as if they
-claimed at age 60, per SSA rules.
+Function that calculates a widow's benefit based on the deceased spouse's earnings record
+using current statutory rules. For disabled widow(er)s (age 50-59), the actuarial
+reduction is calculated as if they claimed at age 60, per SSA rules.
+}
+\details{
+This is the baseline version. For reform-capable widow benefit calculation (with
+options for the 75\% combined widow benefit), see \code{\link{widow_benefit_reform}}.
+}
+\seealso{
+\code{\link{widow_benefit_reform}} for the reform-capable version
 }

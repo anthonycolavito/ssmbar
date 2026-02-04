@@ -30,39 +30,45 @@ Data frame with columns:
 \item \code{year}: Calendar year
 \item \code{age}: Worker's age
 \item \code{earnings}: Nominal earnings
-\item \code{ss_tax}: Social Security tax paid
-\item \code{delta_pv_benefits}: PV of marginal benefit accrual
-\item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits_total) / earnings
+\item \code{years_worked}: Cumulative years of work
+\item \code{qcs}: Cumulative quarters of coverage
+\item \code{eligible}: Whether eligible for benefits (QCs >= 40)
+\item \code{ss_tax}: Social Security tax paid (employee share)
+\item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
+\item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
+\item \code{in_top_35}: Whether this year is in top 35 indexed earnings
 }
 }
 \description{
 Computes the net marginal tax rate on Social Security for each working year.
 The net marginal tax rate accounts for the marginal benefit accrued from
-additional earnings.
+additional earnings using the cumulative stopping-point method.
 }
 \details{
 The net marginal tax rate is calculated as:
-\deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits\_total}{earnings}}
+\deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits}{earnings}}
 
-Where \code{delta_pv_benefits_total} is the present value of additional lifetime
-benefits from this year's earnings (computed as \code{delta_pv_benefits × earnings},
-where \code{delta_pv_benefits} from \code{marginal_benefit_analysis()} is per-dollar).
+Where \code{delta_pv_benefits} is the change in present value of lifetime
+benefits from working year t vs t-1 (using the cumulative stopping-point method).
 
-Interpretation:
+Expected pattern for a max earner:
 \itemize{
-\item Value near 0.062 (6.2\%) or 0.124 (12.4\% with employer) means no benefit accrual — pure tax
-\item Value near 0 means benefits offset most of the tax
-\item Negative value means benefits exceed taxes (common for workers in the
-90\% or 32\% PIA brackets where marginal benefits are substantial)
+\item Years 1-9: NMTR ≈ 12.4\% (not yet eligible, pure tax)
+\item Year 10: NMTR strongly negative (eligibility transition, big benefit gain)
+\item Years 11-35: NMTR varies based on PIA bracket and benefit accrual
+\item Years 36+: NMTR = 12.4\% if year doesn't enter top 35
 }
 }
 \examples{
 \dontrun{
 worker <- calculate_benefits(
-  birth_yr = 1960, sex = "male", type = "medium", age_claim = 67,
+  birth_yr = 1960, sex = "male", type = "max", age_claim = 67,
   factors = sef2025, assumptions = tr2025, debugg = TRUE
 )
-nmtr <- net_marginal_tax_rate(worker, tr2025)
+nmtr <- net_marginal_tax_rate(worker, tr2025, include_employer = TRUE)
+
+# Check the expected pattern
+nmtr[nmtr$age \%in\% 21:35, c("age", "years_worked", "eligible", "net_marginal_tax_rate")]
 }
 
 }

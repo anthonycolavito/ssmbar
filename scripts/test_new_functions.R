@@ -33,7 +33,7 @@ working_marginal <- marginal[marginal$age >= 21 & marginal$age <= 64, ]
 cat("\nSample marginal analysis (ages 30, 40, 50, 60):\n")
 print(working_marginal[working_marginal$age %in% c(30, 40, 50, 60),
                        c("age", "earnings", "in_top_35", "indexed_rank",
-                         "marginal_pia_rate", "delta_pv_benefits")])
+                         "cumulative_aime", "cumulative_pia", "delta_pv_benefits")])
 
 # Test net marginal tax rate
 cat("\nTesting net_marginal_tax_rate()...\n")

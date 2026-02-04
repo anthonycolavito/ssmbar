@@ -18,7 +18,7 @@ for (type in worker_types) {
   irr_emp <- internal_rate_of_return(worker, tr2025, include_employer = FALSE)
   irr_tot <- internal_rate_of_return(worker, tr2025, include_employer = TRUE)
 
-  # Marginal analysis
+  # Marginal analysis (cumulative stopping-point method)
   marginal <- marginal_benefit_analysis(worker, tr2025)
   working <- marginal[marginal$age >= 21 & marginal$age <= 64, ]
 
@@ -34,7 +34,7 @@ for (type in worker_types) {
     type = type,
     lifetime_irr_emp = round(irr_emp$irr * 100, 2),
     lifetime_irr_tot = round(irr_tot$irr * 100, 2),
-    marginal_pia_rate = unique(working$marginal_pia_rate[!is.na(working$marginal_pia_rate)]),
+    mean_delta_pv = round(mean(working$delta_pv_benefits[working$eligible], na.rm = TRUE), 0),
     mean_nmtr = round(mean(working_nmtr$net_marginal_tax_rate, na.rm = TRUE) * 100, 2),
     mean_marginal_irr = round(mean(working_mirr$marginal_irr, na.rm = TRUE) * 100, 2)
   ))
@@ -50,13 +50,10 @@ cat(all(diff(results$lifetime_irr_emp) < 0), "\n")
 cat("2. IRR with employer < IRR employee only: ")
 cat(all(results$lifetime_irr_tot < results$lifetime_irr_emp), "\n")
 
-cat("3. Marginal PIA rate decreases with earnings: ")
-cat(all(diff(results$marginal_pia_rate) <= 0), "\n")
-
-cat("4. Mean NMTR increases with earnings: ")
+cat("3. Mean NMTR increases with earnings: ")
 cat(all(diff(results$mean_nmtr) > 0), "\n")
 
-cat("5. Mean marginal IRR decreases with earnings: ")
+cat("4. Mean marginal IRR decreases with earnings: ")
 cat(all(diff(results$mean_marginal_irr) < 0), "\n")
 
 cat("\n=== Progressivity test completed ===\n")
