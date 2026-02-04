@@ -737,6 +737,15 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
     dataset <- worker
   }
 
+
+  # Ensure spousal columns exist (may not exist if spousal_pia/spouse_benefit were skipped)
+  if (!"spouse_ben" %in% names(dataset)) {
+    dataset$spouse_ben <- 0
+  }
+  if (!"spouse_pia" %in% names(dataset)) {
+    dataset$spouse_pia <- 0
+  }
+
   # Process each worker
 
   dataset <- dataset %>%
@@ -876,9 +885,13 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
     ungroup()
 
   # Select output columns
+  # Determine which columns to remove (only if they existed in original worker)
+  cols_to_remove <- c()
+  if ("wrk_ben" %in% names(worker)) cols_to_remove <- c(cols_to_remove, "wrk_ben_orig")
+  if ("spouse_ben" %in% names(worker)) cols_to_remove <- c(cols_to_remove, "spouse_ben_orig")
+
   if (debugg) {
-    # wrk_ben and spouse_ben already exist and will be overwritten - handle with suffix
-    # Other debug columns need existence check
+    # Debug columns need existence check
     debug_cols <- c("spouse_dep_ben", "s_excess_earnings", "s_ret_reduction", "s_own_ben",
                     "spouse_ret_to_spouse_ben", "s_months_withheld", "s_cum_months_withheld",
                     "excess_earnings", "ret_reduction", "wrk_share", "wrk_reduction",
@@ -890,7 +903,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
     result <- worker %>% left_join(
       dataset %>% select(id, age, wrk_ben, spouse_ben),
       by = c("id", "age"), suffix = c("_orig", "")
-    ) %>% select(-wrk_ben_orig, -spouse_ben_orig)
+    ) %>% select(-any_of(cols_to_remove))
 
     # Then join additional debug columns that don't already exist
     if (length(cols_new) > 0) {
@@ -904,7 +917,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
     worker %>% left_join(
       dataset %>% select(id, age, wrk_ben, spouse_ben),
       by = c("id", "age"), suffix = c("_orig", "")
-    ) %>% select(-wrk_ben_orig, -spouse_ben_orig)
+    ) %>% select(-any_of(cols_to_remove))
   }
 }
 
