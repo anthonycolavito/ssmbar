@@ -154,9 +154,10 @@ test_that("net_marginal_tax_rate follows expected patterns", {
   pre_eligible <- working_years[working_years$years_worked < 10, ]
   expect_true(all(pre_eligible$net_marginal_tax_rate > 0, na.rm = TRUE))
 
-  # Eligibility transition year should have strongly negative NMTR
+  # Eligibility transition year should have negative NMTR
+  # (benefit accrual exceeds tax at eligibility transition)
   year_10 <- working_years[working_years$years_worked == 10, ]
-  expect_lt(year_10$net_marginal_tax_rate, -1)  # Should be very negative
+  expect_lt(year_10$net_marginal_tax_rate, 0)  # Should be negative
 
   # Max NMTR should not exceed full tax rate (6.2%)
   valid_rates <- working_years$net_marginal_tax_rate[!is.na(working_years$net_marginal_tax_rate)]

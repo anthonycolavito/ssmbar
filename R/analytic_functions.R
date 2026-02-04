@@ -331,16 +331,39 @@ rep_rates <- function(worker, assumptions) {
 #' one worked t years and the other worked t-1 years. The marginal value is the
 #' difference in their lifetime PV of benefits.
 #'
-#' Key insights:
+#' \strong{Spousal Benefits:}
+#' If the worker has spouse data (from \code{calculate_benefits()} with spouse
+#' parameters), the function includes the worker's dependent spousal benefit in the
+#' calculation. The spouse's PIA is treated as exogenous (fixed), while the worker's
+#' spousal benefit is recalculated at each year as their own PIA changes:
+#' \itemize{
+#'   \item Spousal PIA = max(0, 50\% × spouse's PIA - worker's own PIA)
+#'   \item As the worker's own PIA increases, their spousal benefit decreases
+#'   \item This can result in higher NMTRs for lower-earning spouses
+#' }
+#'
+#' \strong{Statutory Calculations:}
+#' This function uses the actual statutory formulas for AIME and PIA:
+#' \itemize{
+#'   \item \strong{AIME}: Per 42 USC 415(b), computed as floor(sum(top comp_period
+#'     indexed earnings) / (comp_period * 12)), rounded DOWN to nearest dollar
+#'   \item \strong{Regular PIA}: Per 42 USC 415(a)(1)(A), uses 90/32/15 bend point
+#'     formula with factors from worker's eligibility year, floored to dime
+#'   \item \strong{Special Minimum PIA}: Per 42 USC 415(a)(1)(C), computed if
+#'     years of coverage >= 11, equals special_min_rate * (YOC - 10)
+#'   \item \strong{Final PIA}: Maximum of regular and special minimum PIA
+#' }
+#'
+#' \strong{Key insights:}
 #' \itemize{
 #'   \item Years 1-9: Worker not yet eligible (< 40 QCs), so delta_pv = 0
 #'   \item Year 10: Worker becomes eligible, large positive delta_pv
-#'   \item Years 11-35: Each year adds to AIME numerator (denominator fixed at 420)
+#'   \item Years 11-35: Each year adds to AIME numerator
 #'   \item Years 36+: Only adds value if displacing a lower-earning year from top 35
 #' }
 #'
-#' The computation period (35 years) is fixed based on eligibility age, NOT on
-#' years worked. AIME = sum(top 35 indexed earnings, with zeros if < 35 years) / 420.
+#' The computation period (typically 35 years for retirement) is fixed based on
+#' eligibility age per 42 USC 415(b)(2)(A), NOT on years worked.
 #'
 #' @examples
 #' \dontrun{
@@ -374,18 +397,13 @@ marginal_benefit_analysis <- function(worker, assumptions) {
    stop("worker data must contain 'bp1_elig' and 'bp2_elig' columns (run with debugg = TRUE)")
  }
 
- # Get assumption columns - need nominal discount factor (df) and cola
- assumption_cols <- c("df", "cola")
+ # Get assumption columns - need nominal discount factor (df), cola, and special minimum params
+ assumption_cols <- c("df", "cola", "yoc_threshold", "special_min_rate", "min_yoc_for_special_min")
  cols_missing <- assumption_cols[!assumption_cols %in% names(worker)]
  if (length(cols_missing) > 0) {
    worker <- worker %>%
-     left_join(assumptions %>% select(year, all_of(cols_missing)), by = "year")
+     left_join(assumptions %>% select(year, any_of(cols_missing)), by = "year")
  }
-
- # Get PIA factors (typically 0.90, 0.32, 0.15)
- fact1 <- 0.90
- fact2 <- 0.32
- fact3 <- 0.15
 
  # Process each worker
  result <- worker %>%
@@ -401,6 +419,56 @@ marginal_benefit_analysis <- function(worker, assumptions) {
      bp1 <- first(w$bp1_elig[!is.na(w$bp1_elig)])
      bp2 <- first(w$bp2_elig[!is.na(w$bp2_elig)])
      eligibility_year <- birth_yr + 62
+     elig_age <- 62  # Standard eligibility age for retirement
+
+     # Get PIA factors from worker data (use statutory defaults if not available)
+     fact1 <- if ("fact1_elig" %in% names(w)) first(w$fact1_elig[!is.na(w$fact1_elig)]) else 0.90
+     fact2 <- if ("fact2_elig" %in% names(w)) first(w$fact2_elig[!is.na(w$fact2_elig)]) else 0.32
+     fact3 <- if ("fact3_elig" %in% names(w)) first(w$fact3_elig[!is.na(w$fact3_elig)]) else 0.15
+
+     # Get reform parameters from assumptions at eligibility year
+     # These support policy reforms:
+     # - bp3/fact4: 4th PIA bracket (Reform #3, #12-14)
+     # - pia_multiplier: Across-the-board benefit changes (Reform #1)
+     # - flat_benefit: Flat benefit floor (Reform #2)
+     elig_yr_idx <- which(assumptions$year == eligibility_year)
+     if (length(elig_yr_idx) > 0) {
+       bp3 <- if ("bp3" %in% names(assumptions)) assumptions$bp3[elig_yr_idx[1]] else NA_real_
+       fact4 <- if ("fact4" %in% names(assumptions)) assumptions$fact4[elig_yr_idx[1]] else NA_real_
+       pia_multiplier <- if ("pia_multiplier" %in% names(assumptions)) {
+         val <- assumptions$pia_multiplier[elig_yr_idx[1]]
+         if (is.na(val)) 1.0 else val
+       } else 1.0
+       flat_benefit <- if ("flat_benefit" %in% names(assumptions)) assumptions$flat_benefit[elig_yr_idx[1]] else NA_real_
+     } else {
+       bp3 <- NA_real_
+       fact4 <- NA_real_
+       pia_multiplier <- 1.0
+       flat_benefit <- NA_real_
+     }
+
+     # Get computation period from worker data (use statutory formula if not available)
+     # Per 42 USC 415(b)(2)(A): comp_period = elapsed_years - dropout_years, min 2
+     # For retirement: elapsed = elig_age - 1 - 21, dropout = 5
+     if ("comp_period" %in% names(w)) {
+       comp_period <- first(w$comp_period[!is.na(w$comp_period)])
+     } else {
+       elapsed_years <- elig_age - 1 - 21  # 40 for age 62
+       dropout_years <- 5
+       comp_period <- max(2, elapsed_years - dropout_years)  # 35 for age 62
+     }
+
+     # Get special minimum parameters at eligibility year
+     elig_idx <- which(w$year == eligibility_year)
+     if (length(elig_idx) > 0 && "special_min_rate" %in% names(w)) {
+       special_min_rate_elig <- w$special_min_rate[elig_idx[1]]
+       min_yoc_elig <- if ("min_yoc_for_special_min" %in% names(w)) {
+         w$min_yoc_for_special_min[elig_idx[1]]
+       } else 11
+     } else {
+       special_min_rate_elig <- NA
+       min_yoc_elig <- 11
+     }
 
      # Get actuarial factor if available
      if ("act_factor" %in% names(w)) {
@@ -408,6 +476,40 @@ marginal_benefit_analysis <- function(worker, assumptions) {
        if (is.na(act_factor) || length(act_factor) == 0) act_factor <- 1.0
      } else {
        act_factor <- 1.0
+     }
+
+     # Get spousal actuarial factor if available (for dependent spousal benefit)
+     if ("s_act_factor" %in% names(w)) {
+       s_act_factor <- w$s_act_factor[which(w$age == claim_age)[1]]
+       if (is.na(s_act_factor) || length(s_act_factor) == 0) s_act_factor <- act_factor
+     } else {
+       s_act_factor <- act_factor  # Use worker's factor as fallback
+     }
+
+     # Get spouse's PIA if available (fixed/exogenous - doesn't change with worker's years worked)
+     # s_pia is the spouse's COLA-adjusted PIA from their own earnings record
+     has_spouse <- "s_pia" %in% names(w) && any(!is.na(w$s_pia))
+     if (has_spouse) {
+       # Get spouse's PIA at claim year (when benefits start)
+       claim_year <- birth_yr + ceiling(claim_age)
+       s_pia_idx <- which(w$year == claim_year & !is.na(w$s_pia))
+       if (length(s_pia_idx) > 0) {
+         spouse_pia_fixed <- w$s_pia[s_pia_idx[1]]
+       } else {
+         # Fallback: use first non-NA s_pia value
+         spouse_pia_fixed <- first(w$s_pia[!is.na(w$s_pia)])
+       }
+       if (is.na(spouse_pia_fixed)) has_spouse <- FALSE
+     }
+     if (!has_spouse) spouse_pia_fixed <- 0
+
+     # Get s_pia_share (typically 0.5) from assumptions
+     s_pia_share <- if ("s_pia_share" %in% names(w)) {
+       first(w$s_pia_share[!is.na(w$s_pia_share)])
+     } else if ("s_pia_share" %in% names(assumptions)) {
+       first(assumptions$s_pia_share[!is.na(assumptions$s_pia_share)])
+     } else {
+       0.5  # Default spousal share
      }
 
      # Identify working years (ages 21-64)
@@ -427,8 +529,16 @@ marginal_benefit_analysis <- function(worker, assumptions) {
 
      if (n_working == 0) return(w)
 
-     # Get indexed earnings for working years
+     # Get indexed earnings and nominal earnings for working years
      indexed_earnings <- w$indexed_earn[working_idx]
+     nominal_earnings <- w$earnings[working_idx]
+
+     # Get yoc_threshold for each working year (for special minimum calculation)
+     if ("yoc_threshold" %in% names(w)) {
+       yoc_thresholds <- w$yoc_threshold[working_idx]
+     } else {
+       yoc_thresholds <- rep(NA, n_working)
+     }
 
      # Pre-compute COLA factors for each benefit year
      # COLA factors don't depend on the working year, so we compute once
@@ -478,19 +588,48 @@ marginal_benefit_analysis <- function(worker, assumptions) {
        }
      }
 
-     # Helper function to compute PV of lifetime benefits given a PIA
+     # Helper function to compute PV of lifetime benefits given own PIA
+     # Includes worker's dependent spousal benefit if spouse data is available
      # Discounts nominal benefits to the specified working year
-     compute_pv <- function(pia, df_working_year) {
-       if (pia <= 0 || is.na(df_working_year) || df_working_year == 0) return(0)
+     #
+     # Eligibility rules:
+     # - Worker's own retired worker benefit: Requires 40 QCs (10 years of work)
+     # - Dependent spousal benefit: NO work requirement - based on spouse's record
+     compute_pv <- function(own_pia, df_working_year, t_years) {
+       if (is.na(df_working_year) || df_working_year == 0) return(0)
 
-       # Worker benefit at claim = PIA × actuarial factor
-       worker_benefit_monthly <- pia * act_factor
+       # Worker's own benefit at claim = own_PIA × actuarial factor
+       # Only payable if worker is insured (40 QCs = 10 years of work)
+       if (t_years >= 10 && own_pia > 0) {
+         worker_benefit_monthly <- own_pia * act_factor
+       } else {
+         worker_benefit_monthly <- 0
+       }
+
+       # Worker's dependent spousal benefit (based on spouse's record)
+       # Spousal PIA = max(0, s_pia_share × spouse's PIA - worker's own PIA)
+       # This decreases as the worker's own PIA increases
+       # NO work requirement for spousal benefits - worker can receive them
+       # even with zero quarters of coverage
+       if (has_spouse && spouse_pia_fixed > 0) {
+         # Use worker's own PIA in offset calculation (0 if not insured)
+         effective_own_pia <- if (t_years >= 10) own_pia else 0
+         spousal_pia <- max(0, s_pia_share * spouse_pia_fixed - effective_own_pia)
+         spousal_benefit_monthly <- spousal_pia * s_act_factor
+       } else {
+         spousal_benefit_monthly <- 0
+       }
+
+       # Total monthly benefit
+       total_monthly <- worker_benefit_monthly + spousal_benefit_monthly
+
+       if (total_monthly <= 0) return(0)
 
        # Annual benefit at each age = monthly × 12 × COLA adjustment
        # Discount nominal benefits back to working year using nominal df
        pv_sum <- 0
        for (i in seq_along(benefit_ages)) {
-         annual_nominal <- worker_benefit_monthly * 12 * cola_factors[i]
+         annual_nominal <- total_monthly * 12 * cola_factors[i]
          # Discount factor: df_working_year / df_benefit_year
          # This gives the value of $1 received in benefit year, in working-year dollars
          discount_factor <- df_working_year / df_benefit_years[i]
@@ -502,22 +641,45 @@ marginal_benefit_analysis <- function(worker, assumptions) {
      # Rank all working years by indexed earnings (for reporting)
      all_ranks <- rank(-indexed_earnings, ties.method = "first")
 
-     # Helper function to compute AIME and PIA given t years of indexed earnings
-     compute_pia <- function(t_years) {
+     # Helper function to compute AIME given t years of indexed earnings
+     # Uses statutory formula: floor(sum(top comp_period earnings) / (comp_period * 12))
+     compute_aime <- function(t_years) {
        if (t_years < 1) return(0)
-       if ((4 * t_years) < 40) return(0)  # Not yet eligible
 
        earnings_so_far <- indexed_earnings[1:t_years]
+       years_to_use <- min(t_years, comp_period)
 
-       if (t_years <= 35) {
-         aime <- sum(earnings_so_far, na.rm = TRUE) / 420
+       if (t_years <= comp_period) {
+         # Use all earnings, zero-fill for missing years
+         top_earnings_sum <- sum(earnings_so_far, na.rm = TRUE)
        } else {
-         top_35 <- sort(earnings_so_far, decreasing = TRUE)[1:35]
-         aime <- sum(top_35, na.rm = TRUE) / 420
+         # Use top comp_period years
+         top_earnings <- sort(earnings_so_far, decreasing = TRUE)[1:comp_period]
+         top_earnings_sum <- sum(top_earnings, na.rm = TRUE)
        }
 
-       # Compute PIA using bend point formula
-       pia <- if (aime <= bp1) {
+       # Per 42 USC 415(b): AIME rounded DOWN to next lowest dollar
+       floor(top_earnings_sum / (comp_period * 12))
+     }
+
+     # Helper function to compute years of coverage for special minimum
+     # Counts years where earnings >= yoc_threshold
+     compute_yoc <- function(t_years) {
+       if (t_years < 1 || all(is.na(yoc_thresholds[1:t_years]))) return(0)
+       sum(nominal_earnings[1:t_years] >= yoc_thresholds[1:t_years], na.rm = TRUE)
+     }
+
+     # Helper function to compute PIA given AIME and years of coverage
+     # Returns max of regular PIA and special minimum PIA per 42 USC 415(a)(1)
+     # Supports reform parameters: 4th bracket (bp3/fact4), PIA multiplier, flat benefit
+     compute_pia <- function(aime, yoc) {
+       # Regular PIA: bend point formula per 42 USC 415(a)(1)(A)
+       # Standard: 90/32/15 (3 brackets)
+       # Reform: 90/32/15/X (4 brackets) when bp3 and fact4 are specified
+       regular_pia <- if (!is.na(bp3) && !is.na(fact4) && aime > bp3) {
+         # 4-bracket formula (Reform #3, #12-14)
+         fact1 * bp1 + fact2 * (bp2 - bp1) + fact3 * (bp3 - bp2) + fact4 * (aime - bp3)
+       } else if (aime <= bp1) {
          fact1 * aime
        } else if (aime <= bp2) {
          fact1 * bp1 + fact2 * (aime - bp1)
@@ -525,8 +687,26 @@ marginal_benefit_analysis <- function(worker, assumptions) {
          fact1 * bp1 + fact2 * (bp2 - bp1) + fact3 * (aime - bp2)
        }
 
-       # Floor to dime (SSA rule)
-       floor(pia * 10) / 10
+       # Floor to dime per 42 USC 415(a)(2)(C)
+       regular_pia <- floor(regular_pia * 10) / 10
+
+       # Apply PIA multiplier (Reform #1) - across-the-board benefit changes
+       regular_pia <- floor(regular_pia * pia_multiplier * 10) / 10
+
+       # Apply flat benefit floor (Reform #2) if specified
+       if (!is.na(flat_benefit) && flat_benefit > 0) {
+         regular_pia <- max(regular_pia, flat_benefit)
+       }
+
+       # Special minimum PIA per 42 USC 415(a)(1)(C)(i)
+       # Only if years_of_coverage >= min_yoc_elig (typically 11)
+       special_min_pia <- 0
+       if (!is.na(special_min_rate_elig) && yoc >= min_yoc_elig) {
+         special_min_pia <- floor(special_min_rate_elig * (yoc - 10) * 10) / 10
+       }
+
+       # Per 42 USC 415(a)(1): PIA is the HIGHER of regular or special minimum
+       max(regular_pia, special_min_pia)
      }
 
      # Compute marginal benefits for each working year
@@ -538,7 +718,7 @@ marginal_benefit_analysis <- function(worker, assumptions) {
        w$qcs[idx] <- 4 * t
        w$eligible[idx] <- (4 * t) >= 40
        w$indexed_rank[idx] <- all_ranks[t]
-       w$in_top_35[idx] <- all_ranks[t] <= 35
+       w$in_top_35[idx] <- all_ranks[t] <= comp_period
 
        # Get nominal discount factor for this working year
        df_idx <- which(assumptions$year == working_year)
@@ -549,31 +729,32 @@ marginal_benefit_analysis <- function(worker, assumptions) {
        }
 
        if (w$qcs[idx] < 40) {
-         # Not yet eligible
+         # Not yet eligible for own benefits, but may receive spousal benefits
          w$cumulative_aime[idx] <- 0
          w$cumulative_pia[idx] <- 0
-         w$cumulative_pv[idx] <- 0
-         w$delta_pv_benefits[idx] <- 0
+
+         # Spousal benefits don't require QCs - compute PV even for pre-eligibility
+         pv_t <- compute_pv(0, df_working, t)
+         pv_t_minus_1 <- compute_pv(0, df_working, t - 1)
+         w$cumulative_pv[idx] <- pv_t
+         w$delta_pv_benefits[idx] <- pv_t - pv_t_minus_1
        } else {
-         # Compute PIA with t years
-         pia_t <- compute_pia(t)
+         # Compute AIME and years of coverage with t years
+         aime_t <- compute_aime(t)
+         yoc_t <- compute_yoc(t)
+         pia_t <- compute_pia(aime_t, yoc_t)
 
          # Compute PIA with t-1 years (for delta calculation)
-         pia_t_minus_1 <- compute_pia(t - 1)
+         aime_t_minus_1 <- compute_aime(t - 1)
+         yoc_t_minus_1 <- compute_yoc(t - 1)
+         pia_t_minus_1 <- compute_pia(aime_t_minus_1, yoc_t_minus_1)
 
          # Compute PV of benefits, both discounted to THIS working year
          # This ensures delta_pv is in the same dollars as earnings/taxes
-         pv_t <- compute_pv(pia_t, df_working)
-         pv_t_minus_1 <- compute_pv(pia_t_minus_1, df_working)
+         pv_t <- compute_pv(pia_t, df_working, t)
+         pv_t_minus_1 <- compute_pv(pia_t_minus_1, df_working, t - 1)
 
-         # AIME for reporting (compute it properly here)
-         if (t <= 35) {
-           aime <- sum(indexed_earnings[1:t], na.rm = TRUE) / 420
-         } else {
-           aime <- sum(sort(indexed_earnings[1:t], decreasing = TRUE)[1:35], na.rm = TRUE) / 420
-         }
-
-         w$cumulative_aime[idx] <- aime
+         w$cumulative_aime[idx] <- aime_t
          w$cumulative_pia[idx] <- pia_t
          w$cumulative_pv[idx] <- pv_t
          w$delta_pv_benefits[idx] <- pv_t - pv_t_minus_1
