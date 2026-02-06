@@ -829,7 +829,7 @@ individual_tab_server <- function(id, reform_state) {
               }, error = function(e) NULL)
               if (!is.null(reform_mirr_data)) {
                 reform_mirr_row <- reform_mirr_data %>%
-                  filter(age >= 21 & age <= 64 & !is.na(marginal_irr) & marginal_irr > -1) %>%
+                  filter(age >= 21 & age <= 64 & !is.na(marginal_irr)) %>%
                   arrange(desc(age)) %>%
                   head(1)
                 if (nrow(reform_mirr_row) > 0) {
@@ -841,7 +841,7 @@ individual_tab_server <- function(id, reform_state) {
         }
 
         list(
-          mirr = if (!is.na(mirr_val) && mirr_val > -1) mirr_val else NA_real_,
+          mirr = if (!is.na(mirr_val)) mirr_val else NA_real_,
           btr = marginal_btr,
           reform_mirr = reform_mirr,
           reform_btr = reform_btr,
@@ -959,7 +959,7 @@ individual_tab_server <- function(id, reform_state) {
           earnings = round(earnings, 0),
           delta_pv_benefits = round(delta_pv_benefits, 0),
           net_marginal_tax_rate = round(net_marginal_tax_rate * 100, 1),
-          marginal_irr = ifelse(marginal_irr == -1, NA, round(marginal_irr * 100, 1))
+          marginal_irr = round(marginal_irr * 100, 1)
         ) %>%
         rename(
           Age = age, Earnings = earnings,

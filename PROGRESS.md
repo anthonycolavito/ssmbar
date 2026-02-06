@@ -28,6 +28,21 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 3b) — Fix Marginal IRR Showing N/A for -100% Returns
+
+**Task**: Marginal IRR metric showed "N/A" instead of "-100.0%" when delta_pv_benefits was 0 (worker pays taxes but accrues no additional benefits).
+
+**Root Cause**: The Shiny display layer was filtering out IRR values of -1.0 (which represents -100%) and converting them to NA. This happened in three places:
+1. `marginal_extra_year()` reactive: `mirr_val > -1` guard converted -1 to NA
+2. Reform IRR filter: `marginal_irr > -1` skipped last working year if it had -1
+3. Data table: `ifelse(marginal_irr == -1, NA, ...)` hid -100% values
+
+**Fix**: Removed all three `-1 → NA` conversions. The underlying `marginal_irr()` function correctly returns -1.0 for zero-accrual years; the display should show this as -100.0%.
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 3) — Fix Employer Tax Inclusion and NMTR Reform Chart
 
 **Task**: Fix two bugs: (1) employer-paid taxes missing from BTR and IRR calculations, (2) NMTR chart switching from bars to lines when reform selected.
