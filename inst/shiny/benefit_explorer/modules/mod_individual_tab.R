@@ -16,6 +16,20 @@ individual_tab_ui <- function(id) {
   ns <- NS(id)
 
   tagList(
+    # Shared parameters row (birth year and claim age apply to both workers)
+    fluidRow(
+      column(3,
+        numericInput(ns("birth_year"), "Birth Year",
+                     value = BIRTH_YEAR_DEFAULT,
+                     min = BIRTH_YEAR_MIN, max = BIRTH_YEAR_MAX, step = 1)
+      ),
+      column(3,
+        numericInput(ns("claim_age"), "Claim Age",
+                     value = CLAIM_AGE_DEFAULT,
+                     min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
+      )
+    ),
+
     # Row 1: Worker configuration cards
     fluidRow(
       # Primary worker config
@@ -36,24 +50,10 @@ individual_tab_ui <- function(id) {
                 selectInput(ns("sex"), "Sex", choices = SEX_OPTIONS, selected = "all")
               )
             ),
-
             conditionalPanel(
               condition = sprintf("input['%s'] == 'custom'", ns("worker_type")),
               numericInput(ns("custom_earnings"), "Avg Real Earnings ($)",
                            value = CUSTOM_EARNINGS_DEFAULT, min = 1000, max = 500000, step = 1000)
-            ),
-
-            fluidRow(
-              column(6,
-                numericInput(ns("birth_year"), "Birth Year",
-                             value = BIRTH_YEAR_DEFAULT,
-                             min = BIRTH_YEAR_MIN, max = BIRTH_YEAR_MAX, step = 1)
-              ),
-              column(6,
-                numericInput(ns("claim_age"), "Claim Age",
-                             value = CLAIM_AGE_DEFAULT,
-                             min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
-              )
             )
           )
         )
@@ -85,18 +85,6 @@ individual_tab_ui <- function(id) {
                 condition = sprintf("input['%s'] == 'custom'", ns("spouse_type")),
                 numericInput(ns("spouse_custom_earnings"), "Spouse Earnings ($)",
                              value = CUSTOM_EARNINGS_DEFAULT, min = 1000, max = 500000, step = 1000)
-              ),
-              fluidRow(
-                column(6,
-                  numericInput(ns("spouse_birth_year"), "Birth Year",
-                               value = BIRTH_YEAR_DEFAULT,
-                               min = BIRTH_YEAR_MIN, max = BIRTH_YEAR_MAX, step = 1)
-                ),
-                column(6,
-                  numericInput(ns("spouse_claim_age"), "Claim Age",
-                               value = CLAIM_AGE_DEFAULT,
-                               min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
-                )
               )
             ),
             conditionalPanel(
@@ -233,8 +221,8 @@ individual_tab_server <- function(id, reform_state) {
         # Prepare spouse parameters
         spouse_type <- if (input$add_spouse) input$spouse_type else NULL
         spouse_sex <- if (input$add_spouse) input$spouse_sex else NULL
-        spouse_birth_yr <- if (input$add_spouse) input$spouse_birth_year else NULL
-        spouse_claim_age <- if (input$add_spouse) input$spouse_claim_age else NULL
+        spouse_birth_yr <- if (input$add_spouse) input$birth_year else NULL
+        spouse_claim_age <- if (input$add_spouse) input$claim_age else NULL
         spouse_custom <- if (input$add_spouse && input$spouse_type == "custom") {
           input$spouse_custom_earnings
         } else NULL
@@ -265,10 +253,10 @@ individual_tab_server <- function(id, reform_state) {
           } else NULL
 
           spouse_data <- calculate_benefits(
-            birth_yr = input$spouse_birth_year,
+            birth_yr = input$birth_year,
             sex = input$spouse_sex,
             type = input$spouse_type,
-            age_claim = input$spouse_claim_age,
+            age_claim = input$claim_age,
             factors = sef2025,
             assumptions = tr2025,
             custom_avg_earnings = spouse_custom_ind,
@@ -303,10 +291,30 @@ individual_tab_server <- function(id, reform_state) {
           reform_data$is_reform <- TRUE
         }
 
+        # Calculate REFORM spouse benefits independently (if spouse + reforms)
+        reform_spouse_data <- NULL
+        if (input$add_spouse && reform_state$has_reforms() && !is.null(reform_assumptions)) {
+          reform_spouse_data <- tryCatch({
+            rs <- calculate_benefits_reform(
+              birth_yr = input$birth_year,
+              sex = input$spouse_sex,
+              type = input$spouse_type,
+              age_claim = input$claim_age,
+              factors = sef2025,
+              assumptions = reform_assumptions,
+              custom_avg_earnings = spouse_custom_ind,
+              debugg = TRUE
+            )
+            rs$scenario <- "Reform Spouse"
+            rs
+          }, error = function(e) NULL)
+        }
+
         list(
           baseline = baseline,
           reform = reform_data,
           spouse = spouse_data,
+          reform_spouse = reform_spouse_data,
           has_spouse = input$add_spouse,
           has_reforms = reform_state$has_reforms(),
           reform_label = reform_state$reform_label(),
@@ -320,6 +328,121 @@ individual_tab_server <- function(id, reform_state) {
         return(NULL)
       })
     }, ignoreNULL = FALSE)
+
+    # Couple IRR helper: combine primary + spouse tax/benefit streams, solve with uniroot
+    compute_couple_irr <- function(worker, spouse, assumptions, include_employer = TRUE) {
+      tryCatch({
+        w_taxes <- calculate_taxes(worker, assumptions)
+        s_taxes <- calculate_taxes(spouse, assumptions)
+
+        claim_age_val <- unique(worker$claim_age)[1]
+        death_age_val <- unique(worker$death_age)[1]
+        floor_death <- floor(death_age_val)
+        frac_death <- death_age_val - floor_death
+
+        # Combined tax stream (ages 21-64)
+        w_tax <- w_taxes %>%
+          filter(age >= 21 & age <= 64) %>%
+          mutate(tax_amount = if (include_employer) ss_tax * 2 else ss_tax) %>%
+          select(age, tax_amount)
+        s_tax <- s_taxes %>%
+          filter(age >= 21 & age <= 64) %>%
+          mutate(tax_amount = if (include_employer) ss_tax * 2 else ss_tax) %>%
+          select(age, tax_amount)
+
+        combined_tax <- merge(w_tax, s_tax, by = "age", all = TRUE, suffixes = c("_w", "_s"))
+        combined_tax$tax_amount_w[is.na(combined_tax$tax_amount_w)] <- 0
+        combined_tax$tax_amount_s[is.na(combined_tax$tax_amount_s)] <- 0
+        combined_tax$total_tax <- combined_tax$tax_amount_w + combined_tax$tax_amount_s
+
+        # Combined benefit stream (claim_age to death_age, with partial year)
+        w_ben <- worker %>%
+          filter(age >= claim_age_val & age <= floor_death & annual_ind > 0) %>%
+          mutate(ben_amount = if_else(age == floor_death, annual_ind * frac_death, annual_ind)) %>%
+          select(age, ben_amount)
+        s_ben <- spouse %>%
+          filter(age >= claim_age_val & age <= floor_death & annual_ind > 0) %>%
+          mutate(ben_amount = if_else(age == floor_death, annual_ind * frac_death, annual_ind)) %>%
+          select(age, ben_amount)
+
+        combined_ben <- merge(w_ben, s_ben, by = "age", all = TRUE, suffixes = c("_w", "_s"))
+        combined_ben$ben_amount_w[is.na(combined_ben$ben_amount_w)] <- 0
+        combined_ben$ben_amount_s[is.na(combined_ben$ben_amount_s)] <- 0
+        combined_ben$total_ben <- combined_ben$ben_amount_w + combined_ben$ben_amount_s
+
+        total_taxes <- sum(combined_tax$total_tax, na.rm = TRUE)
+        total_benefits <- sum(combined_ben$total_ben, na.rm = TRUE)
+        if (total_taxes == 0 || total_benefits == 0) return(NA_real_)
+
+        npv_func <- function(r) {
+          base_age <- 21
+          pv_taxes <- sum(combined_tax$total_tax / (1 + r)^(combined_tax$age - base_age), na.rm = TRUE)
+          pv_benefits <- sum(combined_ben$total_ben / (1 + r)^(combined_ben$age - base_age), na.rm = TRUE)
+          pv_benefits - pv_taxes
+        }
+
+        result <- uniroot(npv_func, interval = c(-0.99, 1.0), tol = 1e-8)
+        result$root
+      }, error = function(e) NA_real_)
+    }
+
+    # Couple statistics reactive: shared (50/50) measures when spouse is present
+    couple_stats <- reactive({
+      data <- worker_data()
+      if (is.null(data) || !data$has_spouse || is.null(data$spouse)) return(NULL)
+
+      tryCatch({
+        baseline <- data$baseline
+        spouse <- data$spouse
+        assumptions <- data$assumptions
+
+        # Couple measures using existing function
+        cm <- couple_measures(baseline, spouse, assumptions,
+                              include_employer = TRUE, shared = TRUE)
+
+        # Shared monthly = (primary_ben + spouse_ben) / 2
+        claim_age_val <- unique(baseline$claim_age)[1]
+        primary_monthly <- baseline$ben[baseline$age == claim_age_val][1]
+        spouse_monthly <- spouse$ben[spouse$age == claim_age_val][1]
+
+        # Couple IRR
+        couple_irr <- compute_couple_irr(baseline, spouse, assumptions)
+
+        result <- list(
+          shared_monthly = (primary_monthly + spouse_monthly) / 2,
+          shared_pv_benefits = cm$couple_pv_benefits / 2,
+          shared_pv_taxes = cm$couple_pv_taxes / 2,
+          shared_btr = cm$couple_ratio,
+          shared_irr = couple_irr
+        )
+
+        # Reform shared values (if reforms active)
+        if (data$has_reforms && !is.null(data$reform) && !is.null(data$reform_spouse)) {
+          reform <- data$reform
+          reform_spouse <- data$reform_spouse
+          reform_assumptions <- data$reform_assumptions
+
+          cm_reform <- couple_measures(reform, reform_spouse, reform_assumptions,
+                                       include_employer = TRUE, shared = TRUE)
+
+          reform_primary_monthly <- reform$ben[reform$age == claim_age_val][1]
+          reform_spouse_monthly <- reform_spouse$ben[reform_spouse$age == claim_age_val][1]
+
+          reform_couple_irr <- compute_couple_irr(reform, reform_spouse, reform_assumptions)
+
+          result$reform_shared_monthly <- (reform_primary_monthly + reform_spouse_monthly) / 2
+          result$reform_shared_pv_benefits <- cm_reform$couple_pv_benefits / 2
+          result$reform_shared_pv_taxes <- cm_reform$couple_pv_taxes / 2
+          result$reform_shared_btr <- cm_reform$couple_ratio
+          result$reform_shared_irr <- reform_couple_irr
+          result$has_reforms <- TRUE
+        } else {
+          result$has_reforms <- FALSE
+        }
+
+        result
+      }, error = function(e) NULL)
+    })
 
     # Prepare chart data (combined baseline + reform)
     chart_data <- reactive({
@@ -576,19 +699,48 @@ individual_tab_server <- function(id, reform_state) {
       p
     })
 
+    # Helper: build a value row with optional reform arrow
+    format_value_row <- function(label, baseline_val, reform_val, formatter, has_reform,
+                                  positive_class = "text-success", negative_class = "text-danger") {
+      if (has_reform && !is.na(reform_val)) {
+        tags$div(
+          tags$small(class = "text-muted", paste0(label, ": ")),
+          tags$span(class = "text-muted", formatter(baseline_val)),
+          tags$span(" \u2192 "),
+          tags$strong(class = if (reform_val < baseline_val) negative_class else positive_class,
+                      formatter(reform_val))
+        )
+      } else {
+        tags$div(
+          tags$small(class = "text-muted", paste0(label, ": ")),
+          tags$strong(class = "text-info", formatter(baseline_val))
+        )
+      }
+    }
+
     # Metric: Monthly benefit at claim
     output$metric_monthly <- renderUI({
       data <- worker_data()
       if (is.null(data) || is.null(data$baseline)) return(NULL)
+      couple <- couple_stats()
 
       baseline <- data$baseline
       claim_age <- unique(baseline$claim_age)[1]
       baseline_ben <- baseline$ben[baseline$age == claim_age][1]
+      has_reform <- data$has_reforms && !is.null(data$reform)
+      reform_ben <- if (has_reform) data$reform$ben[data$reform$age == claim_age][1] else NA_real_
 
-      if (data$has_reforms && !is.null(data$reform)) {
-        reform_ben <- data$reform$ben[data$reform$age == claim_age][1]
+      if (!is.null(couple)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", paste0("Monthly at ", claim_age)),
+          format_value_row("Individual", baseline_ben, reform_ben, format_currency, has_reform),
+          format_value_row("Shared", couple$shared_monthly,
+                           if (isTRUE(couple$has_reforms)) couple$reform_shared_monthly else NA_real_,
+                           format_currency, isTRUE(couple$has_reforms))
+        )
+      } else if (has_reform) {
         pct_change <- (reform_ben / baseline_ben - 1) * 100
-
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", paste0("Monthly at ", claim_age)),
@@ -614,28 +766,39 @@ individual_tab_server <- function(id, reform_state) {
     output$metric_pv_benefits <- renderUI({
       data <- worker_data()
       if (is.null(data) || is.null(data$baseline)) return(NULL)
+      couple <- couple_stats()
 
       baseline_pv <- tryCatch({
         pv_lifetime_benefits(data$baseline, data$assumptions)$pv_benefits[1]
       }, error = function(e) NA_real_)
+      has_reform <- data$has_reforms && !is.null(data$reform)
+      reform_pv <- if (has_reform) tryCatch({
+        pv_lifetime_benefits(data$reform, data$reform_assumptions)$pv_benefits[1]
+      }, error = function(e) NA_real_) else NA_real_
 
-      if (data$has_reforms && !is.null(data$reform)) {
-        reform_pv <- tryCatch({
-          pv_lifetime_benefits(data$reform, data$reform_assumptions)$pv_benefits[1]
-        }, error = function(e) NA_real_)
+      fmt_k <- function(x) format_currency(x / 1000, suffix = "K")
 
+      if (!is.null(couple)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Benefits"),
+          format_value_row("Individual", baseline_pv, reform_pv, fmt_k, has_reform),
+          format_value_row("Shared", couple$shared_pv_benefits,
+                           if (isTRUE(couple$has_reforms)) couple$reform_shared_pv_benefits else NA_real_,
+                           fmt_k, isTRUE(couple$has_reforms))
+        )
+      } else if (has_reform) {
         pct_change <- if (!is.na(baseline_pv) && !is.na(reform_pv) && baseline_pv > 0) {
           (reform_pv / baseline_pv - 1) * 100
         } else NA_real_
-
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "PV Benefits"),
           tags$div(
-            tags$span(class = "text-muted", format_currency(baseline_pv / 1000, suffix = "K")),
+            tags$span(class = "text-muted", fmt_k(baseline_pv)),
             tags$span(" \u2192 "),
             tags$strong(class = if (!is.na(pct_change) && pct_change < 0) "text-danger" else "text-success",
-                        format_currency(reform_pv / 1000, suffix = "K"))
+                        fmt_k(reform_pv))
           ),
           if (!is.na(pct_change)) {
             tags$small(class = if (pct_change < 0) "text-danger" else "text-success",
@@ -646,7 +809,7 @@ individual_tab_server <- function(id, reform_state) {
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "PV Benefits"),
-          tags$strong(class = "text-success", format_currency(baseline_pv / 1000, suffix = "K"))
+          tags$strong(class = "text-success", fmt_k(baseline_pv))
         )
       }
     })
@@ -655,30 +818,42 @@ individual_tab_server <- function(id, reform_state) {
     output$metric_pv_taxes <- renderUI({
       data <- worker_data()
       if (is.null(data) || is.null(data$baseline)) return(NULL)
+      couple <- couple_stats()
 
       baseline_pv_tax <- tryCatch({
         pv_lifetime_taxes(data$baseline, data$assumptions,
                           include_employer = TRUE)$pv_taxes[1]
       }, error = function(e) NA_real_)
+      has_reform <- data$has_reforms && !is.null(data$reform)
+      reform_pv_tax <- if (has_reform) tryCatch({
+        pv_lifetime_taxes(data$reform, data$reform_assumptions,
+                          include_employer = TRUE)$pv_taxes[1]
+      }, error = function(e) NA_real_) else NA_real_
 
-      if (data$has_reforms && !is.null(data$reform)) {
-        reform_pv_tax <- tryCatch({
-          pv_lifetime_taxes(data$reform, data$reform_assumptions,
-                            include_employer = TRUE)$pv_taxes[1]
-        }, error = function(e) NA_real_)
+      fmt_k <- function(x) format_currency(x / 1000, suffix = "K")
 
+      if (!is.null(couple)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "PV Taxes"),
+          format_value_row("Individual", baseline_pv_tax, reform_pv_tax, fmt_k, has_reform,
+                           positive_class = "text-warning", negative_class = "text-warning"),
+          format_value_row("Shared", couple$shared_pv_taxes,
+                           if (isTRUE(couple$has_reforms)) couple$reform_shared_pv_taxes else NA_real_,
+                           fmt_k, isTRUE(couple$has_reforms),
+                           positive_class = "text-warning", negative_class = "text-warning")
+        )
+      } else if (has_reform) {
         pct_change <- if (!is.na(baseline_pv_tax) && !is.na(reform_pv_tax) && baseline_pv_tax > 0) {
           (reform_pv_tax / baseline_pv_tax - 1) * 100
         } else NA_real_
-
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "PV Taxes"),
           tags$div(
-            tags$span(class = "text-muted", format_currency(baseline_pv_tax / 1000, suffix = "K")),
+            tags$span(class = "text-muted", fmt_k(baseline_pv_tax)),
             tags$span(" \u2192 "),
-            tags$strong(class = "text-warning",
-                        format_currency(reform_pv_tax / 1000, suffix = "K"))
+            tags$strong(class = "text-warning", fmt_k(reform_pv_tax))
           ),
           if (!is.na(pct_change) && abs(pct_change) > 0.01) {
             tags$small(class = "text-warning", sprintf("%+.1f%%", pct_change))
@@ -688,7 +863,7 @@ individual_tab_server <- function(id, reform_state) {
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "PV Taxes"),
-          tags$strong(class = "text-warning", format_currency(baseline_pv_tax / 1000, suffix = "K"))
+          tags$strong(class = "text-warning", fmt_k(baseline_pv_tax))
         )
       }
     })
@@ -697,46 +872,57 @@ individual_tab_server <- function(id, reform_state) {
     output$metric_ratio <- renderUI({
       data <- worker_data()
       if (is.null(data) || is.null(data$baseline)) return(NULL)
+      couple <- couple_stats()
 
       baseline_pv <- tryCatch({
         pv_lifetime_benefits(data$baseline, data$assumptions)$pv_benefits[1]
       }, error = function(e) NA_real_)
-
       baseline_pv_tax <- tryCatch({
         pv_lifetime_taxes(data$baseline, data$assumptions,
                           include_employer = TRUE)$pv_taxes[1]
       }, error = function(e) NA_real_)
-
       baseline_ratio <- if (!is.na(baseline_pv) && !is.na(baseline_pv_tax) && baseline_pv_tax > 0) {
         baseline_pv / baseline_pv_tax
       } else NA_real_
 
-      if (data$has_reforms && !is.null(data$reform)) {
+      has_reform <- data$has_reforms && !is.null(data$reform)
+      reform_ratio <- NA_real_
+      if (has_reform) {
         reform_pv <- tryCatch({
           pv_lifetime_benefits(data$reform, data$reform_assumptions)$pv_benefits[1]
         }, error = function(e) NA_real_)
-
         reform_pv_tax <- tryCatch({
           pv_lifetime_taxes(data$reform, data$reform_assumptions,
                             include_employer = TRUE)$pv_taxes[1]
         }, error = function(e) NA_real_)
-
         reform_ratio <- if (!is.na(reform_pv) && !is.na(reform_pv_tax) && reform_pv_tax > 0) {
           reform_pv / reform_pv_tax
         } else NA_real_
+      }
 
+      fmt_ratio <- function(x) if (!is.na(x)) sprintf("%.2f", x) else "N/A"
+
+      if (!is.null(couple)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Benefit/Tax Ratio"),
+          format_value_row("Individual", baseline_ratio, reform_ratio, fmt_ratio, has_reform),
+          format_value_row("Shared", couple$shared_btr,
+                           if (isTRUE(couple$has_reforms)) couple$reform_shared_btr else NA_real_,
+                           fmt_ratio, isTRUE(couple$has_reforms))
+        )
+      } else if (has_reform) {
         pct_change <- if (!is.na(baseline_ratio) && !is.na(reform_ratio) && baseline_ratio > 0) {
           (reform_ratio / baseline_ratio - 1) * 100
         } else NA_real_
-
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "Benefit/Tax Ratio"),
           tags$div(
-            tags$span(class = "text-muted", sprintf("%.2f", baseline_ratio)),
+            tags$span(class = "text-muted", fmt_ratio(baseline_ratio)),
             tags$span(" \u2192 "),
             tags$strong(class = if (!is.na(reform_ratio) && reform_ratio >= 1) "text-success" else "text-danger",
-                        sprintf("%.2f", reform_ratio))
+                        fmt_ratio(reform_ratio))
           ),
           if (!is.na(pct_change)) {
             tags$small(class = if (pct_change < 0) "text-danger" else "text-success",
@@ -748,8 +934,7 @@ individual_tab_server <- function(id, reform_state) {
         tags$div(
           class = "text-center p-2 rounded", style = "background: #1f3460;",
           tags$small(class = "text-muted d-block", "Benefit/Tax Ratio"),
-          tags$strong(class = ratio_color,
-                      if (!is.na(baseline_ratio)) sprintf("%.2f", baseline_ratio) else "N/A")
+          tags$strong(class = ratio_color, fmt_ratio(baseline_ratio))
         )
       }
     })
@@ -854,18 +1039,46 @@ individual_tab_server <- function(id, reform_state) {
     output$metric_irr <- renderUI({
       data <- worker_data()
       if (is.null(data) || is.null(data$baseline)) return(NULL)
+      couple <- couple_stats()
 
       baseline_irr <- tryCatch({
         internal_rate_of_return(data$baseline, data$assumptions,
                                 include_employer = TRUE)$irr[1]
       }, error = function(e) NA_real_)
+      has_reform <- data$has_reforms && !is.null(data$reform)
+      reform_irr <- if (has_reform) tryCatch({
+        internal_rate_of_return(data$reform, data$reform_assumptions,
+                                include_employer = TRUE)$irr[1]
+      }, error = function(e) NA_real_) else NA_real_
 
-      tags$div(
-        class = "text-center p-2 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Internal Rate of Return"),
-        tags$strong(class = "text-success",
-                    if (!is.na(baseline_irr)) sprintf("%.1f%%", baseline_irr * 100) else "N/A")
-      )
+      fmt_irr <- function(x) if (!is.na(x)) sprintf("%.1f%%", x * 100) else "N/A"
+
+      if (!is.null(couple)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Internal Rate of Return"),
+          format_value_row("Individual", baseline_irr, reform_irr, fmt_irr, has_reform),
+          format_value_row("Shared", couple$shared_irr,
+                           if (isTRUE(couple$has_reforms)) couple$reform_shared_irr else NA_real_,
+                           fmt_irr, isTRUE(couple$has_reforms))
+        )
+      } else if (has_reform) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Internal Rate of Return"),
+          tags$div(
+            tags$span(class = "text-muted", fmt_irr(baseline_irr)),
+            tags$span(" \u2192 "),
+            tags$strong(class = "text-success", fmt_irr(reform_irr))
+          )
+        )
+      } else {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Internal Rate of Return"),
+          tags$strong(class = "text-success", fmt_irr(baseline_irr))
+        )
+      }
     })
 
     # Metric: Marginal IRR (at last working year)

@@ -28,6 +28,25 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 4) — Spouse Constraints and Shared Summary Statistics
+
+**Task**: Two changes to the Individual Worker tab: (1) spouse shares primary worker's birth year and claim age, (2) when spouse selected, show individual AND shared (50/50) summary statistics.
+
+**Changes Made**:
+- **`mod_individual_tab.R`**:
+  - **UI restructure**: Extracted birth year and claim age inputs from primary worker card into a shared top row above both cards. Removed `spouse_birth_year` and `spouse_claim_age` inputs from spouse card entirely.
+  - **Server sync**: Replaced all `input$spouse_birth_year` → `input$birth_year` and `input$spouse_claim_age` → `input$claim_age` (4 occurrences total).
+  - **Reform spouse calculation**: Added `reform_spouse_data` computation in `worker_data()` — calls `calculate_benefits_reform()` for the spouse independently when both spouse and reform are active.
+  - **`compute_couple_irr()` helper**: Inline function that combines primary + spouse tax/benefit streams (merging by age), then solves for joint IRR using `uniroot()`. Uses same partial-year-at-death treatment as `internal_rate_of_return()`.
+  - **`couple_stats` reactive**: Computes shared (50/50) measures when spouse is present — shared monthly benefit, shared PV benefits, shared PV taxes, shared BTR (via `couple_measures()`), and shared IRR (via `compute_couple_irr()`). Includes reform variants when reforms are active.
+  - **`format_value_row()` helper**: Reusable UI builder for "Label: value → reform_value" rows with configurable color classes.
+  - **5 metric renderUIs updated**: `metric_monthly`, `metric_pv_benefits`, `metric_pv_taxes`, `metric_ratio`, `metric_irr` now show both "Individual" and "Shared" rows when spouse is present. Each row supports reform arrows. Fall back to original single-value display when no spouse.
+  - **Marginal metrics unchanged**: `metric_marginal_irr` and `metric_marginal_btr` remain individual-only.
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 3b) — Fix Marginal IRR Showing N/A for -100% Returns
 
 **Task**: Marginal IRR metric showed "N/A" instead of "-100.0%" when delta_pv_benefits was 0 (worker pays taxes but accrues no additional benefits).
