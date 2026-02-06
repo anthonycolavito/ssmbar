@@ -28,6 +28,22 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 5) — Fix Cohort Discontinuities from Life Expectancy Rounding
+
+**Task**: Investigate and fix discontinuous jumps in Cohort Comparison charts at birth years 1976 and 1994.
+
+**Root Cause**: `death_age` in `R/earnings.R` was computed using `round()`, which caused discrete +1 year jumps when the average life expectancy crossed a `.50` boundary (86.45→87 at birth year 1976, 87.45→88 at birth year 1994). One extra year of benefits caused visible jumps in PV benefits, BTR, and IRR.
+
+**Changes Made**:
+- **`R/earnings.R`**: Removed `round()` from `death_age` calculation. Life expectancy values are now kept fractional (e.g., 86.45 instead of 86). The PV functions already support partial years via `floor(death_age)` and fractional weighting, so this produces smooth transitions across birth cohorts.
+- **`R/survivor.R`**: Fixed 3 equality comparisons (`surv_s_age == surv_s_death_age`) that broke with fractional values — now uses `floor()` to match integer age against fractional death_age.
+- **`R/reform_analysis.R`**: Changed `sprintf("Age %d", ...)` to `sprintf("Age %.1f", ...)` to display fractional death_age.
+- **`tests/testthat/fixtures/spouse_with_drcs.rds`**: Regenerated regression fixture for the 1965 spouse-with-DRCs test case, which had a boundary change from the fractional death_age.
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 4) — Spouse Constraints and Shared Summary Statistics
 
 **Task**: Two changes to the Individual Worker tab: (1) spouse shares primary worker's birth year and claim age, (2) when spouse selected, show individual AND shared (50/50) summary statistics.

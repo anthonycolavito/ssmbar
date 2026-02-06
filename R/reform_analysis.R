@@ -436,7 +436,7 @@ reform_impact_report <- function(comparison_result, reform_name = NULL) {
     "Worker Profile:",
     sprintf("  Birth Year: %d", baseline$birth_year),
     sprintf("  Claim Age: %d", baseline$claim_age),
-    sprintf("  Life Expectancy: Age %d", baseline$death_age),
+    sprintf("  Life Expectancy: Age %.1f", baseline$death_age),
     "",
     "Monthly Benefits:",
     paste0("  Baseline: ", fmt_currency(baseline$initial_monthly_benefit)),

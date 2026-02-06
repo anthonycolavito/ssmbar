@@ -252,17 +252,18 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   # TODO: Document - explain how sex affects benefit calculations (life expectancy lookup)
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
   # Calculate expected death age based on cohort life expectancy at age 65
-  # Round to nearest integer so it matches integer age values in benefit calculations
+  # Keep fractional value — PV functions use floor(death_age) for full years
+  # and the fractional remainder to weight the partial final year
   death_age <- if(sex == "male") {
-    round(assumptions$le_m[which(assumptions$year == birth_yr + 65)])
+    assumptions$le_m[which(assumptions$year == birth_yr + 65)]
   }
   else if (sex == "female") {
-    round(assumptions$le_f[which(assumptions$year == birth_yr + 65)])
+    assumptions$le_f[which(assumptions$year == birth_yr + 65)]
   }
   else {
     # Average of male and female life expectancy for sex = "all"
-    round(mean(c(assumptions$le_m[which(assumptions$year == birth_yr + 65)],
-                 assumptions$le_f[which(assumptions$year == birth_yr + 65)])))
+    mean(c(assumptions$le_m[which(assumptions$year == birth_yr + 65)],
+           assumptions$le_f[which(assumptions$year == birth_yr + 65)]))
   }
 
   # Convert child_spec NULL to NA_character_ for data frame

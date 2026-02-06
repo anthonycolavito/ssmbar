@@ -132,8 +132,9 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
           left_join(spouse_survivor_df, by = "year")
 
         # Calculate year of spouse's death and worker's age at that time
-        yr_s_death <- .x$year[which(.x$surv_s_age == .x$surv_s_death_age)]
-        .x$worker_age_at_spouse_death <- .x$age[which(.x$surv_s_age == .x$surv_s_death_age)]
+        # Use floor() since surv_s_age is integer but surv_s_death_age may be fractional
+        yr_s_death <- .x$year[which(.x$surv_s_age == floor(.x$surv_s_death_age))]
+        .x$worker_age_at_spouse_death <- .x$age[which(.x$surv_s_age == floor(.x$surv_s_death_age))]
 
         # Copy back to standard column names for output (needed for debug mode)
         .x$s_death_age <- .x$surv_s_death_age
@@ -165,7 +166,7 @@ widow_pia <- function(worker, spouse_data = NULL, assumptions, factors = NULL, d
 
         # Calculate the age when disabled widow(er) benefits would first start
         # This is the later of: age 50, disability onset age, worker's age when spouse dies
-        worker_age_at_spouse_death_val <- .x$age[which(.x$s_age == .x$surv_s_death_age)]
+        worker_age_at_spouse_death_val <- .x$age[which(.x$s_age == floor(.x$surv_s_death_age))]
         disabled_widow_start_age <- max(disabled_widow_elig_age, worker_elig_age, worker_age_at_spouse_death_val, na.rm = TRUE)
 
         # Worker is classified as a disabled widow(er) if:
