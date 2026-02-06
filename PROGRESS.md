@@ -28,6 +28,27 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 8) — Correct PIA Bend Point Off-by-One Error
+
+**Task**: Fix PIA bend points in assumptions CSV that were hardcoded one year early (1979 values in 1978 row, 1980 values in 1979 row, etc.).
+
+**Root Cause**: When originally entering bend point data into `2025TR_assumptions.csv`, each year's PIA bend points (bp1, bp2) were placed one year too early. For example, the 1979 row had bp1=194 (actually the 1980 value), and the statutory 1979 base amount of $180 was in the 1978 row. This caused `prep_assumptions()` to project future bend points using bp1_base=194 instead of the correct 180, producing a ~7.8% discontinuity at 2034 (the first projected year after the Trustees Report's explicit values ended at 2033).
+
+**Changes Made**:
+- **`inst/extdata/2025TR_assumptions.csv`**: Replaced bp1/bp2 for years 1979-2026 with correct values from user's verified bend point spreadsheet. Cleared 1978 bp1/bp2 to NA (bend point formula starts at 1979). Corrected 2027-2034 by shifting old values forward one year (old year Y was actually year Y+1's correct value).
+- **`inst/extdata/family_max_bp.csv`**: Added 2026 row (fm_bp1=1643, fm_bp2=2371, fm_bp3=3093). Family max bend points were already correct (no off-by-one error).
+- **`data/tr2025.rda`**: Regenerated via `data-raw/process_data.R` to incorporate corrected bend points.
+- **All 25 regression test fixtures regenerated**: Bend point correction changes benefit amounts for all workers.
+
+**Verification**:
+- PV replacement rates now smooth across birth years 1968-1978: 0.5526 → 0.5490 → 0.5454 (no discontinuity at 1972)
+- BTR similarly smooth: no jump at the 2033/2034 boundary
+- `prep_assumptions()` projection now uses correct 1979 base (bp1=180, bp2=1085), producing values consistent with Trustees Report published series
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 7) — Cohort Tab: Birth Year Range Fix and dplyr::n() Bug
 
 **Task**: Fix cohort comparison tab birth year range to match valid data boundaries, and fix a latent namespace bug.
