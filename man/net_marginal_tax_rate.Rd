@@ -29,7 +29,6 @@ Data frame with columns:
 \item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year,
 in nominal dollars of that working year
 \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
-\item \code{in_top_35}: Whether this year is in top 35 indexed earnings
 }
 }
 \description{

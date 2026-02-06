@@ -111,7 +111,7 @@ utils::globalVariables(c(
 ))
 
 #' @importFrom dplyr %>% mutate select filter left_join group_by ungroup arrange
-#' @importFrom dplyr case_when if_else first row_number group_modify bind_rows rename all_of summarise any_of
+#' @importFrom dplyr case_when if_else first row_number group_modify bind_rows rename all_of summarise any_of n
 #' @importFrom tidyr pivot_longer
 #' @importFrom stats na.omit uniroot
 NULL

@@ -31,8 +31,6 @@ Data frame with columns for each working year:
 expressed in nominal dollars of that working year
 \item \code{delta_pv_benefits}: Change in PV from working this year,
 expressed in nominal dollars of that working year
-\item \code{in_top_35}: Whether this year is in top 35 indexed earnings
-\item \code{indexed_rank}: Rank of indexed earnings (1 = highest)
 }
 
 Data frame with marginal analysis results

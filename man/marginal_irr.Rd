@@ -23,7 +23,6 @@ Data frame with columns:
 \item \code{age}: Worker's age
 \item \code{earnings}: Nominal earnings
 \item \code{ss_tax}: Social Security tax paid
-\item \code{in_top_35}: Whether year is in top 35 indexed earnings
 \item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
 \item \code{marginal_irr}: IRR on this year's tax contribution
 }

@@ -80,8 +80,8 @@ cohort_tab_ui <- function(id) {
                 sliderInput(
                   ns("birth_year_range"),
                   "Birth Year Range",
-                  min = 1955,
-                  max = 2010,
+                  min = BIRTH_YEAR_MIN,
+                  max = BIRTH_YEAR_MAX,
                   value = c(1960, 2005),
                   step = 1,
                   sep = ""

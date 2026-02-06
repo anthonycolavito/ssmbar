@@ -28,6 +28,26 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 7) — Cohort Tab: Birth Year Range Fix and dplyr::n() Bug
+
+**Task**: Fix cohort comparison tab birth year range to match valid data boundaries, and fix a latent namespace bug.
+
+**Investigation findings**:
+- **Minimum birth year**: 1939. Workers born 1939 start working in 1960, the first year with `real_df` data. Earlier cohorts produce NaN for PV replacement rates. Birth years before 1930 fail entirely (no AWI at indexing age).
+- **Maximum birth year**: 2010. Female life expectancy (89.4 years for 2075 cohort) means death in year 2100 — the last year of assumptions data. Birth year 2011 would exceed the data boundary.
+- **Bend point projection discontinuity** at birth year 1972 (eligibility year 2034): Identified root cause as incorrect base values in `prep_assumptions()`. The projection uses `bp1_base=194` (1979 published value) and `awi_1977=9779.44` instead of the statutory base of $180 with the correct AWI denominator (~9,409). This causes a ~7.8% jump in bend points at the boundary between Trustees Report published values (through 2033) and projected values (2034+). **Fix deferred** — requires further discussion about the correct formula.
+- **`dplyr::n()` not imported**: `rep_rates()` uses `n()` in a `summarise()` call but it was missing from the package NAMESPACE. Works in the Shiny app (dplyr is attached) but fails when called via `library(ssmbar)`.
+
+**Changes Made**:
+- **`inst/shiny/benefit_explorer/global.R`**: Changed `BIRTH_YEAR_MIN` from 1940 to 1939
+- **`inst/shiny/benefit_explorer/modules/mod_cohort_tab.R`**: Replaced hardcoded `min=1955, max=2010` with `min=BIRTH_YEAR_MIN, max=BIRTH_YEAR_MAX` to use global constants
+- **`R/ssmbar-package.R`**: Added `n` to `@importFrom dplyr` declaration
+- **`NAMESPACE`**: Regenerated with `devtools::document()` — now includes `importFrom(dplyr,n)`
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 6) — Mid-Year Death Proration in final_benefit()
 
 **Task**: When a spouse dies mid-year (fractional death_age), prorate between spousal and survivor benefits in the death year instead of giving full survivor benefits for the entire year.
