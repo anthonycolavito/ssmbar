@@ -28,6 +28,33 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 6) — Mid-Year Death Proration in final_benefit()
+
+**Task**: When a spouse dies mid-year (fractional death_age), prorate between spousal and survivor benefits in the death year instead of giving full survivor benefits for the entire year.
+
+**Problem**: Previously, `final_benefit()` zeroed out `spouse_ben_adj` entirely in the death year (`age >= worker_age_at_spouse_death`) and awarded full `survivor_ben`. With fractional `s_death_age` (e.g., 84.3), the worker should receive spousal benefits for the fraction of the year the spouse is alive (0.3) and survivor benefits for the remainder (0.7).
+
+**Changes Made**:
+- **`R/benefit_calculations.R` (`final_benefit()`)**:
+  - Added backwards-compatibility check for `s_death_age` column
+  - Added `spouse_frac_alive` computation: `s_death_age - floor(s_death_age)` — fraction of year spouse is alive
+  - Added `is_spouse_death_year` flag: TRUE only when `age == worker_age_at_spouse_death`
+  - Changed `spouse_ben_adj` from binary cutoff to three-way `case_when`: full spousal before death year, prorated in death year (`spouse_ben_fm * frac`), zero after
+  - Added `survivor_ben_adj`: zero before death year, prorated in death year (`survivor_ben * (1 - frac)`), full after
+  - Changed `ben` to use `if_else(is_spouse_death_year, ...)`: in death year, sums prorated spousal + prorated survivor (covering different parts of the year); in non-death years, takes max of the two (original logic, since one is always zero)
+  - Updated BC code logic to use `survivor_ben_adj` instead of raw `survivor_ben` — ensures death year gets post-death BC classification (e.g., ARD instead of ARB)
+- **`R/ssmbar-package.R`**: Added `survivor_ben_adj`, `spouse_frac_alive`, `is_spouse_death_year` to global variables
+- **9 regression test fixtures regenerated**: All spouse-containing fixtures updated to reflect prorated death-year benefits
+
+**Verification**: Manual check on low earner with high spouse (born 1960, claim 62/67) confirmed:
+- Age 83 (pre-death): ben = $1,834 (own $1,676 + spousal $158), BC = ARB
+- Age 84 (death year, frac=0.3): ben = $3,778 (own $1,717 + spousal $162×0.3 + survivor $2,875×0.7), BC = ARD
+- Age 85 (post-death): ben = $4,702 (own $1,758 + survivor $2,944), BC = ARD
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 5) — Fix Cohort Discontinuities from Life Expectancy Rounding
 
 **Task**: Investigate and fix discontinuous jumps in Cohort Comparison charts at birth years 1976 and 1994.

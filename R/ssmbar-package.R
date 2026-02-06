@@ -72,9 +72,9 @@ utils::globalVariables(c(
 
   # Survivor (widow/widower) benefit variables
   "death_age", "s_death_age", "s_wrk_ben", "worker_age_at_spouse_death",
-  "survivor_pia", "prelim_survivor_pia", "survivor_ben",
+  "survivor_pia", "prelim_survivor_pia", "survivor_ben", "survivor_ben_adj",
   "effective_widow_claim_age", "actual_widow_claim_age", "w_elig_age_ind", "w_rf", "w_act_factor",
-  "spouse_ben_adj", "bc",
+  "spouse_ben_adj", "spouse_frac_alive", "is_spouse_death_year", "bc",
   "surv_s_age", "surv_s_pia", "surv_s_wrk_ben", "surv_s_death_age", "surv_s_claim_age",
 
   # Disabled widow(er) benefit variables

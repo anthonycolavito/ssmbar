@@ -897,6 +897,12 @@ final_benefit <- function(worker, debugg = FALSE) {
     worker$s_age <- NA_real_
   }
 
+  # Handle case where s_death_age column doesn't exist (backwards compatibility)
+  # Default to NA (no spouse death age for proration)
+  if (!"s_death_age" %in% names(worker)) {
+    worker$s_death_age <- NA_real_
+  }
+
   # Handle case where family-max-adjusted benefit columns don't exist (backwards compatibility)
   # If spouse_ben_fm doesn't exist but spouse_ben does, use spouse_ben
   if (!"spouse_ben_fm" %in% names(worker)) {
@@ -931,14 +937,39 @@ final_benefit <- function(worker, debugg = FALSE) {
     ) %>%
     ungroup() %>%
     mutate(
-      # Zero out spousal benefit after spouse dies - survivor benefit takes over
-      # Spousal and child benefits require the worker to be alive
-      spouse_ben_adj = if_else(
-        !is.na(worker_age_at_spouse_death) & age >= worker_age_at_spouse_death,
-        0,  # Spouse is dead, spousal benefit stops
-        spouse_ben_fm  # Use family-max-adjusted spousal benefit
+      # Fraction of the death year the spouse is alive (for mid-year death proration)
+      # s_death_age is fractional (e.g. 86.45), so the fraction alive = s_death_age - floor(s_death_age)
+      # This is used only in the death year to prorate between spousal and survivor benefits
+      spouse_frac_alive = if_else(
+        !is.na(s_death_age),
+        s_death_age - floor(s_death_age),
+        NA_real_
       ),
-      # Total benefit = worker's own + spousal (FM adjusted) + child benefits (FM adjusted) + survivor
+      # Is this the year the spouse dies? (worker's age equals worker_age_at_spouse_death)
+      is_spouse_death_year = !is.na(worker_age_at_spouse_death) & age == worker_age_at_spouse_death,
+
+      # Spousal benefit adjustment:
+      # - Before death year: full spousal benefit
+      # - Death year: prorated spousal benefit (fraction of year spouse was alive)
+      # - After death year: zero (survivor benefit takes over)
+      spouse_ben_adj = case_when(
+        is_spouse_death_year ~ spouse_ben_fm * spouse_frac_alive,
+        !is.na(worker_age_at_spouse_death) & age > worker_age_at_spouse_death ~ 0,
+        TRUE ~ spouse_ben_fm
+      ),
+      # Survivor benefit adjustment for death year proration:
+      # - Death year: prorated survivor benefit (fraction of year after spouse died)
+      # - After death year: full survivor benefit
+      # - Before death year: zero (spouse is alive)
+      survivor_ben_adj = case_when(
+        is_spouse_death_year ~ survivor_ben * (1 - spouse_frac_alive),
+        !is.na(worker_age_at_spouse_death) & age > worker_age_at_spouse_death ~ survivor_ben,
+        TRUE ~ 0
+      ),
+      # Total benefit = worker's own + max(spousal, survivor) + child benefits
+      # In the death year, spousal and survivor are already prorated, so we sum them
+      # rather than taking max — they cover different parts of the year.
+      # In non-death years, one of the two is zero, so the sum equals the max behavior.
       # Child benefits only paid while worker is alive (age < death_age)
       total_child_ben = if_else(
         age < death_age,
@@ -947,9 +978,18 @@ final_benefit <- function(worker, debugg = FALSE) {
           pmax(child3_ben_fm, 0, na.rm = TRUE),
         0
       ),
-      ben = pmax(wrk_ben, 0, na.rm = TRUE) +
-            pmax(spouse_ben_adj, survivor_ben, 0, na.rm = TRUE) +
-            total_child_ben,
+      ben = if_else(
+        is_spouse_death_year,
+        # Death year: worker benefit + prorated spousal + prorated survivor
+        pmax(wrk_ben, 0, na.rm = TRUE) +
+          pmax(spouse_ben_adj, 0, na.rm = TRUE) +
+          pmax(survivor_ben_adj, 0, na.rm = TRUE) +
+          total_child_ben,
+        # Non-death years: original logic (max of spousal vs survivor)
+        pmax(wrk_ben, 0, na.rm = TRUE) +
+          pmax(spouse_ben_adj, survivor_ben_adj, 0, na.rm = TRUE) +
+          total_child_ben
+      ),
 
       # Composite Benefit Class (bc) indicator
       # Following SSA BEPUF classification system
@@ -981,30 +1021,33 @@ final_benefit <- function(worker, debugg = FALSE) {
 
       # Benefit Class indicator is defined so as to match the BC codes in SSA's 2020 BEPUF files
       # https://www.ssa.gov/policy/docs/microdata/bepuf-2020/index.html
+      # Uses survivor_ben_adj (which accounts for death-year proration) rather than raw survivor_ben
+      # In the death year, both spouse_ben_adj and survivor_ben_adj are positive (prorated),
+      # so BC reflects the post-death classification (survivor codes take priority)
       bc = case_when(
         # Not yet receiving any benefits (no own, spousal, or survivor benefit)
-        wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben <= 0 ~ NA_character_,
+        wrk_ben <= 0 & spouse_ben_adj <= 0 & survivor_ben_adj <= 0 ~ NA_character_,
 
         # Spouse-only benefit classes (no own worker benefit, only spousal benefit)
         # BD = Spouse of Disabled Worker (spouse is currently disabled, before their NRA)
         # BR = Spouse of Retired Worker (spouse is retired or has reached their NRA)
         # Note: This occurs when worker has no earnings but receives spousal benefits from spouse's record
-        wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0 & s_is_currently_disabled ~ "BD",
-        wrk_ben <= 0 & survivor_ben <= 0 & spouse_ben_adj > 0 ~ "BR",
+        wrk_ben <= 0 & survivor_ben_adj <= 0 & spouse_ben_adj > 0 & s_is_currently_disabled ~ "BD",
+        wrk_ben <= 0 & survivor_ben_adj <= 0 & spouse_ben_adj > 0 ~ "BR",
 
         # Survivor-only benefit classes (no own worker benefit)
         # F = Disabled Widow(er) only
         # D = Standard Widow(er) only
-        wrk_ben <= 0 & survivor_ben > 0 & is_disabled_widow ~ "F",
-        wrk_ben <= 0 & survivor_ben > 0 ~ "D",
+        wrk_ben <= 0 & survivor_ben_adj > 0 & is_disabled_widow ~ "F",
+        wrk_ben <= 0 & survivor_ben_adj > 0 ~ "D",
 
         # Disabled worker benefit classes (AD*) - before NRA
         # ADF = Disabled Worker + Disabled Widow(er) benefit
         # ADD = Disabled Worker + Standard Widow(er) benefit
         # ADB = Disabled Worker + Spouse benefit
         # AD  = Disabled Worker only
-        is_currently_disabled & survivor_ben > 0 & survivor_ben > spouse_ben_adj & is_disabled_widow ~ "ADF",
-        is_currently_disabled & survivor_ben > 0 & survivor_ben > spouse_ben_adj ~ "ADD",
+        is_currently_disabled & survivor_ben_adj > 0 & survivor_ben_adj > spouse_ben_adj & is_disabled_widow ~ "ADF",
+        is_currently_disabled & survivor_ben_adj > 0 & survivor_ben_adj > spouse_ben_adj ~ "ADD",
         is_currently_disabled & spouse_ben_adj > 0 ~ "ADB",
         is_currently_disabled ~ "AD",
 
@@ -1013,8 +1056,8 @@ final_benefit <- function(worker, debugg = FALSE) {
         # ARD = Retired Worker + Standard Widow(er) benefit
         # ARB = Retired Worker + Spouse benefit
         # AR  = Retired Worker only
-        survivor_ben > 0 & survivor_ben > spouse_ben_adj & is_disabled_widow ~ "ARF",
-        survivor_ben > 0 & survivor_ben > spouse_ben_adj ~ "ARD",
+        survivor_ben_adj > 0 & survivor_ben_adj > spouse_ben_adj & is_disabled_widow ~ "ARF",
+        survivor_ben_adj > 0 & survivor_ben_adj > spouse_ben_adj ~ "ARD",
         spouse_ben_adj > 0 ~ "ARB",
         TRUE ~ "AR"
       )
