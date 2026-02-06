@@ -4,12 +4,7 @@
 \alias{net_marginal_tax_rate}
 \title{Calculate Net Marginal Tax Rate}
 \usage{
-net_marginal_tax_rate(
-  worker,
-  assumptions,
-  include_employer = FALSE,
-  base_year = 2025
-)
+net_marginal_tax_rate(worker, assumptions, include_employer = FALSE)
 }
 \arguments{
 \item{worker}{Data frame with calculated benefits. Must contain columns from
@@ -19,9 +14,6 @@ net_marginal_tax_rate(
 
 \item{include_employer}{Logical. If TRUE, includes employer share of taxes
 (12.4\% total). Default is FALSE (6.2\% employee share only).}
-
-\item{base_year}{Numeric value specifying the year for real dollar conversion.
-Default is 2025.}
 }
 \value{
 Data frame with columns:
@@ -34,7 +26,8 @@ Data frame with columns:
 \item \code{qcs}: Cumulative quarters of coverage
 \item \code{eligible}: Whether eligible for benefits (QCs >= 40)
 \item \code{ss_tax}: Social Security tax paid (employee share)
-\item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year
+\item \code{delta_pv_benefits}: Change in PV of lifetime benefits from this year,
+in nominal dollars of that working year
 \item \code{net_marginal_tax_rate}: (ss_tax - delta_pv_benefits) / earnings
 \item \code{in_top_35}: Whether this year is in top 35 indexed earnings
 }
@@ -45,6 +38,11 @@ The net marginal tax rate accounts for the marginal benefit accrued from
 additional earnings using the cumulative stopping-point method.
 }
 \details{
+The calculation uses nominal discounting: future benefits are discounted
+to each working year using nominal discount factors, ensuring that
+delta_pv_benefits is in the same dollars as that year's earnings and taxes.
+This enables meaningful cross-cohort comparisons.
+
 The net marginal tax rate is calculated as:
 \deqn{NMTR = \frac{SS\_tax - \Delta PV\_benefits}{earnings}}
 

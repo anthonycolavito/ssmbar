@@ -4,7 +4,7 @@
 \alias{marginal_irr}
 \title{Calculate Marginal Internal Rate of Return}
 \usage{
-marginal_irr(worker, assumptions, include_employer = FALSE, base_year = 2025)
+marginal_irr(worker, assumptions, include_employer = FALSE)
 }
 \arguments{
 \item{worker}{Data frame with calculated benefits. Must contain columns from
@@ -14,9 +14,6 @@ marginal_irr(worker, assumptions, include_employer = FALSE, base_year = 2025)
 
 \item{include_employer}{Logical. If TRUE, includes employer share of taxes.
 Default is FALSE (employee share only).}
-
-\item{base_year}{Numeric value specifying the year for real dollar conversion.
-Default is 2025.}
 }
 \value{
 Data frame with columns:
@@ -38,14 +35,15 @@ from that year's work using the cumulative stopping-point method.
 }
 \details{
 The marginal IRR is computed using delta_pv_benefits from the cumulative
-stopping-point method. Since delta_pv_benefits is already the present value
-of additional lifetime benefits (discounted to age 65), the IRR is the rate
-that makes the tax contribution grow to equal this benefit gain:
+stopping-point method. Since delta_pv_benefits is the present value of
+additional lifetime benefits discounted to the working year using nominal
+discount factors, the IRR is the rate that makes the tax contribution grow
+to equal this benefit gain by the time benefits begin (claim age):
 
-\deqn{tax_t \times (1 + r)^{(65 - t)} = \Delta PV\_benefits}
+\deqn{tax_t \times (1 + r)^{(claim\_age - t)} = \Delta PV\_benefits}
 
 Solving for r:
-\deqn{r = (\Delta PV\_benefits / tax_t)^{1/(65-t)} - 1}
+\deqn{r = (\Delta PV\_benefits / tax_t)^{1/(claim\_age - t)} - 1}
 
 Special cases:
 \itemize{

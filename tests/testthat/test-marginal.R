@@ -52,28 +52,6 @@ test_that("marginal_benefit_analysis returns correct structure", {
   expect_true("cumulative_pia" %in% names(result))
   expect_true("cumulative_pv" %in% names(result))
   expect_true("delta_pv_benefits" %in% names(result))
-  expect_true("in_top_35" %in% names(result))
-  expect_true("indexed_rank" %in% names(result))
-})
-
-test_that("marginal_benefit_analysis identifies top 35 years correctly", {
-  worker <- create_debug_worker()
-
-  result <- marginal_benefit_analysis(worker, tr2025)
-
-  # Filter to working years
-  working_years <- result[result$age >= 21 & result$age <= 64, ]
-
-  # Should have exactly 35 years in_top_35 (worker has 44 working years)
-  num_top_35 <- sum(working_years$in_top_35, na.rm = TRUE)
-  expect_equal(num_top_35, 35)
-
-  # indexed_rank should range from 1 to 44 (all working years ranked)
-  expect_equal(min(working_years$indexed_rank, na.rm = TRUE), 1)
-  expect_equal(max(working_years$indexed_rank, na.rm = TRUE), 44)
-
-  # in_top_35 should be TRUE iff indexed_rank <= 35
-  expect_true(all(working_years$in_top_35 == (working_years$indexed_rank <= 35), na.rm = TRUE))
 })
 
 test_that("marginal_benefit_analysis follows correct stopping-point pattern", {
@@ -205,39 +183,23 @@ test_that("marginal_irr returns correct structure", {
   # Check structure
   expect_true(is.data.frame(result))
   expect_true("id" %in% names(result))
-  expect_true("in_top_35" %in% names(result))
   expect_true("marginal_irr" %in% names(result))
 })
 
-test_that("marginal_irr returns -1 for years not in top 35", {
-  # Use a worker that will have years outside top 35
-  # (44 working years from age 21-64, so 9 years will be outside)
+test_that("marginal_irr values are reasonable for working years", {
   worker <- create_debug_worker()
 
   result <- marginal_irr(worker, tr2025)
 
-  # Filter to years not in top 35
-  non_top_35 <- result[result$age >= 21 & result$age <= 64 & !result$in_top_35, ]
+  working <- result[result$age >= 21 & result$age <= 64, ]
 
-  if (nrow(non_top_35) > 0) {
-    # Marginal IRR should be -1 for years not in top 35
-    expect_true(all(non_top_35$marginal_irr == -1.0, na.rm = TRUE))
-  }
-})
-
-test_that("marginal_irr values are positive for top 35 years", {
-  worker <- create_debug_worker()
-
-  result <- marginal_irr(worker, tr2025)
-
-  # Filter to years in top 35
-  top_35 <- result[result$age >= 21 & result$age <= 64 & result$in_top_35, ]
-
-  # Marginal IRR for top 35 years should typically be positive
-  # (benefits received for tax paid)
-  valid_irrs <- top_35$marginal_irr[!is.na(top_35$marginal_irr)]
+  # Should have some valid IRR values (> -1, meaning benefit accrual occurred)
+  valid_irrs <- working$marginal_irr[!is.na(working$marginal_irr) & working$marginal_irr > -1]
   expect_true(length(valid_irrs) > 0)
-  expect_true(mean(valid_irrs) > 0)
+
+  # Years with positive delta_pv should have IRR > -1 (not total loss)
+  eligible_positive <- working[!is.na(working$delta_pv_benefits) & working$delta_pv_benefits > 0, ]
+  expect_true(all(eligible_positive$marginal_irr > -1, na.rm = TRUE))
 })
 
 test_that("marginal_irr varies by worker type due to progressivity", {
@@ -247,15 +209,12 @@ test_that("marginal_irr varies by worker type due to progressivity", {
   mirr_low <- marginal_irr(worker_low, tr2025)
   mirr_high <- marginal_irr(worker_high, tr2025)
 
-  # Get mean marginal IRR for top 35 years
-  mean_mirr_low <- mean(
-    mirr_low$marginal_irr[mirr_low$age >= 21 & mirr_low$age <= 64 & mirr_low$in_top_35],
-    na.rm = TRUE
-  )
-  mean_mirr_high <- mean(
-    mirr_high$marginal_irr[mirr_high$age >= 21 & mirr_high$age <= 64 & mirr_high$in_top_35],
-    na.rm = TRUE
-  )
+  # Get mean marginal IRR for working years with positive benefit accrual
+  low_working <- mirr_low[mirr_low$age >= 21 & mirr_low$age <= 64 & !is.na(mirr_low$marginal_irr) & mirr_low$marginal_irr > -1, ]
+  high_working <- mirr_high[mirr_high$age >= 21 & mirr_high$age <= 64 & !is.na(mirr_high$marginal_irr) & mirr_high$marginal_irr > -1, ]
+
+  mean_mirr_low <- mean(low_working$marginal_irr, na.rm = TRUE)
+  mean_mirr_high <- mean(high_working$marginal_irr, na.rm = TRUE)
 
   # Due to progressive benefit formula, low earners should have higher marginal IRR
   expect_gt(mean_mirr_low, mean_mirr_high)

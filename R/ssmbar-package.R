@@ -89,7 +89,7 @@ utils::globalVariables(c(
   "tax_amount", "ss_tax_total",
 
   # Marginal analysis variables (cumulative stopping-point method)
-  "comp_period_val", "working_year", "indexed_rank", "in_top_35",
+  "comp_period_val", "working_year",
   "years_worked", "qcs", "eligible", "cumulative_aime", "cumulative_pia",
   "cumulative_pv", "delta_pv_benefits", "aime_at_claim", "bp1_val", "bp2_val",
   "claim_age_val", "death_age_val", "benefit_months", "discount_year",

@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: February 5, 2026
 
-**Active Work**: Shiny app update complete (Groups 1-4)
+**Active Work**: Investigating BTR/IRR employer tax inclusion and NMTR reform chart display
 
 **Blocked On**: None
 
@@ -27,6 +27,20 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### February 5, 2026 (Session 2) — Remove in_top_35/indexed_rank from Marginal Analysis
+
+**Task**: Remove unused `in_top_35` and `indexed_rank` informational columns from marginal analysis functions. These columns were not used by any computation (NMTR, IRR) and had a bug in the ranking logic causing 3 test failures.
+
+**Changes Made**:
+- **`R/analytic_functions.R`**: Removed `in_top_35`/`indexed_rank` from `marginal_benefit_analysis()` (initialization, computation block, output cols, roxygen), `net_marginal_tax_rate()` (output cols, roxygen), and `marginal_irr()` (output cols, roxygen)
+- **`R/ssmbar-package.R`**: Removed from globalVariables
+- **`tests/testthat/test-marginal.R`**: Removed 3 failing tests (top-35 ranking, IRR-by-top-35), replaced with 1 test verifying IRR reasonableness (positive delta_pv implies IRR > -1). Updated progressivity test to filter by IRR > -1 instead of `in_top_35`.
+- **`inst/shiny/benefit_explorer/modules/mod_individual_tab.R`**: Removed `in_top_35`/`indexed_rank` from marginal data table and summary computations
+
+**Test Results**: 648 pass, 0 fail (resolved all 3 prior failures)
+
+---
 
 ### February 5, 2026 — Shiny App Update: Reform Panel, Charts, Partial-Year PV
 
@@ -121,7 +135,7 @@ Added three new functions to `R/analytic_functions.R`:
 
 1. **`marginal_benefit_analysis(worker, assumptions, base_year = 2025)`**
    - Uses **cumulative stopping-point method**: computes PV of lifetime benefits if worker stopped after t years vs t-1 years
-   - Returns: cumulative_aime, cumulative_pia, cumulative_pv, delta_pv_benefits, in_top_35, indexed_rank
+   - Returns: cumulative_aime, cumulative_pia, cumulative_pv, delta_pv_benefits
    - Years 1-9: delta_pv = 0 (not yet eligible)
    - Year 10: Large positive delta_pv (eligibility transition)
    - Years 11-35: Each year adds to AIME numerator

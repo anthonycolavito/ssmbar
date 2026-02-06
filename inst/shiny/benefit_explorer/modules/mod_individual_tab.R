@@ -454,14 +454,11 @@ individual_tab_server <- function(id, reform_state) {
         working_mirr <- mirr[mirr$age >= 21 & mirr$age <= 64, ]
 
         mean_nmtr <- mean(working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
-        mean_mirr_top35 <- mean(working_mirr$marginal_irr[working_mirr$in_top_35 & working_mirr$marginal_irr > -1], na.rm = TRUE)
-        n_top_35 <- sum(working_marginal$in_top_35, na.rm = TRUE)
+        mean_mirr <- mean(working_mirr$marginal_irr[!is.na(working_mirr$marginal_irr) & working_mirr$marginal_irr > -1], na.rm = TRUE)
 
         table_data <- data.frame(
           age = working_marginal$age,
           earnings = working_marginal$earnings,
-          in_top_35 = working_marginal$in_top_35,
-          indexed_rank = working_marginal$indexed_rank,
           delta_pv_benefits = working_marginal$delta_pv_benefits,
           net_marginal_tax_rate = working_nmtr$net_marginal_tax_rate,
           marginal_irr = working_mirr$marginal_irr
@@ -469,8 +466,7 @@ individual_tab_server <- function(id, reform_state) {
 
         result <- list(
           mean_nmtr = mean_nmtr,
-          mean_mirr_top35 = mean_mirr_top35,
-          n_top_35 = n_top_35,
+          mean_mirr = mean_mirr,
           table_data = table_data,
           working_nmtr = working_nmtr,
           has_reforms = FALSE
@@ -954,7 +950,7 @@ individual_tab_server <- function(id, reform_state) {
           marginal_irr = ifelse(marginal_irr == -1, NA, round(marginal_irr * 100, 1))
         ) %>%
         rename(
-          Age = age, Earnings = earnings, `Top 35` = in_top_35, Rank = indexed_rank,
+          Age = age, Earnings = earnings,
           `Delta PV` = delta_pv_benefits, `NMTR %` = net_marginal_tax_rate, `Marg IRR %` = marginal_irr
         )
 
