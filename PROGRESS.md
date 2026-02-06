@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: February 5, 2026
 
-**Active Work**: Investigating BTR/IRR employer tax inclusion and NMTR reform chart display
+**Active Work**: None
 
 **Blocked On**: None
 
@@ -27,6 +27,18 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### February 5, 2026 (Session 3) — Fix Employer Tax Inclusion and NMTR Reform Chart
+
+**Task**: Fix two bugs: (1) employer-paid taxes missing from BTR and IRR calculations, (2) NMTR chart switching from bars to lines when reform selected.
+
+**Changes Made**:
+- **`mod_individual_tab.R`**: Added `include_employer = TRUE` to all 4 `pv_lifetime_taxes()` calls (2 baseline, 2 reform) for both PV Taxes metric and BTR metric. Changed NMTR reform chart from `geom_line()` to overlapping `geom_col()` — baseline bars in back (wider, semi-transparent), reform bars in front (narrower).
+- **`mod_cohort_tab.R`**: Added `include_employer = TRUE` to both `pv_lifetime_taxes()` calls and both `internal_rate_of_return()` calls (were explicitly `FALSE`).
+
+**Test Results**: 648 pass, 0 fail
+
+---
 
 ### February 5, 2026 (Session 2) — Remove in_top_35/indexed_rank from Marginal Analysis
 

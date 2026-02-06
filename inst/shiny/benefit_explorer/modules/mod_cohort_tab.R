@@ -277,7 +277,7 @@ cohort_tab_server <- function(id, reform_state) {
           }, error = function(e) NA_real_)
 
           baseline_pv_tax <- tryCatch({
-            pv_lifetime_taxes(baseline, tr2025)$pv_taxes[1]
+            pv_lifetime_taxes(baseline, tr2025, include_employer = TRUE)$pv_taxes[1]
           }, error = function(e) NA_real_)
 
           baseline_ratio <- if (!is.na(baseline_pv_ben) && !is.na(baseline_pv_tax) && baseline_pv_tax > 0) {
@@ -292,7 +292,7 @@ cohort_tab_server <- function(id, reform_state) {
 
           # Internal rate of return
           baseline_irr <- tryCatch({
-            internal_rate_of_return(baseline, tr2025, include_employer = FALSE)$irr[1]
+            internal_rate_of_return(baseline, tr2025, include_employer = TRUE)$irr[1]
           }, error = function(e) NA_real_)
 
           # Calculate reform if selected
@@ -323,7 +323,7 @@ cohort_tab_server <- function(id, reform_state) {
             }, error = function(e) NA_real_)
 
             reform_pv_tax <- tryCatch({
-              pv_lifetime_taxes(reform, reform_assumptions)$pv_taxes[1]
+              pv_lifetime_taxes(reform, reform_assumptions, include_employer = TRUE)$pv_taxes[1]
             }, error = function(e) NA_real_)
 
             reform_ratio <- if (!is.na(reform_pv_ben) && !is.na(reform_pv_tax) && reform_pv_tax > 0) {
@@ -336,7 +336,7 @@ cohort_tab_server <- function(id, reform_state) {
             }, error = function(e) NA_real_)
 
             reform_irr <- tryCatch({
-              internal_rate_of_return(reform, reform_assumptions, include_employer = FALSE)$irr[1]
+              internal_rate_of_return(reform, reform_assumptions, include_employer = TRUE)$irr[1]
             }, error = function(e) NA_real_)
           }
 

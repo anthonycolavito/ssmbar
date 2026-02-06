@@ -504,38 +504,46 @@ individual_tab_server <- function(id, reform_state) {
                  theme(plot.background = element_rect(fill = DARK_CARD, color = NA)))
       }
 
-      # If reforms enabled, show comparison line chart
       if (mdata$has_reforms && !is.null(mdata$reform_working_nmtr)) {
+        # Reform comparison: overlapping bar chart
         baseline_nmtr <- mdata$table_data %>%
           filter(!is.na(net_marginal_tax_rate)) %>%
           mutate(
             nmtr_pct = net_marginal_tax_rate * 100,
+            nmtr_pct_display = pmax(pmin(nmtr_pct, 20), -50),
             scenario = "Baseline"
           ) %>%
-          select(age, nmtr_pct, scenario)
+          select(age, nmtr_pct_display, scenario)
 
         reform_nmtr <- data.frame(
           age = mdata$reform_working_nmtr$age,
-          nmtr_pct = mdata$reform_working_nmtr$net_marginal_tax_rate * 100,
-          scenario = mdata$reform_scenario
-        )
+          nmtr_pct = mdata$reform_working_nmtr$net_marginal_tax_rate * 100
+        ) %>%
+          mutate(
+            nmtr_pct_display = pmax(pmin(nmtr_pct, 20), -50),
+            scenario = mdata$reform_scenario
+          ) %>%
+          select(age, nmtr_pct_display, scenario)
 
         combined <- bind_rows(baseline_nmtr, reform_nmtr) %>%
-          filter(!is.na(nmtr_pct))
+          filter(!is.na(nmtr_pct_display))
 
         if (nrow(combined) == 0) return(NULL)
 
-        p <- ggplot(combined, aes(x = age, y = nmtr_pct, color = scenario, linetype = scenario)) +
-          geom_line(linewidth = 1.5) +
+        # Baseline bars in back (wider), reform bars in front (narrower)
+        p <- ggplot(combined, aes(x = age, y = nmtr_pct_display, fill = scenario)) +
+          geom_col(data = combined %>% filter(scenario == "Baseline"),
+                   width = 0.8, alpha = 0.5) +
+          geom_col(data = combined %>% filter(scenario != "Baseline"),
+                   width = 0.5, alpha = 0.85) +
           geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
           geom_hline(yintercept = 12.4, color = CRFB_RED, linewidth = 0.8, linetype = "dashed") +
-          scale_y_continuous(labels = function(x) paste0(x, "%")) +
+          scale_y_continuous(labels = function(x) paste0(x, "%"),
+                             limits = c(-50, 20), oob = scales::squish) +
           scale_x_continuous(breaks = seq(25, 65, by = 5)) +
-          scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                         setNames(CRFB_ORANGE, mdata$reform_scenario))) +
-          scale_linetype_manual(values = c("Baseline" = "solid",
-                                            setNames("dashed", mdata$reform_scenario))) +
-          labs(x = "Age", y = "Net Marginal Tax Rate", color = NULL, linetype = NULL) +
+          scale_fill_manual(values = c("Baseline" = CRFB_TEAL,
+                                        setNames(CRFB_ORANGE, mdata$reform_scenario))) +
+          labs(x = "Age", y = "Net Marginal Tax Rate", fill = NULL) +
           annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
                    color = CRFB_RED, size = 3, hjust = 1) +
           chart_theme +
@@ -649,12 +657,14 @@ individual_tab_server <- function(id, reform_state) {
       if (is.null(data) || is.null(data$baseline)) return(NULL)
 
       baseline_pv_tax <- tryCatch({
-        pv_lifetime_taxes(data$baseline, data$assumptions)$pv_taxes[1]
+        pv_lifetime_taxes(data$baseline, data$assumptions,
+                          include_employer = TRUE)$pv_taxes[1]
       }, error = function(e) NA_real_)
 
       if (data$has_reforms && !is.null(data$reform)) {
         reform_pv_tax <- tryCatch({
-          pv_lifetime_taxes(data$reform, data$reform_assumptions)$pv_taxes[1]
+          pv_lifetime_taxes(data$reform, data$reform_assumptions,
+                            include_employer = TRUE)$pv_taxes[1]
         }, error = function(e) NA_real_)
 
         pct_change <- if (!is.na(baseline_pv_tax) && !is.na(reform_pv_tax) && baseline_pv_tax > 0) {
@@ -693,7 +703,8 @@ individual_tab_server <- function(id, reform_state) {
       }, error = function(e) NA_real_)
 
       baseline_pv_tax <- tryCatch({
-        pv_lifetime_taxes(data$baseline, data$assumptions)$pv_taxes[1]
+        pv_lifetime_taxes(data$baseline, data$assumptions,
+                          include_employer = TRUE)$pv_taxes[1]
       }, error = function(e) NA_real_)
 
       baseline_ratio <- if (!is.na(baseline_pv) && !is.na(baseline_pv_tax) && baseline_pv_tax > 0) {
@@ -706,7 +717,8 @@ individual_tab_server <- function(id, reform_state) {
         }, error = function(e) NA_real_)
 
         reform_pv_tax <- tryCatch({
-          pv_lifetime_taxes(data$reform, data$reform_assumptions)$pv_taxes[1]
+          pv_lifetime_taxes(data$reform, data$reform_assumptions,
+                            include_employer = TRUE)$pv_taxes[1]
         }, error = function(e) NA_real_)
 
         reform_ratio <- if (!is.na(reform_pv) && !is.na(reform_pv_tax) && reform_pv_tax > 0) {
