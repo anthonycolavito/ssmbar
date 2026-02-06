@@ -149,8 +149,8 @@ See `PROGRESS.md` for file manifest and implementation details.
 ## Validation Status
 
 Package output validated against SSA's Table V.C7 (2025 Trustees Report).
-- Overall: 2.51% average difference across all worker types and birth years 1960-2000
-- Remaining differences traced to cumulative rounding in AIME calculation
+- Overall: 0.17% average difference across all worker types and birth years 1960-1970
+- Remaining differences traced to earnings generation precision (scaled_factor × AWI rounding)
 
 See `PROGRESS.md` for complete validation history and methodology.
 

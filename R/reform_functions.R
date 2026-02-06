@@ -514,6 +514,9 @@ cola_reform <- function (worker, assumptions, debugg = FALSE) {
       elig_age_val <- .x$elig_age[1]
       ages <- .x$age
 
+      # Find index of eligibility age for COLA replay
+      elig_idx <- which(ages == elig_age_val)[1]
+
       for (i in seq_len(n)) {
         if (ages[i] < elig_age_val) {
           cola_basic_pia_vals[i] <- 0
@@ -530,11 +533,33 @@ cola_reform <- function (worker, assumptions, debugg = FALSE) {
             # Reform #9: COLA cap - give same dollar increase as median recipient
             # max_cola_increase = cap_threshold * (cola_factor - 1)
             max_cola_increase <- cap_threshold * (cola_factor[i] - 1)
-            cola_basic_pia_vals[i] <- floor_dime(prev_pia + max_cola_increase)
+            cola_forward <- floor_dime(prev_pia + max_cola_increase)
           } else {
             # Standard COLA: multiply previous year's rounded PIA by current COLA factor
             # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
-            cola_basic_pia_vals[i] <- floor_dime(prev_pia * cola_factor[i])
+            cola_forward <- floor_dime(prev_pia * cola_factor[i])
+          }
+
+          # Automatic recomputation (SSA Handbook Section 715):
+          # If AIME increased from continued earnings, basic_pia[i] may be
+          # higher than the original. Replay all COLAs from eligibility year
+          # on the new basic_pia and take the max.
+          if (basic_pia[i] > basic_pia[elig_idx]) {
+            recomp_pia <- basic_pia[i]
+            for (j in (elig_idx + 1):i) {
+              # Replay with the same COLA/cap logic
+              cap_j <- cola_cap_vals[j]
+              cap_active_j <- if (length(cola_cap_active_vals) >= j) cola_cap_active_vals[j] else FALSE
+              if (cap_active_j && !is.na(cap_j) && recomp_pia > cap_j) {
+                max_increase <- cap_j * (cola_factor[j] - 1)
+                recomp_pia <- floor_dime(recomp_pia + max_increase)
+              } else {
+                recomp_pia <- floor_dime(recomp_pia * cola_factor[j])
+              }
+            }
+            cola_basic_pia_vals[i] <- max(cola_forward, recomp_pia)
+          } else {
+            cola_basic_pia_vals[i] <- cola_forward
           }
         }
       }

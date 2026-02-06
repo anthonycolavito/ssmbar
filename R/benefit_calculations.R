@@ -487,6 +487,9 @@ cola <- function (worker, assumptions, debugg = FALSE) {
       elig_age_val <- .x$elig_age[1]
       ages <- .x$age
 
+      # Find index of eligibility age for COLA replay
+      elig_idx <- which(ages == elig_age_val)[1]
+
       for (i in seq_len(n)) {
         if (ages[i] < elig_age_val) {
           cola_basic_pia_vals[i] <- 0
@@ -494,9 +497,23 @@ cola <- function (worker, assumptions, debugg = FALSE) {
           # At eligibility age: no COLA yet, use basic_pia
           cola_basic_pia_vals[i] <- basic_pia[i]
         } else {
-          # After eligibility: multiply previous year's rounded PIA by current COLA factor
+          # COLA the previous year's COLA'd PIA forward
           # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
-          cola_basic_pia_vals[i] <- floor_dime(cola_basic_pia_vals[i-1] * cola_factor[i])
+          cola_forward <- floor_dime(cola_basic_pia_vals[i-1] * cola_factor[i])
+
+          # Automatic recomputation (SSA Handbook Section 715):
+          # If AIME increased from continued earnings, basic_pia[i] may be
+          # higher than the original. Replay all COLAs from eligibility year
+          # on the new basic_pia and take the max.
+          if (basic_pia[i] > basic_pia[elig_idx]) {
+            recomp_pia <- basic_pia[i]
+            for (j in (elig_idx + 1):i) {
+              recomp_pia <- floor_dime(recomp_pia * cola_factor[j])
+            }
+            cola_basic_pia_vals[i] <- max(cola_forward, recomp_pia)
+          } else {
+            cola_basic_pia_vals[i] <- cola_forward
+          }
         }
       }
 

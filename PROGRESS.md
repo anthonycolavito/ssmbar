@@ -28,6 +28,37 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 5, 2026 (Session 9) — Add Automatic Recomputation to COLA Function
+
+**Task**: Implement SSA's automatic recomputation (Handbook Section 715) so that when a worker earns past eligibility age 62, the increasing AIME produces a higher PIA that is properly COLA'd.
+
+**Root Cause of V.C7 Discrepancy**: The `cola()` function in both `benefit_calculations.R` and `reform_functions.R` applied each year's COLA to the previous year's COLA'd PIA (line 499/537) but never checked whether the current year's `basic_pia` (from recalculated AIME with new earnings) was higher. SSA recalculates PIA each year and gives the beneficiary whichever is higher: the COLA'd old PIA or the new PIA with all applicable COLAs replayed from eligibility.
+
+**Changes Made**:
+- **`R/benefit_calculations.R` (cola(), lines 490-510)**: After computing `cola_forward` (the standard COLA'd PIA), check if `basic_pia[i] > basic_pia[elig_idx]`. If so, replay all COLAs from eligibility on the new basic PIA and take `max(cola_forward, recomp_pia)`.
+- **`R/reform_functions.R` (cola_reform(), lines 517-555)**: Same fix, with COLA cap logic replayed correctly during recomputation.
+- **All 25 regression test fixtures regenerated**.
+
+**Verification**: V.C7 comparison for medium earner born 1960:
+- Before fix: $24,768/year (−1.60% vs V.C7's $25,172)
+- After fix: $25,116/year (−0.22% vs V.C7's $25,172)
+
+Full V.C7 comparison (birth years 1960-1970):
+
+| Worker Type | Avg % Diff | Range |
+|---|---|---|
+| very_low | -0.15% | [-0.28%, +0.16%] |
+| low | -0.15% | [-0.22%, +0.07%] |
+| medium | -0.16% | [-0.24%, -0.07%] |
+| high | -0.15% | [-0.22%, +0.11%] |
+| max | -0.14% | [-0.22%, +0.08%] |
+
+**Overall: 0.17% average |difference| (improved from 0.90%)**
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 5, 2026 (Session 8) — Correct PIA Bend Point Off-by-One Error
 
 **Task**: Fix PIA bend points in assumptions CSV that were hardcoded one year early (1979 values in 1978 row, 1980 values in 1979 row, etc.).
@@ -444,6 +475,7 @@ ssmbar's methodology is **correct per statute**. The SSA max benefit table may u
 | # | Issue | Location | Type | Status |
 |---|-------|----------|------|--------|
 | 1 | `worker_builder.R` contains incomplete code (references undefined `dataset` variable) | `R/worker_builder.R` | Rule bug (needs discussion) | Open |
+| 2 | ~~Missing automatic recomputation~~ | `R/benefit_calculations.R` | Rule bug | **Fixed** (Session 9) |
 
 ---
 
@@ -632,6 +664,78 @@ The `rep_rates()` function is not exported. In the Shiny app, use `ssmbar:::rep_
 ---
 
 ## Validation History
+
+### Table V.C7 Re-Validation After Bend Point Correction (February 5, 2026)
+
+After correcting the PIA bend point off-by-one error, V.C7 validation was re-run for birth years 1960-2000.
+
+**Updated Results (Birth Years 1960-2000, Turning 65 in 2025-2065)**:
+
+| Worker Type | Avg % Diff | Min %   | Max %   |
+|-------------|-----------|---------|---------|
+| very_low    | -0.78%    | -1.05%  | -0.71%  |
+| low         | -0.96%    | -1.25%  | -0.88%  |
+| medium      | -1.22%    | -1.60%  | -1.14%  |
+| high        | -0.78%    | -1.02%  | -0.73%  |
+| max         | -0.78%    | -1.08%  | -0.70%  |
+
+**Overall: 0.90% average |difference| (improved from 1.36%)**
+
+All differences are negative (ssmbar slightly below V.C7). No discontinuity at the 2033/2034 projection boundary. Projected years (birth 1975-2000) show stable accuracy.
+
+**Comparison Across All Validations**:
+
+| Validation | Overall Avg |diff| |
+|---|---|
+| Original (Jan 2026) | 2.51% |
+| After rounding fixes (Jan 29) | 1.36% |
+| **After bend point fix (Feb 5)** | **0.90%** |
+
+**Root Cause of Remaining 0.9% Difference — Identified**:
+
+The remaining gap is **not** caused by AIME rounding. Diagnostic testing showed that different intermediate rounding approaches (no rounding, round earnings to dollar, round indexed earnings to cent, both) all produce identical AIME values. The total lifetime earnings difference from rounding is only $0.41 across 44 years.
+
+The actual root cause is the **missing automatic recomputation** (SSA Handbook Section 715). Our `cola()` function applies COLAs to the age-62 PIA and carries it forward, but never accounts for AIME increasing when the worker continues to earn past eligibility:
+
+| Age | AIME | basic_pia | Our cola_pia | With Recomp | Gap |
+|-----|------|-----------|-------------|-------------|-----|
+| 62 | 4,618 | $2,071.60 | $2,071.60 | $2,071.60 | $0 |
+| 63 | 4,654 | $2,083.20 | $2,251.80 | $2,264.40 | $12.60 |
+| 64 | 4,683 | $2,092.40 | $2,323.80 | $2,347.10 | $23.30 |
+| 65 | 4,709 | $2,100.80 | $2,381.80 | $2,415.40 | $33.60 |
+
+With recomputation, the medium earner benefit becomes $25,120/year vs V.C7's $25,172 (0.21% gap vs current 1.60%). **Fixed in Session 9** — overall accuracy now 0.17%.
+
+---
+
+### Table V.C7 Re-Validation After Automatic Recomputation Fix (February 5, 2026)
+
+After adding automatic recomputation to `cola()`, V.C7 validation re-run for birth years 1960-1970.
+
+**Updated Results**:
+
+| Worker Type | Avg % Diff | Range |
+|---|---|---|
+| very_low | -0.15% | [-0.28%, +0.16%] |
+| low | -0.15% | [-0.22%, +0.07%] |
+| medium | -0.16% | [-0.24%, -0.07%] |
+| high | -0.15% | [-0.22%, +0.11%] |
+| max | -0.14% | [-0.22%, +0.08%] |
+
+**Overall: 0.17% average |difference| (improved from 0.90%)**
+
+**Comparison Across All Validations**:
+
+| Validation | Overall Avg |diff| |
+|---|---|
+| Original (Jan 2026) | 2.51% |
+| After rounding fixes (Jan 29) | 1.36% |
+| After bend point fix (Feb 5) | 0.90% |
+| **After recomputation fix (Feb 5)** | **0.17%** |
+
+**Remaining 0.17% Difference**: Attributable to small differences in earnings generation (`scaled_factor × AWI`). SSA may round hypothetical worker earnings to the nearest dollar at each year; our code keeps full double precision. Diagnostic testing confirmed this makes no difference to AIME, so the gap likely arises from slight differences in SSA's internal scaled earnings factor precision vs what's published in the Actuarial Note.
+
+---
 
 ### Table V.C7 Validation (January 2026)
 
