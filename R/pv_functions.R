@@ -101,18 +101,25 @@ pv_lifetime_benefits <- function(worker, assumptions, discount_to_age = 65, base
   }
 
   # Calculate PV of lifetime benefits in real 2025 dollars
+  # Includes partial year at death: fractional_year * annual_benefit
   result <- dataset %>%
     group_by(id) %>%
     mutate(
       # Get discount factor at the normalization age BEFORE filtering
       birth_yr = first(year) - first(age),
       discount_year = birth_yr + discount_to_age,
-      real_df_norm = real_df[which(year == discount_year)][1]
+      real_df_norm = real_df[which(year == discount_year)][1],
+      floor_death_age = floor(first(death_age)),
+      frac_death = first(death_age) - floor(first(death_age))
     ) %>%
-    filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
+    # Full years: claim_age to floor(death_age) - 1
+    # Partial year: age == floor(death_age) gets fractional weight
+    filter(age >= claim_age & age <= floor_death_age & annual_ind > 0) %>%
     mutate(
+      # Apply fractional weight for the partial year at death
+      year_weight = if_else(age == floor_death_age, frac_death, 1.0),
       # Step 1: Convert nominal to real 2025 dollars
-      real_benefit = annual_ind * (gdp_pi_base / gdp_pi),
+      real_benefit = annual_ind * (gdp_pi_base / gdp_pi) * year_weight,
       # Step 2: Discount real benefits using real discount factor
       pv_factor = real_df_norm / real_df,
       pv_annual = real_benefit * pv_factor
@@ -505,14 +512,20 @@ real_lifetime_benefits <- function(worker, assumptions, base_year = 2025) {
     dataset <- worker
   }
 
-  # Calculate real lifetime benefits
+  # Calculate real lifetime benefits (with partial year at death)
   result <- dataset %>%
     group_by(id) %>%
-    filter(age >= claim_age & age < death_age & annual_ind > 0) %>%
     mutate(
+      floor_death_age = floor(first(death_age)),
+      frac_death = first(death_age) - floor(first(death_age))
+    ) %>%
+    filter(age >= claim_age & age <= floor_death_age & annual_ind > 0) %>%
+    mutate(
+      # Apply fractional weight for the partial year at death
+      year_weight = if_else(age == floor_death_age, frac_death, 1.0),
       # Deflate benefits to base year constant dollars
       price_scalar = gdp_pi_base / gdp_pi,
-      real_annual = annual_ind * price_scalar
+      real_annual = annual_ind * price_scalar * year_weight
     ) %>%
     summarise(
       real_benefits = sum(real_annual, na.rm = TRUE),
@@ -905,9 +918,15 @@ internal_rate_of_return <- function(worker, assumptions, include_employer = FALS
       ) %>%
       select(year, age, tax_amount)
 
-    # Extract benefit stream (claim_age to death_age)
+    # Extract benefit stream (claim_age to death_age, with partial year)
+    floor_death <- floor(death_age_val)
+    frac_death <- death_age_val - floor_death
+
     benefit_data <- w_data %>%
-      filter(age >= claim_age_val & age < death_age_val & annual_ind > 0) %>%
+      filter(age >= claim_age_val & age <= floor_death & annual_ind > 0) %>%
+      mutate(
+        annual_ind = if_else(age == floor_death, annual_ind * frac_death, annual_ind)
+      ) %>%
       select(year, age, annual_ind)
 
     # Check for edge cases

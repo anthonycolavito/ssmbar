@@ -15,7 +15,7 @@ ui <- page_navbar(
 
   # Sidebar with shared reform selector
   sidebar = sidebar(
-    width = 300,
+    width = 340,
     title = "Reform Comparison",
 
     # Shared reform selector (mandatory)

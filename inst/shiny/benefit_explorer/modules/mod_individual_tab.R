@@ -135,7 +135,7 @@ individual_tab_ui <- function(id) {
             radioButtons(
               ns("chart_type"), NULL,
               choices = c("Nominal $" = "nominal", "Real 2025 $" = "real"),
-              selected = "nominal", inline = TRUE
+              selected = "real", inline = TRUE
             )
           ),
           card_body(
@@ -150,8 +150,7 @@ individual_tab_ui <- function(id) {
         card(
           card_header(
             class = "bg-info text-white d-flex justify-content-between align-items-center py-2",
-            tags$span("Net Marginal Tax Rate by Age"),
-            checkboxInput(ns("include_employer"), "Incl. Employer", value = FALSE, width = "120px")
+            tags$span("Net Marginal Tax Rate by Age")
           ),
           card_body(
             class = "p-2",
@@ -170,12 +169,12 @@ individual_tab_ui <- function(id) {
       column(3, uiOutput(ns("metric_ratio")))
     ),
 
-    # Row 4: Additional metrics (mean NMTR, IRR, etc.)
+    # Row 4: Additional metrics (IRR, Marginal IRR, Marginal BTR)
     fluidRow(
       class = "mt-2",
-      column(3, uiOutput(ns("metric_mean_nmtr"))),
       column(3, uiOutput(ns("metric_irr"))),
-      column(3, uiOutput(ns("metric_years_top35"))),
+      column(3, uiOutput(ns("metric_marginal_irr"))),
+      column(3, uiOutput(ns("metric_marginal_btr"))),
       column(3,
         tags$div(
           class = "text-end pt-3",
@@ -407,6 +406,30 @@ individual_tab_server <- function(id, reform_state) {
           plot.margin = margin(10, 15, 10, 10)
         )
 
+      # Add benefit-type labels at transition points (baseline only)
+      if ("bc" %in% names(data_filtered)) {
+        baseline_data <- data_filtered %>% filter(scenario == "Baseline")
+        if (nrow(baseline_data) > 0) {
+          # Find transition points where bc changes
+          bc_runs <- rle(baseline_data$bc)
+          transition_idx <- cumsum(bc_runs$lengths)
+          # Label at the midpoint of each run
+          start_idx <- c(1, cumsum(bc_runs$lengths[-length(bc_runs$lengths)]) + 1)
+          mid_idx <- floor((start_idx + transition_idx) / 2)
+
+          for (i in seq_along(bc_runs$values)) {
+            bc_val <- bc_runs$values[i]
+            if (!is.na(bc_val) && bc_val %in% names(BC_LABELS)) {
+              label_row <- baseline_data[mid_idx[i], ]
+              p <- p + annotate("text",
+                x = label_row$age, y = label_row[[y_var]],
+                label = bc_val, size = 3.5, color = DARK_MUTED,
+                vjust = -1.5, fontface = "italic")
+            }
+          }
+        }
+      }
+
       p
     })
 
@@ -422,9 +445,9 @@ individual_tab_server <- function(id, reform_state) {
         # Baseline marginal analysis
         marginal <- marginal_benefit_analysis(baseline, assumptions)
         nmtr <- net_marginal_tax_rate(baseline, assumptions,
-                                       include_employer = input$include_employer)
+                                       include_employer = TRUE)
         mirr <- marginal_irr(baseline, assumptions,
-                             include_employer = input$include_employer)
+                             include_employer = TRUE)
 
         working_marginal <- marginal[marginal$age >= 21 & marginal$age <= 64, ]
         working_nmtr <- nmtr[nmtr$age >= 21 & nmtr$age <= 64, ]
@@ -459,7 +482,7 @@ individual_tab_server <- function(id, reform_state) {
           reform_assumptions <- data$reform_assumptions
 
           reform_nmtr <- net_marginal_tax_rate(reform, reform_assumptions,
-                                                include_employer = input$include_employer)
+                                                include_employer = TRUE)
           reform_working_nmtr <- reform_nmtr[reform_nmtr$age >= 21 & reform_nmtr$age <= 64, ]
           reform_mean_nmtr <- mean(reform_working_nmtr$net_marginal_tax_rate, na.rm = TRUE)
 
@@ -723,34 +746,100 @@ individual_tab_server <- function(id, reform_state) {
       }
     })
 
-    # Metric: Mean NMTR
-    output$metric_mean_nmtr <- renderUI({
-      mdata <- marginal_data()
-      if (is.null(mdata)) return(NULL)
+    # Compute marginal metrics for one additional year of work
+    # Uses avg of last 5 nonzero earnings years as the hypothetical additional earnings
+    marginal_extra_year <- reactive({
+      data <- worker_data()
+      if (is.null(data) || is.null(data$baseline)) return(NULL)
 
-      if (mdata$has_reforms && !is.na(mdata$reform_mean_nmtr)) {
-        baseline_color <- if (!is.na(mdata$mean_nmtr) && mdata$mean_nmtr < 0.062) "text-success" else "text-warning"
-        reform_color <- if (!is.na(mdata$reform_mean_nmtr) && mdata$reform_mean_nmtr < 0.062) "text-success" else "text-warning"
-        tags$div(
-          class = "text-center p-2 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Mean NMTR"),
-          tags$div(
-            tags$span(class = "text-muted",
-                      if (!is.na(mdata$mean_nmtr)) sprintf("%.1f%%", mdata$mean_nmtr * 100) else "N/A"),
-            tags$span(" \u2192 "),
-            tags$strong(class = reform_color,
-                        if (!is.na(mdata$reform_mean_nmtr)) sprintf("%.1f%%", mdata$reform_mean_nmtr * 100) else "N/A")
-          )
+      tryCatch({
+        baseline <- data$baseline
+        assumptions <- data$assumptions
+
+        # Find last 5 non-zero earnings years
+        working <- baseline %>%
+          filter(age >= 21 & age <= 64 & earnings > 0) %>%
+          arrange(desc(age))
+
+        if (nrow(working) < 1) return(NULL)
+
+        avg_last5 <- mean(head(working$earnings, 5))
+        last_work_age <- max(working$age)
+
+        # The hypothetical additional year is at age last_work_age + 1
+        extra_age <- last_work_age + 1
+        if (extra_age > 64) extra_age <- 64  # cap at working age
+
+        # Get the marginal data — find delta_pv and tax at the last working year
+        mdata <- marginal_data()
+        if (is.null(mdata) || is.null(mdata$table_data)) return(NULL)
+
+        # Use the last working year's marginal IRR as proxy
+        last_row <- mdata$table_data %>%
+          filter(!is.na(net_marginal_tax_rate) & earnings > 0) %>%
+          arrange(desc(age)) %>%
+          head(1)
+
+        if (nrow(last_row) == 0) return(NULL)
+
+        # Marginal IRR from last working year
+        mirr_val <- last_row$marginal_irr
+        delta_pv <- last_row$delta_pv_benefits
+
+        # Marginal BTR: delta_pv_benefits / tax on that year's earnings
+        # Tax = 12.4% (employee + employer) of min(earnings, taxmax)
+        tax_on_year <- last_row$earnings * 0.124  # approximate employee+employer
+        if (!is.na(delta_pv) && tax_on_year > 0) {
+          marginal_btr <- delta_pv / tax_on_year
+        } else {
+          marginal_btr <- NA_real_
+        }
+
+        # Also compute for reform if available
+        reform_mirr <- NA_real_
+        reform_btr <- NA_real_
+        if (mdata$has_reforms && !is.null(data$reform) && !is.null(data$reform_assumptions)) {
+          reform_marginal <- tryCatch({
+            marginal_benefit_analysis(data$reform, data$reform_assumptions)
+          }, error = function(e) NULL)
+
+          if (!is.null(reform_marginal)) {
+            reform_working <- reform_marginal %>%
+              filter(age >= 21 & age <= 64 & !is.na(delta_pv_benefits) & earnings > 0) %>%
+              arrange(desc(age)) %>%
+              head(1)
+
+            if (nrow(reform_working) > 0) {
+              reform_delta_pv <- reform_working$delta_pv_benefits
+              reform_tax <- reform_working$earnings * 0.124
+              if (reform_tax > 0) {
+                reform_btr <- reform_delta_pv / reform_tax
+              }
+              # For reform IRR, use the marginal_irr function
+              reform_mirr_data <- tryCatch({
+                marginal_irr(data$reform, data$reform_assumptions, include_employer = TRUE)
+              }, error = function(e) NULL)
+              if (!is.null(reform_mirr_data)) {
+                reform_mirr_row <- reform_mirr_data %>%
+                  filter(age >= 21 & age <= 64 & !is.na(marginal_irr) & marginal_irr > -1) %>%
+                  arrange(desc(age)) %>%
+                  head(1)
+                if (nrow(reform_mirr_row) > 0) {
+                  reform_mirr <- reform_mirr_row$marginal_irr
+                }
+              }
+            }
+          }
+        }
+
+        list(
+          mirr = if (!is.na(mirr_val) && mirr_val > -1) mirr_val else NA_real_,
+          btr = marginal_btr,
+          reform_mirr = reform_mirr,
+          reform_btr = reform_btr,
+          has_reforms = mdata$has_reforms
         )
-      } else {
-        nmtr_color <- if (!is.na(mdata$mean_nmtr) && mdata$mean_nmtr < 0.062) "text-success" else "text-warning"
-        tags$div(
-          class = "text-center p-2 rounded", style = "background: #1f3460;",
-          tags$small(class = "text-muted d-block", "Mean NMTR"),
-          tags$strong(class = nmtr_color,
-                      if (!is.na(mdata$mean_nmtr)) sprintf("%.1f%%", mdata$mean_nmtr * 100) else "N/A")
-        )
-      }
+      }, error = function(e) NULL)
     })
 
     # Metric: IRR
@@ -760,7 +849,7 @@ individual_tab_server <- function(id, reform_state) {
 
       baseline_irr <- tryCatch({
         internal_rate_of_return(data$baseline, data$assumptions,
-                                include_employer = input$include_employer)$irr[1]
+                                include_employer = TRUE)$irr[1]
       }, error = function(e) NA_real_)
 
       tags$div(
@@ -771,16 +860,60 @@ individual_tab_server <- function(id, reform_state) {
       )
     })
 
-    # Metric: Years in Top 35
-    output$metric_years_top35 <- renderUI({
-      mdata <- marginal_data()
-      if (is.null(mdata)) return(NULL)
+    # Metric: Marginal IRR (at last working year)
+    output$metric_marginal_irr <- renderUI({
+      extra <- marginal_extra_year()
+      if (is.null(extra)) return(NULL)
 
-      tags$div(
-        class = "text-center p-2 rounded", style = "background: #1f3460;",
-        tags$small(class = "text-muted d-block", "Years in Top 35"),
-        tags$strong(class = "text-info", mdata$n_top_35)
-      )
+      if (!is.null(extra$has_reforms) && extra$has_reforms && !is.na(extra$reform_mirr)) {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Marginal IRR"),
+          tags$div(
+            tags$span(class = "text-muted",
+                      if (!is.na(extra$mirr)) sprintf("%.1f%%", extra$mirr * 100) else "N/A"),
+            tags$span(" \u2192 "),
+            tags$strong(class = "text-success",
+                        sprintf("%.1f%%", extra$reform_mirr * 100))
+          )
+        )
+      } else {
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Marginal IRR"),
+          tags$strong(class = "text-success",
+                      if (!is.na(extra$mirr)) sprintf("%.1f%%", extra$mirr * 100) else "N/A")
+        )
+      }
+    })
+
+    # Metric: Marginal Benefit-Tax Ratio
+    output$metric_marginal_btr <- renderUI({
+      extra <- marginal_extra_year()
+      if (is.null(extra)) return(NULL)
+
+      if (!is.null(extra$has_reforms) && extra$has_reforms && !is.na(extra$reform_btr)) {
+        btr_color <- if (!is.na(extra$reform_btr) && extra$reform_btr >= 1) "text-success" else "text-danger"
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Marginal Benefit-Tax Ratio"),
+          tags$div(
+            tags$span(class = "text-muted",
+                      if (!is.na(extra$btr)) sprintf("%.2f", extra$btr) else "N/A"),
+            tags$span(" \u2192 "),
+            tags$strong(class = btr_color,
+                        sprintf("%.2f", extra$reform_btr))
+          )
+        )
+      } else {
+        btr_color <- if (!is.na(extra$btr) && extra$btr >= 1) "text-success" else "text-danger"
+        tags$div(
+          class = "text-center p-2 rounded", style = "background: #1f3460;",
+          tags$small(class = "text-muted d-block", "Marginal Benefit-Tax Ratio"),
+          tags$strong(class = btr_color,
+                      if (!is.na(extra$btr)) sprintf("%.2f", extra$btr) else "N/A")
+        )
+      }
     })
 
     # Benefits data table

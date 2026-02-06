@@ -1,5 +1,5 @@
 # =============================================================================
-# Reform Selector Module - Organized by category with radio/checkbox inputs
+# Reform Selector Module - Organized by category with checkbox inputs
 # =============================================================================
 
 # Module UI
@@ -16,7 +16,7 @@ reform_selector_ui <- function(id) {
       tags$small(class = "text-muted d-block mb-3",
                  "Choose reforms to compare against baseline"),
 
-      # PIA Formula Changes (mutually exclusive)
+      # Slow Initial Benefit Growth (mutually exclusive via server)
       tags$div(
         class = "reform-section mb-3",
         tags$div(
@@ -24,28 +24,25 @@ reform_selector_ui <- function(id) {
           style = "cursor: pointer;",
           onclick = sprintf("$('#%s').slideToggle(200)", ns("section_pia")),
           icon("calculator", class = "me-2 text-info"),
-          tags$span(class = "fw-bold small", "PIA Formula"),
+          tags$span(class = "fw-bold small", "Slow Initial Benefit Growth"),
           tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
         ),
         tags$div(
           id = ns("section_pia"),
           class = "ps-3",
-          radioButtons(
+          checkboxGroupInput(
             ns("pia_formula"),
             NULL,
             choices = c(
-              "None" = "none",
-              "Reduce Fact3 to 5%" = "Reduce Fact3 to 5%",
-              "Flat Benefit" = "Flat Benefit",
-              "Simpson-Bowles PIA" = "Simpson-Bowles PIA",
-              "Mini-PIA" = "Mini-PIA"
-            ),
-            selected = "none"
+              "Slow Benefit Growth for Top 20% of Earners" = "Reduce Fact3 to 5%",
+              "Transition to a Flat Benefit" = "Flat Benefit",
+              "Slow Benefit Growth for Top Half of Earners" = "Simpson-Bowles PIA"
+            )
           )
         )
       ),
 
-      # NRA Changes (mutually exclusive)
+      # Increase Retirement Age (mutually exclusive via server)
       tags$div(
         class = "reform-section mb-3",
         tags$div(
@@ -53,27 +50,25 @@ reform_selector_ui <- function(id) {
           style = "cursor: pointer;",
           onclick = sprintf("$('#%s').slideToggle(200)", ns("section_nra")),
           icon("clock", class = "me-2 text-info"),
-          tags$span(class = "fw-bold small", "Retirement Age"),
+          tags$span(class = "fw-bold small", "Increase Retirement Age"),
           tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
         ),
         tags$div(
           id = ns("section_nra"),
           class = "ps-3",
-          radioButtons(
+          checkboxGroupInput(
             ns("nra"),
             NULL,
             choices = c(
-              "None" = "none",
               "Raise NRA to 68" = "Raise NRA to 68",
               "Index NRA to Longevity" = "Index NRA to Longevity",
               "NRA to 69, then Index" = "NRA to 69, then Index"
-            ),
-            selected = "none"
+            )
           )
         )
       ),
 
-      # COLA Indexing (mutually exclusive)
+      # Modify COLAs (mutually exclusive via server)
       tags$div(
         class = "reform-section mb-3",
         tags$div(
@@ -81,27 +76,25 @@ reform_selector_ui <- function(id) {
           style = "cursor: pointer;",
           onclick = sprintf("$('#%s').slideToggle(200)", ns("section_cola")),
           icon("chart-line", class = "me-2 text-info"),
-          tags$span(class = "fw-bold small", "COLA Indexing"),
+          tags$span(class = "fw-bold small", "Modify Cost-of-Living Adjustments (COLAs)"),
           tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
         ),
         tags$div(
           id = ns("section_cola"),
           class = "ps-3",
-          radioButtons(
+          checkboxGroupInput(
             ns("cola"),
             NULL,
             choices = c(
-              "None" = "none",
-              "Chained CPI (-0.3pp)" = "Chained CPI",
-              "Cap COLAs at Median" = "Cap COLAs at Median",
-              "CPI-E (+0.2pp)" = "CPI-E (Higher)"
-            ),
-            selected = "none"
+              "Index COLAs to \"Chained CPI\"" = "Chained CPI",
+              "Cap COLAs for Top Half of Beneficiaries" = "Cap COLAs at Median",
+              "Index COLAs to \"CPI-E\"" = "CPI-E (Higher)"
+            )
           )
         )
       ),
 
-      # Tax Changes - Taxmax (mutually exclusive)
+      # Increase Taxable Maximum (mutually exclusive via server)
       tags$div(
         class = "reform-section mb-3",
         tags$div(
@@ -109,103 +102,25 @@ reform_selector_ui <- function(id) {
           style = "cursor: pointer;",
           onclick = sprintf("$('#%s').slideToggle(200)", ns("section_taxmax")),
           icon("money-bill", class = "me-2 text-info"),
-          tags$span(class = "fw-bold small", "Taxable Maximum"),
+          tags$span(class = "fw-bold small", "Increase $184,500 Taxable Maximum"),
           tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
         ),
         tags$div(
           id = ns("section_taxmax"),
           class = "ps-3",
-          radioButtons(
+          checkboxGroupInput(
             ns("taxmax"),
             NULL,
             choices = c(
-              "None" = "none",
-              "90% Coverage + Credit" = "90% Coverage + 5% Credit",
-              "Eliminate + 15% Credit" = "Eliminate Taxmax + 15% Credit",
-              "Eliminate, No Credit" = "Eliminate Taxmax, No Credit"
-            ),
-            selected = "none"
-          )
-        )
-      ),
-
-      # Benefit Cuts (checkboxes, can combine)
-      tags$div(
-        class = "reform-section mb-3",
-        tags$div(
-          class = "reform-section-header d-flex align-items-center mb-2",
-          style = "cursor: pointer;",
-          onclick = sprintf("$('#%s').slideToggle(200)", ns("section_cuts")),
-          icon("scissors", class = "me-2 text-danger"),
-          tags$span(class = "fw-bold small", "Benefit Cuts"),
-          tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
-        ),
-        tags$div(
-          id = ns("section_cuts"),
-          class = "ps-3",
-          checkboxGroupInput(
-            ns("benefit_cuts"),
-            NULL,
-            choices = c(
-              "5% Benefit Cut" = "5% Benefit Cut",
-              "10% Benefit Cut" = "10% Benefit Cut"
+              "Raise Tax Max to Cover 90% of Wages ($330,500 in 2026)" = "90% Coverage + 5% Credit",
+              "Eliminate Tax Max with Benefit Credit for Additional Payments" = "Eliminate Taxmax + 15% Credit",
+              "Eliminate Tax Max without Benefit Credit" = "Eliminate Taxmax, No Credit"
             )
           )
         )
       ),
 
-      # Tax Rate Changes (checkboxes)
-      tags$div(
-        class = "reform-section mb-3",
-        tags$div(
-          class = "reform-section-header d-flex align-items-center mb-2",
-          style = "cursor: pointer;",
-          onclick = sprintf("$('#%s').slideToggle(200)", ns("section_taxrate")),
-          icon("percent", class = "me-2 text-warning"),
-          tags$span(class = "fw-bold small", "Tax Rate"),
-          tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
-        ),
-        tags$div(
-          id = ns("section_taxrate"),
-          class = "ps-3",
-          checkboxGroupInput(
-            ns("tax_rate"),
-            NULL,
-            choices = c(
-              "+1pp Tax Rate" = "Increase Tax Rate +1pp",
-              "+2pp Tax Rate" = "Increase Tax Rate +2pp"
-            )
-          )
-        )
-      ),
-
-      # Benefit Enhancements (checkboxes)
-      tags$div(
-        class = "reform-section mb-3",
-        tags$div(
-          class = "reform-section-header d-flex align-items-center mb-2",
-          style = "cursor: pointer;",
-          onclick = sprintf("$('#%s').slideToggle(200)", ns("section_enhance")),
-          icon("plus-circle", class = "me-2 text-success"),
-          tags$span(class = "fw-bold small", "Benefit Enhancements"),
-          tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
-        ),
-        tags$div(
-          id = ns("section_enhance"),
-          class = "ps-3",
-          checkboxGroupInput(
-            ns("enhancements"),
-            NULL,
-            choices = c(
-              "Basic Minimum Benefit" = "Basic Minimum Benefit",
-              "Child Care Credit" = "Child Care Credit",
-              "75% Widow Benefit" = "75% Widow Benefit"
-            )
-          )
-        )
-      ),
-
-      # Other Reforms (checkboxes)
+      # Other Reforms (checkboxes, can combine)
       tags$div(
         class = "reform-section mb-3",
         tags$div(
@@ -223,9 +138,36 @@ reform_selector_ui <- function(id) {
             ns("other_reforms"),
             NULL,
             choices = c(
-              "40-Year Averaging" = "40-Year Averaging",
-              "Repeal RET" = "Repeal RET",
-              "Phase Out Spousal" = "Phase Out Spousal"
+              "Calculate Benefits Based on Highest 40 Years" = "40-Year Averaging",
+              "Phase Out Non-Widow(er) Spousal Benefit" = "Phase Out Spousal",
+              "Apply the Benefit Formula to Annual Earnings" = "Mini-PIA",
+              "Repeal the Retirement Earnings Test" = "Repeal RET"
+            )
+          )
+        )
+      ),
+
+      # Enact Benefit Enhancements (checkboxes, can combine) — last section
+      tags$div(
+        class = "reform-section mb-3",
+        tags$div(
+          class = "reform-section-header d-flex align-items-center mb-2",
+          style = "cursor: pointer;",
+          onclick = sprintf("$('#%s').slideToggle(200)", ns("section_enhance")),
+          icon("plus-circle", class = "me-2 text-success"),
+          tags$span(class = "fw-bold small", "Enact Benefit Enhancements"),
+          tags$span(class = "ms-auto text-muted small", icon("chevron-down"))
+        ),
+        tags$div(
+          id = ns("section_enhance"),
+          class = "ps-3",
+          checkboxGroupInput(
+            ns("enhancements"),
+            NULL,
+            choices = c(
+              "Establish a Basic Minimum Benefit" = "Basic Minimum Benefit",
+              "Provide Earnings Credit for Child Care" = "Child Care Credit",
+              "Expand Widow(er) Benefits to 75% of a Couple's Combined Benefit" = "75% Widow Benefit"
             )
           )
         )
@@ -251,14 +193,16 @@ reform_selector_ui <- function(id) {
       #%s .reform-section:hover {
         border-left-color: #9ACDFF;
       }
-      #%s .radio label, #%s .checkbox label {
-        font-size: 0.85rem;
+      #%s .checkbox label {
+        font-size: 0.78rem;
         padding: 2px 0;
+        white-space: normal;
+        word-wrap: break-word;
       }
       #%s .form-check {
         margin-bottom: 2px;
       }
-    ", ns(""), ns(""), ns(""), ns(""), ns(""))))
+    ", ns(""), ns(""), ns(""), ns(""))))
   )
 }
 
@@ -267,14 +211,46 @@ reform_selector_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    # --- Mutual exclusivity enforcement for checkbox groups ---
+    # PIA Formula: max 1 selection
+    observeEvent(input$pia_formula, {
+      if (length(input$pia_formula) > 1) {
+        # Keep only the most recently added (last element)
+        updateCheckboxGroupInput(session, "pia_formula",
+                                 selected = tail(input$pia_formula, 1))
+      }
+    }, ignoreNULL = FALSE)
+
+    # NRA: max 1 selection
+    observeEvent(input$nra, {
+      if (length(input$nra) > 1) {
+        updateCheckboxGroupInput(session, "nra",
+                                 selected = tail(input$nra, 1))
+      }
+    }, ignoreNULL = FALSE)
+
+    # COLA: max 1 selection
+    observeEvent(input$cola, {
+      if (length(input$cola) > 1) {
+        updateCheckboxGroupInput(session, "cola",
+                                 selected = tail(input$cola, 1))
+      }
+    }, ignoreNULL = FALSE)
+
+    # Taxmax: max 1 selection
+    observeEvent(input$taxmax, {
+      if (length(input$taxmax) > 1) {
+        updateCheckboxGroupInput(session, "taxmax",
+                                 selected = tail(input$taxmax, 1))
+      }
+    }, ignoreNULL = FALSE)
+
     # Clear all selections
     observeEvent(input$clear_all, {
-      updateRadioButtons(session, "pia_formula", selected = "none")
-      updateRadioButtons(session, "nra", selected = "none")
-      updateRadioButtons(session, "cola", selected = "none")
-      updateRadioButtons(session, "taxmax", selected = "none")
-      updateCheckboxGroupInput(session, "benefit_cuts", selected = character(0))
-      updateCheckboxGroupInput(session, "tax_rate", selected = character(0))
+      updateCheckboxGroupInput(session, "pia_formula", selected = character(0))
+      updateCheckboxGroupInput(session, "nra", selected = character(0))
+      updateCheckboxGroupInput(session, "cola", selected = character(0))
+      updateCheckboxGroupInput(session, "taxmax", selected = character(0))
       updateCheckboxGroupInput(session, "enhancements", selected = character(0))
       updateCheckboxGroupInput(session, "other_reforms", selected = character(0))
     })
@@ -283,27 +259,21 @@ reform_selector_server <- function(id) {
     all_selected <- reactive({
       selected <- character(0)
 
-      # Radio button selections (exclude "none")
-      if (!is.null(input$pia_formula) && input$pia_formula != "none") {
+      # Mutually exclusive checkbox group selections
+      if (!is.null(input$pia_formula) && length(input$pia_formula) > 0) {
         selected <- c(selected, input$pia_formula)
       }
-      if (!is.null(input$nra) && input$nra != "none") {
+      if (!is.null(input$nra) && length(input$nra) > 0) {
         selected <- c(selected, input$nra)
       }
-      if (!is.null(input$cola) && input$cola != "none") {
+      if (!is.null(input$cola) && length(input$cola) > 0) {
         selected <- c(selected, input$cola)
       }
-      if (!is.null(input$taxmax) && input$taxmax != "none") {
+      if (!is.null(input$taxmax) && length(input$taxmax) > 0) {
         selected <- c(selected, input$taxmax)
       }
 
-      # Checkbox selections
-      if (!is.null(input$benefit_cuts)) {
-        selected <- c(selected, input$benefit_cuts)
-      }
-      if (!is.null(input$tax_rate)) {
-        selected <- c(selected, input$tax_rate)
-      }
+      # Multi-select checkbox selections
       if (!is.null(input$enhancements)) {
         selected <- c(selected, input$enhancements)
       }
@@ -314,7 +284,7 @@ reform_selector_server <- function(id) {
       selected
     })
 
-    # Valid reforms (same as selected since we enforce exclusivity via UI)
+    # Valid reforms (same as selected since we enforce exclusivity via server)
     valid_reforms <- reactive({
       all_selected()
     })

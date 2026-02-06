@@ -17,7 +17,7 @@ data(tr2025, package = "ssmbar")
 data(sef2025, package = "ssmbar")
 
 # App configuration constants
-APP_TITLE <- "Social Security Benefit Explorer"
+APP_TITLE <- "Social Security Explorer"
 APP_VERSION <- "0.1.0"
 
 # Worker type options
@@ -110,21 +110,21 @@ app_theme <- bs_theme(
   ")
 
 # Chart theme for ggplot - Dark mode
-chart_theme <- theme_minimal(base_size = 12) +
+chart_theme <- theme_minimal(base_size = 16) +
   theme(
     plot.background = element_rect(fill = DARK_CARD, color = NA),
     panel.background = element_rect(fill = DARK_CARD, color = NA),
-    plot.title = element_text(face = "bold", size = 14, color = CRFB_LIGHT_BLUE),
-    plot.subtitle = element_text(color = DARK_MUTED, size = 10),
+    plot.title = element_text(face = "bold", size = 18, color = CRFB_LIGHT_BLUE),
+    plot.subtitle = element_text(color = DARK_MUTED, size = 13),
     legend.position = "right",
     legend.background = element_rect(fill = DARK_CARD, color = NA),
-    legend.text = element_text(color = DARK_TEXT, size = 9),
-    legend.title = element_text(color = CRFB_LIGHT_BLUE, size = 10),
+    legend.text = element_text(color = DARK_TEXT, size = 12),
+    legend.title = element_text(color = CRFB_LIGHT_BLUE, size = 13),
     legend.key = element_rect(fill = DARK_CARD, color = NA),
     panel.grid.major = element_line(color = "#2a3f5f", linewidth = 0.3),
     panel.grid.minor = element_blank(),
-    axis.title = element_text(size = 11, color = DARK_MUTED),
-    axis.text = element_text(size = 10, color = DARK_MUTED)
+    axis.title = element_text(size = 14, color = DARK_MUTED),
+    axis.text = element_text(size = 13, color = DARK_MUTED)
   )
 
 # Color palette for charts (bright colors for dark background)
@@ -154,15 +154,7 @@ paste0(format(round(x * 100, digits), nsmall = digits), "%")
 # Available reforms organized by category
 # Each reform is a function that creates a Reform object
 AVAILABLE_REFORMS <- list(
-  "Benefit Changes" = list(
-    "5% Benefit Cut" = list(
-      fn = function() reform_reduce_benefits(0.95, 2030),
-      desc = "Reduce all benefits by 5%"
-    ),
-    "10% Benefit Cut" = list(
-      fn = function() reform_reduce_benefits(0.90, 2030),
-      desc = "Reduce all benefits by 10%"
-    ),
+  "PIA Formula" = list(
     "Reduce Fact3 to 5%" = list(
       fn = function() reform_reduce_fact3(0.05, 2030),
       desc = "Reduce top PIA bracket from 15% to 5%",
@@ -176,11 +168,6 @@ AVAILABLE_REFORMS <- list(
     "Simpson-Bowles PIA" = list(
       fn = function() reform_simpson_bowles(2030, 10),
       desc = "4-bracket PIA (30/10/5% phase-in)",
-      group = "pia_formula"
-    ),
-    "Mini-PIA" = list(
-      fn = function() reform_mini_pia(2030, 10),
-      desc = "Average yearly PIAs instead of AIME",
       group = "pia_formula"
     )
   ),
@@ -233,14 +220,6 @@ AVAILABLE_REFORMS <- list(
       fn = function() reform_eliminate_taxmax_no_credit(2030),
       desc = "Eliminate taxmax for taxes only",
       group = "taxmax"
-    ),
-    "Increase Tax Rate +1pp" = list(
-      fn = function() reform_change_tax_rate(1.0, 2030),
-      desc = "Increase payroll tax rate by 1 percentage point"
-    ),
-    "Increase Tax Rate +2pp" = list(
-      fn = function() reform_change_tax_rate(2.0, 2030),
-      desc = "Increase payroll tax rate by 2 percentage points"
     )
   ),
   "Benefit Enhancements" = list(
@@ -262,13 +241,17 @@ AVAILABLE_REFORMS <- list(
       fn = function() reform_40_year_averaging(2030),
       desc = "Phase out dropout years (35 to 40 year average)"
     ),
-    "Repeal RET" = list(
-      fn = function() reform_repeal_ret(2030),
-      desc = "Repeal the Retirement Earnings Test"
-    ),
     "Phase Out Spousal" = list(
       fn = function() reform_phase_out_spousal(2030),
       desc = "Phase out spousal benefits over 10 years"
+    ),
+    "Mini-PIA" = list(
+      fn = function() reform_mini_pia(2030, 10),
+      desc = "Average yearly PIAs instead of AIME"
+    ),
+    "Repeal RET" = list(
+      fn = function() reform_repeal_ret(2030),
+      desc = "Repeal the Retirement Earnings Test"
     )
   )
 )
@@ -296,7 +279,7 @@ check_ui_exclusivity <- function(selected_reforms) {
     nra = c("Raise NRA to 68", "Index NRA to Longevity", "NRA to 69, then Index"),
     cola = c("Chained CPI", "Cap COLAs at Median", "CPI-E (Higher)"),
     taxmax = c("90% Coverage + 5% Credit", "Eliminate Taxmax + 15% Credit", "Eliminate Taxmax, No Credit"),
-    pia_formula = c("Reduce Fact3 to 5%", "Flat Benefit", "Simpson-Bowles PIA", "Mini-PIA")
+    pia_formula = c("Reduce Fact3 to 5%", "Flat Benefit", "Simpson-Bowles PIA")
   )
 
   conflicts <- list()

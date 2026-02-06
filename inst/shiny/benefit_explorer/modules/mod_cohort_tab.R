@@ -41,11 +41,23 @@ cohort_tab_ui <- function(id) {
               ),
               column(2,
                 numericInput(ns("claim_age"), "Claim Age",
-                             value = 67, min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
+                             value = 65, min = CLAIM_AGE_MIN, max = CLAIM_AGE_MAX, step = 1)
               ),
               column(2,
+                selectInput(ns("repl_rate_type"), "Replacement Rate",
+                            choices = c(
+                              "PV Replacement Rate" = "pv_rr",
+                              "High-35 Wage-Indexed" = "wage_h35",
+                              "High-35 Price-Indexed" = "real_h35"
+                            ),
+                            selected = "pv_rr")
+              )
+            ),
+            fluidRow(
+              class = "mt-2",
+              column(2,
                 tags$div(
-                  class = "pt-4",
+                  class = "pt-2",
                   actionButton(
                     ns("calculate"),
                     "Calculate",
@@ -56,7 +68,7 @@ cohort_tab_ui <- function(id) {
               ),
               column(2,
                 tags$div(
-                  class = "pt-4",
+                  class = "pt-2",
                   downloadButton(ns("download_data"), "Export CSV",
                                  class = "btn-outline-secondary w-100")
                 )
@@ -272,10 +284,10 @@ cohort_tab_server <- function(id, reform_state) {
             baseline_pv_ben / baseline_pv_tax
           } else NA_real_
 
-          # Replacement rate (wage-indexed highest 35)
+          # Replacement rate (using selected type)
           baseline_repl <- tryCatch({
             rr <- rep_rates(baseline, tr2025)
-            rr$rep_rate[rr$type == "wage_h35"][1]
+            rr$rep_rate[rr$type == input$repl_rate_type][1]
           }, error = function(e) NA_real_)
 
           # Internal rate of return
@@ -320,7 +332,7 @@ cohort_tab_server <- function(id, reform_state) {
 
             reform_repl <- tryCatch({
               rr <- rep_rates(reform, reform_assumptions)
-              rr$rep_rate[rr$type == "wage_h35"][1]
+              rr$rep_rate[rr$type == input$repl_rate_type][1]
             }, error = function(e) NA_real_)
 
             reform_irr <- tryCatch({
@@ -452,8 +464,8 @@ cohort_tab_server <- function(id, reform_state) {
       show_legend <- chart_info$has_reforms
 
       p <- ggplot(df, aes(x = birth_year, y = repl_rate, color = scenario, group = scenario)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(size = 2, alpha = 0.7) +
+        geom_line(linewidth = 1.5) +
+        geom_point(size = 3, alpha = 0.8) +
         scale_y_continuous(labels = function(x) paste0(x, "%")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
         scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
@@ -481,8 +493,8 @@ cohort_tab_server <- function(id, reform_state) {
       show_legend <- chart_info$has_reforms
 
       p <- ggplot(df, aes(x = birth_year, y = pv_benefits, color = scenario, group = scenario)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(size = 2, alpha = 0.7) +
+        geom_line(linewidth = 1.5) +
+        geom_point(size = 3, alpha = 0.8) +
         scale_y_continuous(labels = dollar_format(suffix = "K")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
         scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
@@ -510,8 +522,8 @@ cohort_tab_server <- function(id, reform_state) {
       show_legend <- chart_info$has_reforms
 
       p <- ggplot(df, aes(x = birth_year, y = ratio, color = scenario, group = scenario)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(size = 2, alpha = 0.7) +
+        geom_line(linewidth = 1.5) +
+        geom_point(size = 3, alpha = 0.8) +
         geom_hline(yintercept = 1.0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
         scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
@@ -542,8 +554,8 @@ cohort_tab_server <- function(id, reform_state) {
       show_legend <- chart_info$has_reforms
 
       p <- ggplot(df, aes(x = birth_year, y = irr, color = scenario, group = scenario)) +
-        geom_line(linewidth = 1.2) +
-        geom_point(size = 2, alpha = 0.7) +
+        geom_line(linewidth = 1.5) +
+        geom_point(size = 3, alpha = 0.8) +
         geom_hline(yintercept = 0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
         scale_y_continuous(labels = function(x) paste0(x, "%")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
