@@ -16,6 +16,19 @@ These files contain binding rules and essential context. Do not proceed without 
 
 ---
 
+## Commit Workflow (Non-Negotiable)
+
+Every commit must follow this exact sequence:
+
+1. **Update `PROGRESS.md`** with a session log entry describing what changed — this goes in the same commit, not a separate one
+2. **Run full test suite** (`devtools::test()`) immediately before committing — a test run from earlier in the session does not count
+3. **Stage only files you actually changed** — do not use `git add -A` or `git add .`
+4. **Write a commit message** that explains what changed and why
+
+Failure to follow this sequence (e.g., committing without PROGRESS.md, relying on a stale test run, pushing and then updating PROGRESS.md as a second commit) violates project rules.
+
+---
+
 ## Goals
 
 1. **Benefit Calculation**: Specify any hypothetical worker configuration (e.g., "medium-earner born in 1960 with a low-earner spouse born in 1963") and calculate their annual Social Security benefits at every year of their life.

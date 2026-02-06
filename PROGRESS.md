@@ -93,6 +93,9 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Commits**:
 - `dd0c5c9`: Update Shiny app: reform panel overhaul, chart improvements, partial-year PV
+- `af419c7`: Update PROGRESS.md with February 5 session log (committed separately — workflow error, see below)
+
+**Post-session fix**: Added commit workflow rules to `CLAUDE.md` to prevent future violations (committing without PROGRESS.md, skipping pre-commit test run, not reading guidelines at session start).
 
 **Open Questions**: None
 
