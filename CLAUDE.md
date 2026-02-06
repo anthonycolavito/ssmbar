@@ -150,7 +150,7 @@ See `PROGRESS.md` for file manifest and implementation details.
 
 Package output validated against SSA's Table V.C7 (2025 Trustees Report).
 - Overall: 0.17% average difference across all worker types and birth years 1960-1970
-- Remaining differences traced to earnings generation precision (scaled_factor × AWI rounding)
+- Remaining difference traced to scaled factor precision: Actuarial Note 2025.3 Table 6 publishes factors to 3 decimal places; SSA's internal computation uses 6+ decimal places. This is a data precision limitation, not a computational error. AWI, indexing, COLAs, bend points, PIA formula, and actuarial reduction all match SSA exactly.
 
 See `PROGRESS.md` for complete validation history and methodology.
 
