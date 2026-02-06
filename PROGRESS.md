@@ -16,9 +16,9 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: January 30, 2026
+**Last Updated**: February 5, 2026
 
-**Active Work**: Analytical measures implementation complete; Shiny integration pending
+**Active Work**: Shiny app update complete (Groups 1-4)
 
 **Blocked On**: None
 
@@ -27,6 +27,76 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### February 5, 2026 — Shiny App Update: Reform Panel, Charts, Partial-Year PV
+
+**Task**: Implement SHINY_UPDATE_INSTRUCTIONS.md — 4 groups of changes to the Benefit Explorer app.
+
+**Changes Made**:
+
+**Group 1: Rename App & Reform Panel Overhaul**
+- Renamed `APP_TITLE` from "Social Security Benefit Explorer" to "Social Security Explorer"
+- Restructured `AVAILABLE_REFORMS` in `global.R`:
+  - Removed "Benefit Changes" category (5% and 10% benefit cuts)
+  - Removed tax rate reforms (Increase Tax Rate +1pp, +2pp)
+  - Moved Mini-PIA from "Benefit Changes" to "Other Reforms" (removed `pia_formula` group tag)
+  - Updated `check_ui_exclusivity()` accordingly
+- Complete rewrite of `mod_reform_selector.R`:
+  - Converted all 4 mutually exclusive groups (PIA, NRA, COLA, Taxmax) from `radioButtons` to `checkboxGroupInput`
+  - Added 4 `observeEvent()` handlers in server to enforce max-1 selection per group
+  - Removed Benefit Cuts and Tax Rate sections entirely
+  - Renamed section headers: "PIA Formula" → "Slow Initial Benefit Growth", "Retirement Age" → "Increase Retirement Age", "COLA Indexing" → "Modify Cost-of-Living Adjustments (COLAs)", "Taxable Maximum" → "Increase $184,500 Taxable Maximum", "Benefit Enhancements" → "Enact Benefit Enhancements"
+  - Renamed all individual reform display labels to descriptive names (e.g., "Reduce Fact3 to 5%" → "Slow Benefit Growth for Top 20% of Earners")
+  - Moved "Enact Benefit Enhancements" to last section position
+  - Reduced label font-size from 0.85rem to 0.78rem, added word-wrap CSS
+- Increased sidebar width from 300 to 340px in `app.R`
+
+**Group 2: Individual Worker Tab Updates**
+- Increased chart `base_size` from 12 to 16 in `global.R` `chart_theme` (all text sizes proportionally increased)
+- Added benefit-type (bc) labels at transition points on benefits-by-age chart
+- Changed default chart toggle from "Nominal $" to "Real 2025 $"
+- Removed employer toggle checkbox from NMTR chart header
+- Hardcoded `include_employer = TRUE` in all calls to `net_marginal_tax_rate()`, `marginal_irr()`, and `internal_rate_of_return()`
+- Replaced "Mean NMTR" and "Years in Top 35" metric boxes with:
+  - "Marginal IRR" — IRR from last working year's marginal data, with baseline→reform display
+  - "Marginal Benefit-Tax Ratio" — delta_pv_benefits / tax at last working year
+
+**Group 3: Cohort Comparison Tab Updates**
+- Changed default claim age from 67 to 65
+- Increased chart point sizes (2→3) and line widths (1.2→1.5)
+- Added replacement rate type selector with 3 options:
+  - "PV Replacement Rate" (pv_rr)
+  - "High-35 Wage-Indexed" (wage_h35)
+  - "High-35 Price-Indexed" (real_h35)
+- Server updated to filter `rep_rates()` output by selected type
+
+**Group 4: Partial Years Lifetime Measure**
+- Updated `pv_lifetime_benefits()`: includes fractional year at `floor(death_age)` weighted by `death_age - floor(death_age)`
+- Updated `real_lifetime_benefits()`: same partial year treatment
+- Updated `internal_rate_of_return()`: benefit stream includes partial year at death with fractional weight
+- Tax side unchanged (ages 21-64)
+
+**Files Modified**:
+| File | Changes |
+|------|---------|
+| `inst/shiny/benefit_explorer/global.R` | App title, AVAILABLE_REFORMS restructure, chart_theme font sizes, check_ui_exclusivity |
+| `inst/shiny/benefit_explorer/app.R` | Sidebar width 300→340 |
+| `inst/shiny/benefit_explorer/modules/mod_reform_selector.R` | Complete rewrite: checkboxes, mutual exclusivity, renamed labels/sections |
+| `inst/shiny/benefit_explorer/modules/mod_individual_tab.R` | Default to real, bc labels, remove employer toggle, hardcode include_employer, new marginal metrics |
+| `inst/shiny/benefit_explorer/modules/mod_cohort_tab.R` | Default claim age 65, larger charts, replacement rate type selector |
+| `R/pv_functions.R` | Partial year support in pv_lifetime_benefits, real_lifetime_benefits, internal_rate_of_return |
+
+**Test Results**:
+- 652 tests passing (same as before changes)
+- 3 pre-existing failures in `test-marginal.R` (unrelated to Shiny/PV changes)
+- All 57 `pv_functions` tests pass (partial year changes compatible)
+
+**Commits**:
+- `dd0c5c9`: Update Shiny app: reform panel overhaul, chart improvements, partial-year PV
+
+**Open Questions**: None
+
+---
 
 ### January 30, 2026 — Analytical Measures and AIME Optimization
 
@@ -246,8 +316,9 @@ ssmbar's methodology is **correct per statute**. The SSA max benefit table may u
 
 | Date | Task | Key Changes | Verified |
 |------|------|-------------|----------|
+| Feb 2026 | Shiny App Update (Groups 1-4) | Reform panel overhaul, chart improvements, marginal metrics, partial-year PV | ✓ (652 tests pass) |
 | Jan 2026 | Table V.C7 Validation | Comprehensive validation against Trustees Report; identified CPI-W deflation requirement; traced AIME discrepancies to rounding | ✓ |
-| Jan 2026 | Benefit Explorer Shiny App | Created `run_app()`, PV functions, modular Shiny app with 5 modules | ✓ |
+| Jan 2026 | Benefit Explorer Shiny App | Created `run_app()`, PV functions, modular Shiny app with 2-tab architecture | ✓ |
 | Earlier | Package Structure Conversion | Converted informal R scripts to professional package with roxygen2, devtools, testing | ✓ |
 
 ---
@@ -308,11 +379,11 @@ All PV calculations use **real 2025 dollars** to ensure comparability across tim
 
 2. **Discount to age 65**: All PV calculations normalize to age 65 by default.
 
-3. **Death age exclusion**: Use `age < death_age` (not `<=`) to exclude benefits in the year of death.
+3. **Partial year at death**: Benefits include a fractional year at `floor(death_age)`, weighted by `death_age - floor(death_age)`. Full years use `age >= claim_age & age < floor(death_age)`. This applies to `pv_lifetime_benefits()`, `real_lifetime_benefits()`, and `internal_rate_of_return()`.
 
 4. **Tax period**: Taxes calculated ages 21-64 (working years before typical retirement).
 
-5. **Benefit period**: Benefits calculated from claim_age to death_age - 1.
+5. **Benefit period**: Benefits calculated from claim_age through floor(death_age) with fractional last year.
 
 6. **Employer taxes optional**: `include_employer = TRUE` doubles the employee tax to capture total payroll tax contribution.
 
@@ -500,30 +571,30 @@ After implementing child benefits and family maximum (which included rounding fi
 
 | File | Purpose |
 |------|---------|
-| `R/pv_functions.R` | Present value calculation functions |
+| `R/pv_functions.R` | Present value calculation functions (with partial-year support) |
+| `R/analytic_functions.R` | Marginal analysis functions (NMTR, marginal IRR) |
 | `R/run_app.R` | App launcher function |
-| `inst/shiny/benefit_explorer/app.R` | Main app (ui + server) |
-| `inst/shiny/benefit_explorer/global.R` | Load packages and data |
-| `inst/shiny/benefit_explorer/modules/mod_worker_input.R` | Worker selection sidebar |
-| `inst/shiny/benefit_explorer/modules/mod_benefits.R` | Benefits over time charts |
-| `inst/shiny/benefit_explorer/modules/mod_replacement.R` | Replacement rate comparisons |
-| `inst/shiny/benefit_explorer/modules/mod_lifetime.R` | PV benefits/taxes display |
-| `inst/shiny/benefit_explorer/modules/mod_ratios.R` | Benefit-tax ratios |
+| `inst/shiny/benefit_explorer/app.R` | Main app — 2-tab layout with shared reform sidebar (340px) |
+| `inst/shiny/benefit_explorer/global.R` | Config, AVAILABLE_REFORMS, chart_theme (base_size 16) |
+| `inst/shiny/benefit_explorer/modules/mod_reform_selector.R` | Reform sidebar — checkbox groups with server-side mutual exclusivity |
+| `inst/shiny/benefit_explorer/modules/mod_individual_tab.R` | Individual Worker tab — benefits chart, NMTR chart, metrics (incl. marginal IRR/BTR) |
+| `inst/shiny/benefit_explorer/modules/mod_cohort_tab.R` | Cohort Comparison tab — 4 charts across birth years, replacement rate type selector |
 
 ---
 
 ## Test Suite Reference
 
-All 495 tests pass (as of January 30, 2026):
+652 tests passing (as of February 5, 2026; 3 pre-existing failures in test-marginal.R):
 - 256 regression tests
+- 133 reform template tests
 - 67 reform tests
-- 51 PV function tests (includes 5 IRR tests)
-- 32 marginal analysis tests (new)
+- 57 PV function tests
+- 40 marginal analysis tests (3 failing — pre-existing)
 - 29 child benefit tests
 - 22 family maximum tests
 - 19 special minimum PIA tests
+- 16 baseline-reform equivalence tests
 - 13 actuarial tests
-- 6 other tests
 
 ---
 
