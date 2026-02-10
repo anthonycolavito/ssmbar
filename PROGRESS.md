@@ -16,7 +16,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: February 6, 2026
+**Last Updated**: February 10, 2026
 
 **Active Work**: None
 
@@ -27,6 +27,29 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### February 10, 2026 (Session 11) — Fix Custom Earnings Date-Sensitive Bug
+
+**Task**: Fix bug in `generate_single_worker()` where custom worker type failed for birth years 2006-2010 due to a date-sensitive GDP price index lookup.
+
+**Root Cause**: In `R/earnings.R` line 321, the custom earnings code path looked up the current year's GDP price index (`pi_curr`) inside a `mutate()` on the worker dataframe:
+```r
+pi_curr = gdp_pi[which(year == as.numeric(format(Sys.Date(), "%Y")))]
+```
+This searched for `year == 2026` in the worker's own rows (ages 21-119). For workers born 2006+, the first row is year 2027, so 2026 doesn't exist in the data — the lookup returns an empty vector, causing dplyr to error with "pi_curr must be size 99 or 1, not 0."
+
+Workers born 1939-2005 were unaffected because their lifetime spans include 2026. Medium/scaled workers were unaffected because they use pre-computed `awi * factor` and never reference the current year's price index.
+
+**Changes Made**:
+- **`R/earnings.R` (line 321)**: Moved `pi_curr` lookup outside the `mutate()`, pulling directly from the `assumptions` dataframe instead of the worker's row data:
+  ```r
+  pi_curr <- assumptions$gdp_pi[assumptions$year == as.numeric(format(Sys.Date(), "%Y"))]
+  ```
+  The `assumptions` dataframe (tr2025) always contains year 2026, so this lookup is reliable regardless of birth year.
+
+**Test Results**: 648 pass, 0 fail
+
+---
 
 ### February 6, 2026 (Session 10) — Investigate Remaining 0.17% V.C7 Gap
 

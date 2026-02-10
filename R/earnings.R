@@ -315,10 +315,12 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   #4. The ratio of the user-specified average earnings to the average resulting from the raw factors is found.
   #5. The real earnings at each age are multiplied by this ratio and then converted back into nominal dollars.
 
+    pi_curr <- assumptions$gdp_pi[assumptions$year == as.numeric(format(Sys.Date(), "%Y"))]
+
     worker <- worker %>% left_join(factors %>% filter(.data$worker == "raw") %>% select(age, factor),
                                    by = "age") %>%
       mutate(
-      pi_curr = gdp_pi[which(year == as.numeric(format(Sys.Date(), "%Y")))], #Price index for the current year
+      pi_curr = pi_curr, #Price index for the current year (looked up from assumptions)
       index = pi_curr / gdp_pi, #Indexing factors to convert nominal earnings into real earnings
       nom_earn = factor * awi, #Nominal earnings used the raw scaled earnings factor and the yearly AWI
       real_earn = nom_earn * index) #Real earnings
