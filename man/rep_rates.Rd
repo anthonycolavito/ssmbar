@@ -57,9 +57,6 @@ Per SSA Handbook Section 700.3, earnings are indexed to the worker's indexing ye
 (typically 2 years before eligibility age). This function indexes to the last
 working year (year before claiming) for replacement rate comparability.
 }
-\note{
-This function is not exported. Use \code{ssmbar:::rep_rates()} to access it.
-}
 \examples{
 \dontrun{
 # Calculate benefits with debugg = TRUE to get annual_ind
@@ -69,7 +66,7 @@ worker <- calculate_benefits(
 )
 
 # Calculate all replacement rates
-rr <- ssmbar:::rep_rates(worker, tr2025)
+rr <- rep_rates(worker, tr2025)
 
 # View results
 rr
@@ -83,4 +80,3 @@ rr[rr$type == "pv_rr", ]
 SSA Handbook Section 700.3: How Are Earnings Indexed?
 \url{https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html}
 }
-\keyword{internal}

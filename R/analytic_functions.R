@@ -153,8 +153,6 @@ calculate_taxes <- function(worker, assumptions) {
 #' (typically 2 years before eligibility age). This function indexes to the last
 #' working year (year before claiming) for replacement rate comparability.
 #'
-#' @note This function is not exported. Use \code{ssmbar:::rep_rates()} to access it.
-#'
 #' @references
 #' SSA Handbook Section 700.3: How Are Earnings Indexed?
 #' \url{https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html}
@@ -168,7 +166,7 @@ calculate_taxes <- function(worker, assumptions) {
 #' )
 #'
 #' # Calculate all replacement rates
-#' rr <- ssmbar:::rep_rates(worker, tr2025)
+#' rr <- rep_rates(worker, tr2025)
 #'
 #' # View results
 #' rr
@@ -179,7 +177,7 @@ calculate_taxes <- function(worker, assumptions) {
 #'
 #' @importFrom dplyr %>% group_by arrange mutate filter summarise select first
 #' @importFrom tidyr pivot_longer
-#' @keywords internal
+#' @export
 rep_rates <- function(worker, assumptions) {
 
   # Error Prevention

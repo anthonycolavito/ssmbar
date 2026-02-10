@@ -28,6 +28,28 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 10, 2026 (Session 12) — Export rep_rates(), Remove Stale Duplicate File, Resolve Known Issues
+
+**Task**: Clean up analytic functions: export `rep_rates()`, delete stale duplicate file, resolve known issues.
+
+**Investigation Findings**:
+- `R/analytic_functions_new.R` was an untracked stale earlier version of `marginal_benefit_analysis()` and `compute_pv_to_year()`, both of which also exist (in updated form) in `R/analytic_functions.R`. The `_new` version still contained the `in_top_35` and `indexed_rank` columns that were removed in Session 2, and its duplicate `@export` tags caused roxygen2 to generate duplicate entries in man pages (`marginal_benefit_analysis.Rd` listed source from both files).
+- `R/worker_builder.R` (Known Issue #1) no longer exists — it was deleted in a prior session. The known issues entry was stale.
+- `rep_rates()` was marked `@keywords internal` despite being used extensively in analysis scripts and the Shiny app's cohort tab. All other analytic functions (`calculate_taxes`, `marginal_benefit_analysis`, `net_marginal_tax_rate`, `marginal_irr`) are exported.
+
+**Changes Made**:
+- **`R/analytic_functions.R`**: Changed `rep_rates()` from `@keywords internal` to `@export`. Removed `@note` about using `ssmbar:::rep_rates()`. Updated example to use `rep_rates()` directly.
+- **`R/analytic_functions_new.R`**: Deleted (untracked file, not staged — was never committed).
+- **`NAMESPACE`**: Regenerated via `devtools::document()` — now includes `export(rep_rates)`.
+- **`man/rep_rates.Rd`**: Regenerated — now references only `analytic_functions.R`.
+- **`man/marginal_benefit_analysis.Rd`**: Regenerated — duplicate source reference to `analytic_functions_new.R` removed.
+- **`man/compute_pv_to_year.Rd`**: Regenerated — duplicate source reference removed.
+- **`PROGRESS.md`**: Marked Known Issue #1 (`worker_builder.R`) as resolved.
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 10, 2026 (Session 11) — Fix Custom Earnings Date-Sensitive Bug
 
 **Task**: Fix bug in `generate_single_worker()` where custom worker type failed for birth years 2006-2010 due to a date-sensitive GDP price index lookup.
@@ -535,7 +557,7 @@ ssmbar's methodology is **correct per statute**. The SSA max benefit table may u
 
 | # | Issue | Location | Type | Status |
 |---|-------|----------|------|--------|
-| 1 | `worker_builder.R` contains incomplete code (references undefined `dataset` variable) | `R/worker_builder.R` | Rule bug (needs discussion) | Open |
+| 1 | ~~`worker_builder.R` contains incomplete code~~ | `R/worker_builder.R` | Rule bug | **Resolved** — file no longer exists (deleted in prior session) |
 | 2 | ~~Missing automatic recomputation~~ | `R/benefit_calculations.R` | Rule bug | **Fixed** (Session 9) |
 
 ---
