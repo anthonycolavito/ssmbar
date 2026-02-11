@@ -28,6 +28,63 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 10, 2026 (Session 14) — Generosity Charts and tr2025 Documentation
+
+**Task**: (1) Create generosity analysis charts for custom workers across birth cohorts. (2) Document all 59 columns of tr2025 assumptions data.
+
+**Charts Created** (`scripts/chart_generosity_extended.R`):
+- Complete rewrite producing 7 charts + 1 combined image for 4 worker types ($25K, $59K, $100K, $250K in 2025 real earnings), birth cohorts 1940-2026, all claiming at age 65
+- Charts: real replacement rate (all years), wage-indexed H35 replacement rate, real initial benefits (2025$), benefit-tax ratio, PV benefits, PV taxes, and IRR
+- All charts show NRA transition bands (1938-1942, 1955-1960)
+- Extended tr2025 assumptions from 2100 to 2120 within the script to cover death ages of workers born through 2026 (~year 2116)
+- Set `qc_required = 0` to bypass QC eligibility for custom workers whose price-indexed earnings fall below AWI-indexed QC thresholds in far-future cohorts
+- Used `patchwork` package to combine all 7 charts into a 4x2 grid with shared legend
+- Output: 7 individual PNGs + `generosity_combined.png`, copied to Desktop
+
+**Documentation** (`R/data.R`, `R/assumptions_prep.R`):
+- Documented all 59 columns of tr2025, organized into 4 groups:
+  1. Raw Trustees Report Data (23 columns) — from `inst/extdata/2025TR_assumptions.csv`
+  2. Projected Program Parameters (13 columns) — computed by `prep_assumptions()`
+  3. Program Rule Constants (8 columns) — fixed current-law parameters
+  4. Reform Scaffolding (16 columns) — default values for policy reform modeling
+- User-verified source information for: df/real_df (derived from TR interest rates), gdp_pi (base year user-calculated to 2025), le_m/le_f (cohort life expectancy tables, by cohort turning 62), cpi_w (from TR)
+- Noted `child_pia_share` needs verification
+- Reform scaffolding columns have brief descriptions; detailed reform assumption documentation deferred per user request
+- Updated `prep_assumptions()` docstring to describe its role (23-column input → 59-column output)
+- Added Projection Formulas section documenting statutory indexing rules
+- Added Hypothetical Worker Birth Date Convention section
+- Regenerated man pages via `devtools::document()`
+
+**Packages Installed**: `patchwork`, `cowplot` (for chart combining)
+
+**Test Results**: 648 pass, 0 fail
+
+**Deferred**:
+- Reform parameter documentation: User said "We need to work through the assumptions used for each reform" — to be done in a future session
+- Verify `child_pia_share` (50% of worker's PIA per 42 USC 402(d)(2))
+
+---
+
+### February 10, 2026 (Session 13) — Charts: Extended Projections, Analytical Investigation
+
+**Task**: Create generosity trend charts for extended birth cohort analysis (1940-2035, later revised to 1940-2026). Investigate and fix issues with far-future cohort projections.
+
+**Investigation**:
+- Charts initially showed benefits dropping to zero for far-future cohorts
+- Root cause: QC threshold grows with AWI (~3.55%) while custom workers' price-indexed earnings grow with GDP PI (~2.05%), causing QC eligibility failure
+- Fix: Set `qc_required = 0` for the thought experiment
+- Secondary issue: tr2025 only covers through year 2100, but workers born 2026 die at ~age 90 = year 2116, causing NA in PV/COLA/discount calculations
+- Fix: Extended assumptions by 20 years (2101-2120) with steady-state growth rates from the 2025 TR
+
+**Key Finding** (user question about $25K worker real benefit plateau):
+- Once a custom worker's AIME falls entirely below BP1 (the 90% bracket), PIA = 90% × AIME
+- Since AIME grows with prices and we deflate to 2025$, the real benefit becomes constant
+- This occurs around the 2005 birth cohort for $25K workers
+
+**No permanent code changes committed** — charts script is in `scripts/` (untracked).
+
+---
+
 ### February 10, 2026 (Session 12) — Export rep_rates(), Remove Stale Duplicate File, Resolve Known Issues
 
 **Task**: Clean up analytic functions: export `rep_rates()`, delete stale duplicate file, resolve known issues.
@@ -622,7 +679,7 @@ ssmbar's methodology is **correct per statute**. The SSA max benefit table may u
 | assumptions_prep.R | line 21 | TODO: Add specific handbook section citations for parameter projection formulas | ☐ |
 | earnings.R | line 252 | TODO: Document how sex affects benefit calculations (life expectancy lookup) | ☐ |
 | spousal.R | line 52 | TODO: Explain custom earnings parsing regex pattern | ☐ |
-| data.R | tr2025 | Verify le_m and le_f data source citations | ☐ |
+| data.R | tr2025 | ~~Verify le_m and le_f data source citations~~ | ☑ (Session 14 — user confirmed: cohort life expectancy tables in TR, by cohort turning 62) |
 
 ---
 
@@ -918,7 +975,7 @@ After implementing child benefits and family maximum (which included rounding fi
 
 ## Test Suite Reference
 
-652 tests passing (as of February 5, 2026; 3 pre-existing failures in test-marginal.R):
+648 tests passing (as of February 10, 2026):
 - 256 regression tests
 - 133 reform template tests
 - 67 reform tests

@@ -7,22 +7,35 @@
 prep_assumptions(dataset, cola_file = NULL)
 }
 \arguments{
-\item{dataset}{Dataframe with the latest Social Security Trustees Report assumptions.}
+\item{dataset}{Data frame with raw Trustees Report assumptions (23 columns).
+Typically loaded from \code{inst/extdata/2025TR_assumptions.csv}.}
 
 \item{cola_file}{Path to CSV file containing historical COLA data.
-If NULL, looks for cola.csv in inst/extdata/. Format: year,cola where
-cola is the percentage (e.g., 2.8 for 2.8\%).}
+If NULL, looks for \code{inst/extdata/cola.csv}. Format: year,cola where
+cola is the percentage (e.g., 2.8 for 2.8\\%).}
 }
 \value{
-assume Dataframe with TR assumptions and projected program parameters.
+Data frame with 59 columns: the original 23 raw columns plus 36
+computed columns. See \code{\link{tr2025}} for complete column documentation.
 }
 \description{
-Function that imports the Social Security Trustees Report's assumptions and
-sets and projections Social Security's main parameters.
+Processes raw Trustees Report data into a complete assumptions data frame
+for benefit calculations. Takes the 23-column raw CSV data and adds 36
+columns: projected program parameters (bend points, taxmax, QC thresholds,
+COLA, special minimum PIA, family maximum bend points), program rule
+constants (eligibility age, dropout years, etc.), and reform scaffolding
+parameters (all set to current-law defaults).
+}
+\details{
+Future values for taxmax, bend points, QC thresholds, and RET exempt amounts
+are projected using statutory AWI-indexing formulas where the raw data
+contains NA. Historical COLA, YOC, and family max bend point data are loaded
+from supplementary CSV files in \code{inst/extdata/}.
 }
 \examples{
 \dontrun{
-tr2025 <- prep_assumptions(tr2025)
+raw <- read.csv(system.file("extdata", "2025TR_assumptions.csv", package = "ssmbar"))
+tr2025 <- prep_assumptions(raw)
 }
 
 }
