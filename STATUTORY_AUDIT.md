@@ -18,10 +18,12 @@ This document tracks the comparison of ssmbar's benefit calculation functions ag
 | Old-Age Benefits | 42 USC 402(a) | `worker_benefit()` | **Reviewed** ✓ |
 | Wife's Benefits | 42 USC 402(b) | `spousal_pia()`, `spouse_benefit()` | **Reviewed** ✓ |
 | Husband's Benefits | 42 USC 402(c) | `spousal_pia()`, `spouse_benefit()` | **Reviewed** ✓ |
-| Child's Benefits | 42 USC 402(d) | **Not yet implemented** | **Documented** ✓ |
+| Child's Benefits | 42 USC 402(d) | `child_pia()`, `child_benefit()` | **Reviewed** ✓ |
 | Widow's Benefits | 42 USC 402(e) | `widow_pia()`, `widow_benefit()` | **Reviewed** ✓ |
 | Widower's Benefits | 42 USC 402(f) | `widow_pia()`, `widow_benefit()` | **Reviewed** ✓ |
-| Family Maximum | 42 USC 403(a) | **Not yet implemented** | **Documented** ✓ |
+| Family Maximum | 42 USC 403(a) | `family_maximum()` | **Reviewed** ✓ |
+| Retirement Earnings Test | 42 USC 403(f) | `ret()` | **Reviewed** ✓ |
+| Years of Coverage | 42 USC 415(a)(1)(C) | `years_of_coverage()` | **Reviewed** ✓ |
 | Actuarial Reduction | 42 USC 402(q) | `worker_benefit()`, `spouse_benefit()`, `widow_benefit()` | **Reviewed** ✓ |
 | Delayed Retirement Credits | 42 USC 402(w) | `worker_benefit()` | **Reviewed** ✓ |
 | Contribution/Benefit Base | 42 USC 430 | `tr2025$taxmax` | **Reviewed** ✓ |
@@ -47,12 +49,13 @@ The following benefit types are defined in Title II but are **intentionally not 
 
 ## Not Yet Implemented (Future Work)
 
-The following benefit rules are **within ssmbar's scope** but have not yet been implemented. The audit should document statutory requirements for these to inform future development.
+The following benefit rules are **within ssmbar's scope** but have not yet been implemented.
 
 | Benefit Type | Statutory Reference | Priority | Notes |
 |--------------|--------------------|---------| ------|
-| Child's Benefits | 42 USC 402(d) | TBD | Needed for complete family benefit modeling |
-| Family Maximum | 42 USC 403(a) | TBD | Caps total family benefits; affects couples with children |
+| ~~Child's Benefits~~ | ~~42 USC 402(d)~~ | — | **Implemented** January 29, 2026 |
+| ~~Family Maximum~~ | ~~42 USC 403(a)~~ | — | **Implemented** January 29, 2026 |
+| RET Two-Tier (year of NRA) | 42 USC 403(f)(3) | Medium | See Finding #8 |
 
 ---
 
@@ -846,6 +849,136 @@ Widower's benefits are substantively identical to widow's benefits under 402(e).
 | 2 | `pia()` in benefit_calculations.R | 415(a)(2)(C): PIA rounds to $0.10 | ~~Uses `floor()` rounding to $1~~ | ~~Low~~ | **RESOLVED** - Fixed in commit d193627 using `floor_dime()` |
 | 3 | `pia()` | 415(a)(1)(C)(i): Special minimum PIA | ~~Not implemented~~ | ~~Low~~ | **RESOLVED** - Implemented January 29, 2026 with `years_of_coverage()`, `special_min_rate` |
 | 4 | `cola()` in benefit_calculations.R | 415(i)(2)(A)(ii): COLA-adjusted amounts round to $0.10 | ~~Uses `floor()` rounding to $1~~ | ~~Low~~ | **RESOLVED** - Fixed in commit d193627 using `floor_dime()` |
+| 5 | `assumptions_prep.R` line 170 | 42 USC 402(w): DRCs stop at age 70 = (70-NRA)*12 months | ~~Hardcoded `drc_max_months = 36`~~ | ~~Medium~~ | **RESOLVED** — Replaced with `max_drc_age = 70`; `rf_and_drc()` computes `(max_drc_age - nra) * 12` dynamically |
+| 6 | `family_maximum()` line 726 | 42 USC 403(a)(6)(A): Disability FM = min(max(85%*AIME, PIA), 150%*PIA) | ~~Uses `pmin(0.85 * aime, 1.50 * pia)`~~ | ~~Low~~ | **RESOLVED** — Added inner `pmax(0.85 * aime, pia)` clause |
+| 7 | `family_maximum()` lines 764-770 | 42 USC 403(a): Family max applies to ALL auxiliaries on worker's record | Only child benefits are reduced; dependent spousal benefits excluded | **N/A** | **NOT A BUG** — In ssmbar's data model, `spouse_ben` is the benefit the worker receives FROM the spouse's record, not a benefit paid from the worker's record. Correctly excluded from worker's family max. |
+| 8 | `ret()` / `calculate_excess_earnings()` | 42 USC 403(f)(3): Year of NRA uses ret2 threshold and $1/$3 rate | Uses only ret1 threshold and $1/$2 rate uniformly | **N/A** | **BY DESIGN** — Hypothetical workers born Jan 2 attain NRA on Jan 1, so no months before NRA in the NRA year; ret2 never applies |
+| 9 | `floor_dime()` line 108 | Code comment cites "42 USC 415(a)(2)(C)" | ~~No such subsection exists~~ | ~~Doc only~~ | **RESOLVED** — Corrected to 42 USC 415(a)(1)(A) |
+| 10 | `years_of_coverage()` comment | Comment says "1979-1990" for threshold transition | Statute says 1978-1990 per 42 USC 415(a)(1)(C)(i) | **Doc only** | OPEN (deferred per user) |
+| 11 | `years_of_coverage()` | 42 USC 415(a)(1)(C)(ii): Max 30 years of coverage for special min | ~~No cap at 30~~ | ~~Low~~ | **RESOLVED** — Added `pmin(cumsum(is_coverage_year), 30L)` cap |
+| 12 | `assumptions_prep.R` ret1/ret2 rounding | 42 USC 403(f)(8): Round to nearest $120 (ret1) / $480 (ret2) | ~~Uses floor-to-dime~~ | ~~Low~~ | **RESOLVED** — Changed to `round(.../ 120) * 120` and `round(... / 480) * 480` |
+
+---
+
+## Second Audit Pass (February 10, 2026)
+
+### Findings Detail
+
+#### Finding #5: drc_max_months Hardcoded to 36
+
+**Location**: `assumptions_prep.R` line 170
+
+**Issue**: `drc_max_months` is hardcoded to 36, which is only correct for NRA = 67 (born 1960+). Per 42 USC 402(w), DRCs accrue from NRA to age 70, so the correct value is `(70 - NRA) * 12`:
+
+| Birth Year | NRA | Correct drc_max_months | Current Value | Error |
+|------------|-----|------------------------|---------------|-------|
+| <=1937 | 65 | 60 | 36 | -24 months of DRC lost |
+| 1938 | 65.167 | 58 | 36 | -22 months |
+| 1939-1940 | 65.333-65.5 | 56-54 | 36 | -18 to -20 months |
+| 1941-1942 | 65.667-65.833 | 52-50 | 36 | -14 to -16 months |
+| 1943-1954 | 66 | 48 | 36 | -12 months |
+| 1955 | 66.167 | 46 | 36 | -10 months |
+| 1956 | 66.333 | 44 | 36 | -8 months |
+| 1957 | 66.5 | 42 | 36 | -6 months |
+| 1958 | 66.667 | 40 | 36 | -4 months |
+| 1959 | 66.833 | 38 | 36 | -2 months |
+| 1960+ | 67 | 36 | 36 | None |
+
+**Impact**: Any worker born before 1960 who claims after NRA+3 years gets fewer DRCs than they should. For NRA=66 (born 1943-1954), a worker claiming at 70 should get 48 months of DRC (32% increase) but only gets 36 months (24% increase) — an 8% benefit understatement.
+
+**Fix**: Compute dynamically as `(70 - nra) * 12` rather than hardcoding. This would need to be a row-level calculation since NRA varies by year.
+
+---
+
+#### Finding #6: Disability Family Maximum Missing max() Clause
+
+**Location**: `family_maximum()` line 726
+
+**Issue**: The disability family maximum formula is `pmin(0.85 * aime_at_elig, 1.50 * pia_at_elig)`. Per 42 USC 403(a)(6)(A), it should be `min(max(85% * AIME, 100% * PIA), 150% * PIA)`. The inner `max()` ensures the disability FM is never less than the PIA itself.
+
+**Impact**: Only affects disabled workers with very low AIME where `0.85 * AIME < PIA`. In practice this is a narrow edge case since PIA = 90% of AIME for very low earners, so `0.85 * AIME` could dip below PIA only when the 90% bracket dominates.
+
+**Fix**: Change line 726 to `floor_dime(pmin(pmax(0.85 * aime_at_elig, pia_at_elig), 1.50 * pia_at_elig))`.
+
+---
+
+#### Finding #7: Family Maximum Excludes Dependent Spousal Benefits
+
+**Location**: `family_maximum()` lines 764-770
+
+**Issue**: The `total_aux_ben` calculation only includes child benefits. Per 42 USC 403(a), the family maximum applies to ALL auxiliary benefits paid on one worker's record — including dependent spousal benefits. If a worker has both children and a dependent spouse, the spouse's benefit should also be subject to the family max.
+
+**Impact**: Only affects workers who have both children and a dependent spouse receiving benefits simultaneously. For spousal-only couples without children, the family max cannot bind (spouse gets at most 50% PIA; family max floor is 150% PIA). But with children in the picture, the combined auxiliary benefits could exceed the family max, and the spouse's benefit should be part of the reduction pool.
+
+**Current code comment explains the rationale**: "Spousal benefits come from the spouse's record and are subject to the spouse's family max." This is **incorrect** for dependent spousal benefits — a dependent spouse's benefit (50% of the worker's PIA minus own PIA) IS paid from the worker's record and IS subject to the worker's family max.
+
+**Fix**: Include `spouse_ben` in `total_aux_ben` and apply `fm_reduction_factor` to `spouse_ben_fm` as well.
+
+---
+
+#### Finding #8: RET Missing Two-Tier Structure
+
+**Location**: `ret.R`, `calculate_excess_earnings()` line 45
+
+**Issue**: The RET currently uses only `ret1` (under-NRA threshold) and a uniform $1/$2 phaseout rate. Per 42 USC 403(f)(3), in the year a worker reaches NRA:
+- A **higher** exempt amount (`ret2`) applies
+- The phaseout rate is $1/$3 (not $1/$2)
+- Only earnings in months **before** NRA month count
+
+The package has `ret2` data in the assumptions but never uses it.
+
+**Impact**: Workers who earn in the year they reach NRA will have slightly too much benefit withheld. For 2025: ret1 = $22,320 with $1/$2 rate vs ret2 = $59,520 with $1/$3 rate. A worker earning $80,000 in their NRA year would have:
+- Current code: ($80,000 - $22,320) * 0.5 = $28,840 withheld
+- Correct: ($80,000 - $59,520) * 0.333 = $6,827 withheld
+This is a substantial difference, but it only applies to a single year per worker.
+
+**Fix**: In `calculate_excess_earnings()`, add logic to check if the worker reaches NRA in the current year, and if so, use `ret2` threshold and $1/$3 rate.
+
+---
+
+#### Finding #9: floor_dime() Citation Error (Doc Only)
+
+**Location**: `benefit_calculations.R` line ~95 (roxygen comment)
+
+**Issue**: The `floor_dime()` function's documentation cites "42 USC 415(a)(2)(C)" — this subsection does not exist in the statute. The correct citation is **42 USC 415(a)(1)(A)**, which specifies that PIAs are rounded to the next lower $0.10.
+
+---
+
+#### Finding #10: years_of_coverage() Comment Date Range (Doc Only)
+
+**Location**: `eligibility.R`, `years_of_coverage()` comment
+
+**Issue**: A code comment references "1979-1990" as the period for the old-law YOC threshold transition, but the statute (42 USC 415(a)(1)(C)(i)) specifies 1978-1990.
+
+---
+
+#### Finding #11: Years of Coverage Missing Cap at 30
+
+**Location**: `years_of_coverage()` in eligibility.R
+
+**Issue**: Per 42 USC 415(a)(1)(C)(ii), the special minimum PIA maxes out at 30 years of coverage (30 - 10 = 20 increments). The current code has no cap, so a worker with 35+ years of coverage would get a higher special minimum PIA than the statute allows.
+
+**Impact**: Very low in practice — workers with 30+ years of coverage almost always qualify for a regular PIA that exceeds the special minimum.
+
+---
+
+#### Finding #12: RET Exempt Amount Rounding
+
+**Location**: `assumptions_prep.R` lines ~104, ~112
+
+**Issue**: The RET exempt amount projection uses `floor(... * 10) / 10` (floor to nearest dime). Per 42 USC 403(f)(8)(A), ret1 should be rounded to the nearest multiple of $120, and ret2 to the nearest multiple of $480.
+
+**Impact**: Very small — the dime-level rounding produces values extremely close to the $120/$480 rounding, and the historical values loaded from the Trustees Report are already correctly rounded.
+
+---
+
+### Known Simplifications (Not Discrepancies)
+
+These are intentional modeling simplifications, not statutory errors:
+
+1. **No student exception for child benefits**: 42 USC 402(d)(1)(B) allows child benefits for full-time students ages 18-19. The package terminates child eligibility at age 18. Impact: Low for retirement analysis.
+
+2. **Child benefit at parent death**: Child benefit should increase from 50% to 75% of parent's PIA upon parent's death (42 USC 402(d)(2)). Not currently modeled.
 
 ---
 
@@ -853,4 +986,6 @@ Widower's benefits are substantively identical to widow's benefits under 402(e).
 
 *Observations that don't fit elsewhere.*
 
--
+- The first audit (January 29, 2026) focused on core AIME/PIA/COLA functions; child benefits and family maximum were not yet implemented.
+- The second audit (February 10, 2026) covered all current-law functions including child benefits, family maximum, RET, spousal, survivor, and eligibility functions.
+- Reform-specific functions (`aime_reform`, `pia_reform`, `cola_reform`, `ret_reform`, `widow_benefit_reform`) were NOT audited against statute in this pass. They share most logic with baseline functions but add reform parameters.

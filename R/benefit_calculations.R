@@ -56,7 +56,7 @@ join_all_assumptions <- function(worker, assumptions) {
   # - aime: awi, taxmax, qc_rec, qc_required, max_qc_per_year, max_dropout_years, min_comp_period, index_age_offset
   # - pia: bp1, bp2, fact1, fact2, fact3, elig_age_retired, yoc_threshold, special_min_rate, min_yoc_for_special_min
   # - cola: cola (year-by-year COLA percentage)
-  # - worker_benefit: nra, rf1, rf2, drc, drc_max_months
+  # - worker_benefit: nra, rf1, rf2, drc, max_drc_age
   # - spousal_pia: s_pia_share
   # - spouse_benefit: s_rf1, s_rf2
   # - child_pia: child_pia_share
@@ -67,7 +67,7 @@ join_all_assumptions <- function(worker, assumptions) {
                    "max_dropout_years", "min_comp_period", "index_age_offset",
                    "bp1", "bp2", "fact1", "fact2", "fact3", "elig_age_retired",
                    "yoc_threshold", "special_min_rate", "min_yoc_for_special_min",
-                   "cola", "nra", "rf1", "rf2", "drc", "drc_max_months",
+                   "cola", "nra", "rf1", "rf2", "drc", "max_drc_age",
                    "s_pia_share", "s_rf1", "s_rf2", "child_pia_share",
                    "fm_bp1", "fm_bp2", "fm_bp3", "ret1", "ret_phaseout_rate")
 
@@ -87,14 +87,14 @@ join_all_assumptions <- function(worker, assumptions) {
 # =============================================================================
 # SECTION 0.5: Rounding Helper
 # =============================================================================
-# Per 42 USC 415(a)(2)(C) and 415(i)(2)(A)(ii), PIA and COLA-adjusted amounts
+# Per 42 USC 415(a)(1)(A) and 415(i)(2)(A)(ii), PIA and COLA-adjusted amounts
 # are rounded to the next lower multiple of $0.10 (dime). This helper function
 # applies consistent dime rounding across all benefit calculations.
 
 #' Floor to Next Lower Dime
 #'
 #' Rounds a dollar amount down to the next lower multiple of $0.10, per
-#' 42 USC 415(a)(2)(C) (PIA rounding) and 42 USC 415(i)(2)(A)(ii) (COLA rounding).
+#' 42 USC 415(a)(1)(A) (PIA rounding) and 42 USC 415(i)(2)(A)(ii) (COLA rounding).
 #'
 #' @param x Numeric value(s) representing dollar amounts
 #'
@@ -125,12 +125,13 @@ floor_dime <- function(x) {
 #' @param rf1 Numeric value that represents the incremental reduction in benefits for the first 36 months prior to the NRA based on the worker's birth cohort.
 #' @param rf2 Numeric value that represents the incremental reduction in benefits for the additional months past 36 that in which benefits are claimed early.
 #' @param drc Numeric value that represents the incremental increase in benefits for the months claimed past the NRA, based on the worker's birth cohort.
-#' @param drc_max_months Numeric value for maximum months of DRC (currently 36 months, capping at age 70). Default 36.
+#' @param max_drc_age Numeric value for maximum age at which DRCs accrue (default 70).
+#'   DRC months = (max_drc_age - nra) * 12. Per 42 USC 402(w).
 #'
 #' @return act_factor numeric value used for adjusting a worker's PIA to compute their monthly benefit
 #'
 #' @export
-rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, drc_max_months = 36) {
+rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, max_drc_age = 70) {
   # Benefit reduction factors are described in Sections 723 and 724 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
@@ -140,18 +141,19 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, drc_max_months = 36) {
   # rf1: Reduction for first 36 months early (5/9 of 1% per month for retired worker beneficiaries)
   # rf2: Reduction for months beyond 36 early (5/12 of 1% per month for retired worker beneficiaries)
   # drc: Delayed retirement credit per month (varies by birth year, max 8%/yr)
-  # drc_max_months: Maximum months of DRC (36 = 3 years past NRA, capping at age 70)
+  # max_drc_age: Age at which DRCs stop accruing (70 under current law)
 
   dist_from_nra <- (claim_age - nra) * 12 # Distance from Normal Retirement Age in months
+  drc_max_months <- (max_drc_age - nra) * 12 # Maximum months of DRC per 42 USC 402(w)
 
   # Calculate reduction factors
   rf_amt <- if_else(dist_from_nra >= 0, 0, # If claiming at or above NRA, no RFs
                    if_else(dist_from_nra <= -36, (-36*rf1) + (pmax(-24,(dist_from_nra + 36))*rf2), # If claiming more than three years before NRA
                           dist_from_nra * rf1)) # If claiming less than three years before NRA
 
-  # Calculate DRCs (capped at drc_max_months)
+  # Calculate DRCs (capped at drc_max_months past NRA, i.e., max_drc_age)
   drc_amt <- if_else(dist_from_nra <= 0, 0, # If claiming at or below NRA
-                    pmin(drc_max_months * drc, dist_from_nra * drc)) # If claiming above NRA. DRCs capped at drc_max_months past NRA
+                    pmin(drc_max_months * drc, dist_from_nra * drc)) # If claiming above NRA. DRCs capped at max_drc_age
 
   act_factor <- 1 + rf_amt + drc_amt # Final actuarial factor for adjusting benefits
 
@@ -369,7 +371,7 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
 
       # Regular PIA per 42 USC 415(a)(1)(A): 90/32/15 bend point formula
-      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       regular_pia = case_when(
         age >= elig_age ~ floor_dime(case_when(
                           aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
@@ -381,7 +383,7 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
       # PIA = special_min_rate x (years_of_coverage - 10)
       # Only applies if years_of_coverage >= min_yoc_for_special_min (11)
-      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       special_min_pia = case_when(
         age >= elig_age & years_of_coverage >= min_yoc_elig ~
           floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
@@ -720,10 +722,11 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
         1.75 * pmax(0, pia_at_elig - fm_bp3_elig)
       ),
 
-      # Calculate disability family maximum alternative (42 USC 403(a)(6))
-      # For disabled workers: min(85% of AIME, 150% of PIA)
+      # Calculate disability family maximum alternative (42 USC 403(a)(6)(A))
+      # For disabled workers: min(max(85% of AIME, 100% of PIA), 150% of PIA)
+      # The inner max() ensures disability FM is never less than the PIA itself.
       aime_at_elig = aime[which(age == elig_age)][1],
-      disability_fm = floor_dime(pmin(0.85 * aime_at_elig, 1.50 * pia_at_elig)),
+      disability_fm = floor_dime(pmin(pmax(0.85 * aime_at_elig, pia_at_elig), 1.50 * pia_at_elig)),
 
       # Use disability formula if disabled worker and it's lower than regular formula
       # (disability formula is always used for disabled workers, even if lower)
@@ -762,9 +765,14 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
   dataset <- dataset %>%
     mutate(
       # Total auxiliary benefits (before family max reduction)
-      # Only child benefits are included here, not spousal benefits, because spousal
-      # benefits come from the spouse's record and are subject to the spouse's family
-      # max, not this worker's family max.
+      # In ssmbar's data model, `spouse_ben` in the worker's dataframe is the
+      # benefit the worker receives FROM the spouse's record (as a dependent of
+      # the spouse). This is subject to the SPOUSE's family max, not this
+      # worker's family max. Only benefits paid FROM this worker's record
+      # (i.e., child benefits) are subject to this worker's family max.
+      # Per 42 USC 403(a), the family max applies to all auxiliaries on ONE
+      # worker's record — but the spouse_ben here is an auxiliary on the
+      # spouse's record, not this worker's.
       total_aux_ben = pmax(child1_ben, 0, na.rm = TRUE) +
                       pmax(child2_ben, 0, na.rm = TRUE) +
                       pmax(child3_ben, 0, na.rm = TRUE),
@@ -781,12 +789,9 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
         1.0  # No reduction needed
       ),
 
-      # Apply proportional reduction to each auxiliary benefit
-      # Note: Spousal benefits are NOT reduced here because they are paid from the
-      # spouse's record, not the worker's record. The spouse's family max (which we
-      # don't calculate here) is what limits spousal benefits. Only child benefits
-      # (which are paid from this worker's record) are subject to this worker's family max.
-      spouse_ben_fm = pmax(spouse_ben, 0, na.rm = TRUE),  # Pass through unchanged
+      # Apply proportional reduction to each auxiliary benefit on this worker's record.
+      # spouse_ben is passed through unchanged (it's from the spouse's record).
+      spouse_ben_fm = pmax(spouse_ben, 0, na.rm = TRUE),
       child1_ben_fm = floor(pmax(child1_ben, 0, na.rm = TRUE) * fm_reduction_factor),
       child2_ben_fm = floor(pmax(child2_ben, 0, na.rm = TRUE) * fm_reduction_factor),
       child3_ben_fm = floor(pmax(child3_ben, 0, na.rm = TRUE) * fm_reduction_factor)

@@ -118,8 +118,9 @@
 #'     SSA Handbook \S 703}
 #'   \item{max_qc_per_year}{Maximum quarters of coverage per year: 4.
 #'     SSA Handbook \S 212}
-#'   \item{drc_max_months}{Maximum months of delayed retirement credits: 36.
-#'     SSA Handbook \S 720}
+#'   \item{max_drc_age}{Maximum age for delayed retirement credit accrual: 70.
+#'     DRC months = (max_drc_age - NRA) * 12, computed dynamically in
+#'     \code{rf_and_drc()}. 42 USC 402(w); SSA Handbook \S 720}
 #'   \item{ret_phaseout_rate}{RET phaseout rate: 0.5 ($1 withheld per $2 of
 #'     excess earnings). SSA Handbook \S 1803}
 #' }

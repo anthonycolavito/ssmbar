@@ -372,7 +372,7 @@ pia_reform <- function(worker, assumptions, debugg = FALSE) {
       # Regular PIA per 42 USC 415(a)(1)(A): bend point formula
       # Standard: 90/32/15 (3 brackets)
       # Reform: 90/32/15/X (4 brackets) when bp3 and fact4 are specified
-      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       regular_pia = case_when(
         age >= elig_age ~ floor_dime(case_when(
           # 4-bracket formula when bp3 and fact4 are specified
@@ -389,7 +389,7 @@ pia_reform <- function(worker, assumptions, debugg = FALSE) {
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
       # PIA = special_min_rate × (years_of_coverage - 10)
       # Only applies if years_of_coverage >= min_yoc_for_special_min (11)
-      # Per 42 USC 415(a)(2)(C): round to next lower $0.10
+      # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       special_min_pia = case_when(
         age >= elig_age & years_of_coverage >= min_yoc_elig ~
           floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
@@ -751,7 +751,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
   # Join required assumption columns
   # Skip join if columns already present (from join_all_assumptions)
   cols_needed <- c("ret1", "nra", "rf1", "rf2", "drc", "s_rf1", "s_rf2",
-                   "ret_phaseout_rate", "elig_age_retired", "drc_max_months")
+                   "ret_phaseout_rate", "elig_age_retired", "max_drc_age")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -781,7 +781,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
       spec <- wd$spouse_spec[1]
       elig_age_ret <- wd$elig_age_retired[1]
       ret_rate <- wd$ret_phaseout_rate[1]
-      drc_max <- wd$drc_max_months[1]
+      max_drc_age_val <- wd$max_drc_age[1]
       claim_age_val <- wd$claim_age[1]
       s_pia_share_val <- wd$s_pia_share[1]
 
@@ -870,7 +870,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
       is_disabled <- wd$elig_age[1] < elig_age_ret
 
       drc_factors <- calculate_drc_payback(claim_age_val, cum_months_at_nra, nra_ind,
-                                            rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, drc_max)
+                                            rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, max_drc_age_val)
 
       # TODO: Verify DRC payback for spouse_ben withheld due to spouse's RET.
       # Currently assuming the worker gets DRC payback on their spousal actuarial
@@ -879,7 +879,7 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
       s_drc_payback_factor <- if (s_cum_months_at_s_nra > 0 && !is.na(s_nra_ind)) {
         # Recalculate spousal actuarial factor based on effective claim age
         effective_s_claim_age <- min(claim_age_val + (s_cum_months_at_s_nra / 12), s_nra_ind)
-        rf_and_drc(effective_s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0, drc_max)
+        rf_and_drc(effective_s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0, max_drc_age_val)
       } else {
         drc_factors$new_s_act_factor
       }

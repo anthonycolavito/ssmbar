@@ -14,7 +14,7 @@ Numeric value(s) rounded down to the nearest $0.10
 }
 \description{
 Rounds a dollar amount down to the next lower multiple of $0.10, per
-42 USC 415(a)(2)(C) (PIA rounding) and 42 USC 415(i)(2)(A)(ii) (COLA rounding).
+42 USC 415(a)(1)(A) (PIA rounding) and 42 USC 415(i)(2)(A)(ii) (COLA rounding).
 }
 \examples{
 floor_dime(1234.56)  # Returns 1234.50

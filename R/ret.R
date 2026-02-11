@@ -161,11 +161,11 @@ calculate_months_withheld <- function(annual_reduction, monthly_benefit, age, cl
 #' @param drc Numeric scalar of delayed retirement credit rate
 #' @param s_rf1 Numeric scalar of spousal first reduction factor
 #' @param s_rf2 Numeric scalar of spousal second reduction factor
-#' @param drc_max_months Numeric scalar of maximum DRC months
+#' @param max_drc_age Numeric scalar of maximum age for DRC accrual (default 70)
 #' @return List with new_act_factor, new_s_act_factor, orig_act_factor, orig_s_act_factor
 #' @keywords internal
 
-calculate_drc_payback <- function(claim_age, cum_months_withheld, nra, rf1, rf2, drc, s_rf1, s_rf2, drc_max_months) {
+calculate_drc_payback <- function(claim_age, cum_months_withheld, nra, rf1, rf2, drc, s_rf1, s_rf2, max_drc_age) {
   # Effective claim age is adjusted by months withheld (Section 1806)
   # TODO: Add SSA Handbook citation explaining that spousal actuarial factor
   # is also recalculated at NRA based on withheld months. Verify whether this
@@ -174,12 +174,12 @@ calculate_drc_payback <- function(claim_age, cum_months_withheld, nra, rf1, rf2,
 
   # Calculate new actuarial factors with effective claim age
 
-  new_act_factor <- rf_and_drc(effective_claim_age, nra, rf1, rf2, drc, drc_max_months)
-  new_s_act_factor <- rf_and_drc(effective_claim_age, nra, s_rf1, s_rf2, 0, drc_max_months)
+  new_act_factor <- rf_and_drc(effective_claim_age, nra, rf1, rf2, drc, max_drc_age)
+  new_s_act_factor <- rf_and_drc(effective_claim_age, nra, s_rf1, s_rf2, 0, max_drc_age)
 
   # Original factors for comparison
-  orig_act_factor <- rf_and_drc(claim_age, nra, rf1, rf2, drc, drc_max_months)
-  orig_s_act_factor <- rf_and_drc(claim_age, nra, s_rf1, s_rf2, 0, drc_max_months)
+  orig_act_factor <- rf_and_drc(claim_age, nra, rf1, rf2, drc, max_drc_age)
+  orig_s_act_factor <- rf_and_drc(claim_age, nra, s_rf1, s_rf2, 0, max_drc_age)
 
   list(
     new_act_factor = new_act_factor,
@@ -244,11 +244,11 @@ calculate_spouse_ret_effect <- function(worker_data, spouse_df, assumptions, s_p
   s_rf1 <- assumptions$rf1[assumptions$year == s_yr_elig][1]
   s_rf2 <- assumptions$rf2[assumptions$year == s_yr_elig][1]
   s_drc <- assumptions$drc[assumptions$year == s_yr_elig][1]
-  drc_max <- assumptions$drc_max_months[1]
+  max_drc_age_val <- assumptions$max_drc_age[1]
   ret_rate <- assumptions$ret_phaseout_rate[1]
 
   # Calculate spouse's actuarial factor
-  s_act_factor <- rf_and_drc(s_claim_age, s_nra, s_rf1, s_rf2, s_drc, drc_max)
+  s_act_factor <- rf_and_drc(s_claim_age, s_nra, s_rf1, s_rf2, s_drc, max_drc_age_val)
 
   # Calculate spouse's own benefit at each age (after actuarial adjustment)
   s_own_ben <- if_else(s_age >= s_claim_age, floor(s_pia * s_act_factor), 0)
@@ -351,7 +351,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
   # Join required assumption columns
   # Skip join if columns already present (from join_all_assumptions)
   cols_needed <- c("ret1", "nra", "rf1", "rf2", "drc", "s_rf1", "s_rf2",
-                   "ret_phaseout_rate", "elig_age_retired", "drc_max_months")
+                   "ret_phaseout_rate", "elig_age_retired", "max_drc_age")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -381,7 +381,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       spec <- wd$spouse_spec[1]
       elig_age_ret <- wd$elig_age_retired[1]
       ret_rate <- wd$ret_phaseout_rate[1]
-      drc_max <- wd$drc_max_months[1]
+      max_drc_age_val <- wd$max_drc_age[1]
       claim_age_val <- wd$claim_age[1]
       s_pia_share_val <- wd$s_pia_share[1]
 
@@ -470,7 +470,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       is_disabled <- wd$elig_age[1] < elig_age_ret
 
       drc_factors <- calculate_drc_payback(claim_age_val, cum_months_at_nra, nra_ind,
-                                            rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, drc_max)
+                                            rf1_ind, rf2_ind, drc_ind, s_rf1_ind, s_rf2_ind, max_drc_age_val)
 
       # TODO: Verify DRC payback for spouse_ben withheld due to spouse's RET.
       # Currently assuming the worker gets DRC payback on their spousal actuarial
@@ -479,7 +479,7 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       s_drc_payback_factor <- if (s_cum_months_at_s_nra > 0 && !is.na(s_nra_ind)) {
         # Recalculate spousal actuarial factor based on effective claim age
         effective_s_claim_age <- min(claim_age_val + (s_cum_months_at_s_nra / 12), s_nra_ind)
-        rf_and_drc(effective_s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0, drc_max)
+        rf_and_drc(effective_s_claim_age, nra_ind, s_rf1_ind, s_rf2_ind, 0, max_drc_age_val)
       } else {
         drc_factors$new_s_act_factor
       }

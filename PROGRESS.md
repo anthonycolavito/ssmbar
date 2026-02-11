@@ -28,6 +28,36 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### February 10, 2026 (Session 15) — Statutory Audit Fixes
+
+**Task**: Fix discrepancies found in the second-pass statutory audit (Title II comparison). Six fixes implemented per user approval.
+
+**Fixes Implemented**:
+
+1. **drc_max_months → max_drc_age** (Finding #5): Replaced hardcoded `drc_max_months = 36` with `max_drc_age = 70` assumptions variable. `rf_and_drc()` now computes `(max_drc_age - nra) * 12` internally, producing correct DRC months for all NRA values (48 for NRA=66, 60 for NRA=65, etc.). Previously, pre-1960 birth cohorts claiming past NRA+3 years were undercomputed.
+   - Files: `assumptions_prep.R`, `benefit_calculations.R` (rf_and_drc, join_all_assumptions), `ret.R` (calculate_drc_payback, calculate_spouse_ret_effect, ret), `reform_functions.R` (ret_reform), `data.R`, `ssmbar-package.R`
+
+2. **Disability family max formula** (Finding #6): Changed `pmin(0.85 * aime, 1.50 * pia)` to `pmin(pmax(0.85 * aime, pia), 1.50 * pia)` per 42 USC 403(a)(6)(A). The inner `max()` ensures the disability FM is never less than the PIA.
+
+3. **floor_dime() citation** (Finding #9): Corrected erroneous "42 USC 415(a)(2)(C)" to "42 USC 415(a)(1)(A)" in roxygen and code comments. Also fixed same citation in `reform_functions.R`.
+
+4. **Years of coverage cap at 30** (Finding #11): Added `pmin(cumsum(is_coverage_year), 30L)` in `years_of_coverage()` per 42 USC 415(a)(1)(C)(ii). Special minimum PIA maxes out at 30 years of coverage.
+
+5. **RET exempt amount rounding** (Finding #12): Changed ret1 projection from `floor(... * 10) / 10` (floor-to-dime) to `round(... / 120) * 120` (nearest $120) per 42 USC 403(f)(8)(A). Changed ret2 similarly from floor-to-dime to `round(... / 480) * 480` (nearest $480).
+
+**Not Implemented (per user decision)**:
+- Finding #7 (family max includes dependent spouse): After investigation, the `spouse_ben` column in ssmbar's data model represents benefits the worker receives FROM the spouse's record (as a dependent of the spouse), not benefits paid from the worker's own record. Therefore it is correctly excluded from the worker's family max. The existing code and comment are correct.
+- Finding #8 (RET two-tier ret2/$1-per-$3): User noted that since all hypothetical workers are born January 2, they attain NRA on January 1 — there are no months in the NRA year before NRA attainment, so ret2 never applies.
+- Finding #10 (years_of_coverage date range comment): Left as is per user.
+
+**STATUTORY_AUDIT.md**: Updated with all second-pass findings (Findings #5-#12), detailed analysis, and resolution status.
+
+**Regenerated**: tr2025.rda, all 25 regression test fixtures
+
+**Test Results**: 648 pass, 0 fail
+
+---
+
 ### February 10, 2026 (Session 14) — Generosity Charts and tr2025 Documentation
 
 **Task**: (1) Create generosity analysis charts for custom workers across birth cohorts. (2) Document all 59 columns of tr2025 assumptions data.

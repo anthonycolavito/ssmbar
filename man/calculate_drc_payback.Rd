@@ -13,7 +13,7 @@ calculate_drc_payback(
   drc,
   s_rf1,
   s_rf2,
-  drc_max_months
+  max_drc_age
 )
 }
 \arguments{
@@ -33,7 +33,7 @@ calculate_drc_payback(
 
 \item{s_rf2}{Numeric scalar of spousal second reduction factor}
 
-\item{drc_max_months}{Numeric scalar of maximum DRC months}
+\item{max_drc_age}{Numeric scalar of maximum age for DRC accrual (default 70)}
 }
 \value{
 List with new_act_factor, new_s_act_factor, orig_act_factor, orig_s_act_factor

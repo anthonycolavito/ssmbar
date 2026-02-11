@@ -17,7 +17,7 @@ utils::globalVariables(c(
   "s_pia_share", "s_rf1", "s_rf2",
   "qc_required", "elig_age_retired", "index_age_offset",
   "max_dropout_years", "min_comp_period", "max_qc_per_year",
-  "drc_max_months", "ret_phaseout_rate",
+  "max_drc_age", "ret_phaseout_rate",
 
   # Reform parameters
   "pia_multiplier", "ret_enabled", "bp3", "fact4", "cola_cap", "cola_cap_active",

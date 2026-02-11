@@ -134,7 +134,9 @@ years_of_coverage <- function(worker, debugg=FALSE) {
         0L
       ),
       # Cumulative years of coverage through each age
-      years_of_coverage = cumsum(is_coverage_year)
+      # Capped at 30 per 42 USC 415(a)(1)(C)(ii): special minimum PIA
+      # maxes out at 30 years of coverage (30 - 10 = 20 increments)
+      years_of_coverage = pmin(cumsum(is_coverage_year), 30L)
     ) %>%
     ungroup()
 

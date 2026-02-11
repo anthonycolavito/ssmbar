@@ -97,11 +97,12 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
       assume[assume$year == i, "qc_rec"] <- qc_rec_i
     }
 
-    #Project out RET exempt amounts
+    # Project out RET exempt amounts
+    # Per 42 USC 403(f)(8)(A): ret1 rounds to nearest $120, ret2 rounds to nearest $480
     if (is.na(ret1_i)) {
       prev_ret1 <- assume[assume$year == i - 1, "ret1"]
 
-      ret1_i <- max(floor(ret1_base * awi_end / awi_1992 * 10) / 10, prev_ret1)
+      ret1_i <- max(round(ret1_base * awi_end / awi_1992 / 120) * 120, prev_ret1)
 
       assume[assume$year == i, "ret1"] <- ret1_i
     }
@@ -109,7 +110,7 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
     if (is.na(ret2_i)) {
       prev_ret2 <- assume[assume$year == i - 1, "ret2"]
 
-      ret2_i <- max(floor(ret2_base * awi_end / awi_2000 * 10) / 10, prev_ret2)
+      ret2_i <- max(round(ret2_base * awi_end / awi_2000 / 480) * 480, prev_ret2)
 
       assume[assume$year == i, "ret2"] <- ret2_i
 
@@ -165,9 +166,11 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   # SSA Handbook Section 212: https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0212.html
   assume$max_qc_per_year <- 4
 
-  # Maximum months of delayed retirement credits (caps at age 70, which is 36 months past NRA 67)
-  # SSA Handbook Section 720: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
-  assume$drc_max_months <- 36
+  # Maximum age for delayed retirement credits (DRCs stop accruing at age 70)
+  # 42 USC 402(w); SSA Handbook Section 720
+  # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0720.html
+  # DRC months = (max_drc_age - NRA) * 12, computed dynamically in rf_and_drc()
+  assume$max_drc_age <- 70
 
   # Retirement Earnings Test phaseout rate (reduction per dollar of excess earnings)
   # SSA Handbook Section 1803: https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1803.html

@@ -4,7 +4,7 @@
 \alias{rf_and_drc}
 \title{Early Retirement Reduction Factor and Delayed Retirement Credit Calculation}
 \usage{
-rf_and_drc(claim_age, nra, rf1, rf2, drc, drc_max_months = 36)
+rf_and_drc(claim_age, nra, rf1, rf2, drc, max_drc_age = 70)
 }
 \arguments{
 \item{claim_age}{Numeric value that represents the age at which a worker first claims benefits}
@@ -17,7 +17,8 @@ rf_and_drc(claim_age, nra, rf1, rf2, drc, drc_max_months = 36)
 
 \item{drc}{Numeric value that represents the incremental increase in benefits for the months claimed past the NRA, based on the worker's birth cohort.}
 
-\item{drc_max_months}{Numeric value for maximum months of DRC (currently 36 months, capping at age 70). Default 36.}
+\item{max_drc_age}{Numeric value for maximum age at which DRCs accrue (default 70).
+DRC months = (max_drc_age - nra) * 12. Per 42 USC 402(w).}
 }
 \value{
 act_factor numeric value used for adjusting a worker's PIA to compute their monthly benefit
