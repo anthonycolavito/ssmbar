@@ -126,7 +126,6 @@ floor_dime <- function(x) {
 #' @param rf2 Numeric value that represents the incremental reduction in benefits for the additional months past 36 that in which benefits are claimed early.
 #' @param drc Numeric value that represents the incremental increase in benefits for the months claimed past the NRA, based on the worker's birth cohort.
 #' @param max_drc_age Numeric value for maximum age at which DRCs accrue (default 70).
-#'   DRC months = (max_drc_age - nra) * 12. Per 42 USC 402(w).
 #'
 #' @return act_factor numeric value used for adjusting a worker's PIA to compute their monthly benefit
 #'
@@ -234,7 +233,7 @@ aime <- function(worker, assumptions, debugg = FALSE) {
   #
   # AIME equals the average monthly earnings of the highest earning years
   # in the computation period (typically 35 years for retired workers).
-  # For January 1 claims, AIME at age X uses earnings through age X-1.
+  # For January 2 claims, AIME at age X uses earnings through age X-1.
   #
   # Optimization: Uses partial sort which is O(n) vs full sort O(n log n).
   # Pre-computes eligibility flags to reduce redundant checks.
@@ -256,10 +255,10 @@ aime <- function(worker, assumptions, debugg = FALSE) {
       first_eligible <- which(is_eligible)[1]
 
       if (!is.na(first_eligible)) {
-        # Only iterate from first eligible year onwards
+        # Only iterate from first eligible year onward
         for (i in first_eligible:n) {
           if (is_eligible[i]) {
-            # Earnings through age-1 (i-1 rows)
+            # Earnings through age-1 (i-1 rows) -- When a worker claims benefits, only the earnings through the last year are available to SSA, so current year earnings are not included in the calculation
             available_years <- i - 1
 
             if (available_years > 0) {
