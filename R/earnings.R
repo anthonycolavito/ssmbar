@@ -249,11 +249,9 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
     claim_age <- disabled_age  # Disabled workers claim when they become disabled
     elig_age <- disabled_age   # Eligibility age is disability age
   }
-  # TODO: Document - explain how sex affects benefit calculations (life expectancy lookup)
+
   worker_sex <- sex #Sex of the worker for lifetime benefit calculations.
   # Calculate expected death age based on cohort life expectancy at age 65
-  # Keep fractional value — PV functions use floor(death_age) for full years
-  # and the fractional remainder to weight the partial final year
   death_age <- if(sex == "male") {
     assumptions$le_m[which(assumptions$year == birth_yr + 65)]
   }
@@ -295,8 +293,10 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
 
   } # End of type conditional
   else if (type == "max") {
+    #Workers who had earnings at the taxable maximum at every year of their careers.
+
     worker <- worker %>% left_join(assumptions %>% select(year, taxmax),
-                                   by = "year") %>% #Left joins scaled earnings factors for the type of worker selected.
+                                   by = "year") %>% #Left joins tax max by year
       mutate(
         earnings =  case_when(
           elig_age < elig_age_ret & age >= 21 & age < elig_age ~ taxmax, # Disabled max earner: earnings until disability
@@ -307,7 +307,6 @@ generate_single_worker <- function(birth_yr, sex, type, age_claim, disabled_age,
   }
   else {
   #Condition for when a worker is specified as custom.
-  # TODO: Document - add citation to Trustees Report methodology for scaled earnings factors
   #Earnings are generated using the raw scaled earnings factors provided by the trustee in five (5) steps
   #1. The raw scaled earnings factors are multiplied by the AWI at each age to produce earnings by age in nominal dollars
   #2. These earnings are inflated/deflated to be in terms of today's dollars.
