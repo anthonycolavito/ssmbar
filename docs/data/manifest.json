@@ -1,0 +1,92 @@
+{
+  "generated": "2026-02-28T00:00:00",
+  "package_version": "0.0.0.9001",
+  "data_source": "2025 Trustees Report",
+  "dimensions": {
+    "worker_types": [
+      { "key": "very_low", "label": "Very Low Earner", "type": "very_low", "custom_earnings": null },
+      { "key": "low", "label": "Low Earner", "type": "low", "custom_earnings": null },
+      { "key": "medium", "label": "Medium Earner", "type": "medium", "custom_earnings": null },
+      { "key": "high", "label": "High Earner", "type": "high", "custom_earnings": null },
+      { "key": "max", "label": "Maximum Earner", "type": "max", "custom_earnings": null },
+      { "key": "custom_25k", "label": "$25K Earner", "type": "custom", "custom_earnings": 25000 },
+      { "key": "custom_50k", "label": "$50K Earner", "type": "custom", "custom_earnings": 50000 },
+      { "key": "custom_75k", "label": "$75K Earner", "type": "custom", "custom_earnings": 75000 },
+      { "key": "custom_100k", "label": "$100K Earner", "type": "custom", "custom_earnings": 100000 },
+      { "key": "custom_125k", "label": "$125K Earner", "type": "custom", "custom_earnings": 125000 },
+      { "key": "custom_150k", "label": "$150K Earner", "type": "custom", "custom_earnings": 150000 }
+    ],
+    "sexes": ["male", "female"],
+    "claim_ages": [62, 63, 64, 65, 66, 67, 68, 69, 70],
+    "cohort_birth_years": [1960, 2005],
+    "individual_birth_years": [1939, 2010]
+  },
+  "reform_scenarios": {
+    "baseline": { "name": "baseline", "label": "Current Law" },
+    "reduce_fact3": { "name": "reduce_fact3", "label": "Reduce Fact3 to 5%" },
+    "flat_benefit": { "name": "flat_benefit", "label": "Flat Benefit" },
+    "simpson_bowles_pia": { "name": "simpson_bowles_pia", "label": "Simpson-Bowles PIA" },
+    "nra_to_68": { "name": "nra_to_68", "label": "Raise NRA to 68" },
+    "index_nra": { "name": "index_nra", "label": "Index NRA to Longevity" },
+    "nra_to_69_index": { "name": "nra_to_69_index", "label": "NRA to 69, then Index" },
+    "chained_cpi": { "name": "chained_cpi", "label": "Chained CPI" },
+    "cola_cap": { "name": "cola_cap", "label": "Cap COLAs at Median" },
+    "cpi_e": { "name": "cpi_e", "label": "CPI-E (Higher)" },
+    "taxmax_90_pct": { "name": "taxmax_90_pct", "label": "90% Coverage + 5% Credit" },
+    "eliminate_taxmax": { "name": "eliminate_taxmax", "label": "Eliminate Taxmax + 15% Credit" },
+    "eliminate_taxmax_no_credit": { "name": "eliminate_taxmax_no_credit", "label": "Eliminate Taxmax, No Credit" },
+    "benefit_cut_5": { "name": "benefit_cut_5", "label": "5% Benefit Cut" },
+    "benefit_cut_10": { "name": "benefit_cut_10", "label": "10% Benefit Cut" },
+    "forty_year_avg": { "name": "forty_year_avg", "label": "40-Year Averaging" },
+    "repeal_ret": { "name": "repeal_ret", "label": "Repeal RET" },
+    "phase_out_spousal": { "name": "phase_out_spousal", "label": "Phase Out Spousal" },
+    "mini_pia": { "name": "mini_pia", "label": "Mini-PIA" },
+    "basic_minimum": { "name": "basic_minimum", "label": "Basic Minimum Benefit" },
+    "child_care_credit": { "name": "child_care_credit", "label": "Child Care Credit" },
+    "widow_75_pct": { "name": "widow_75_pct", "label": "75% Widow Benefit" },
+    "simpson_bowles_combo": { "name": "simpson_bowles_combo", "label": "Simpson-Bowles Package" }
+  },
+  "reform_categories": {
+    "pia_formula": {
+      "label": "Slow Initial Benefit Growth",
+      "reforms": ["reduce_fact3", "flat_benefit", "simpson_bowles_pia"],
+      "exclusive": true
+    },
+    "nra": {
+      "label": "Increase Retirement Age",
+      "reforms": ["nra_to_68", "index_nra", "nra_to_69_index"],
+      "exclusive": true
+    },
+    "cola": {
+      "label": "Modify COLAs",
+      "reforms": ["chained_cpi", "cola_cap", "cpi_e"],
+      "exclusive": true
+    },
+    "taxmax": {
+      "label": "Increase Taxable Maximum",
+      "reforms": ["taxmax_90_pct", "eliminate_taxmax", "eliminate_taxmax_no_credit"],
+      "exclusive": true
+    },
+    "other": {
+      "label": "Other Reforms",
+      "reforms": ["benefit_cut_5", "benefit_cut_10", "forty_year_avg", "repeal_ret", "phase_out_spousal", "mini_pia"],
+      "exclusive": false
+    },
+    "enhancements": {
+      "label": "Benefit Enhancements",
+      "reforms": ["basic_minimum", "child_care_credit", "widow_75_pct"],
+      "exclusive": false
+    },
+    "combo": {
+      "label": "Combined Package",
+      "reforms": ["simpson_bowles_combo"],
+      "exclusive": false
+    }
+  },
+  "file_patterns": {
+    "cohort": "cohort/{type}_{sex}_{claimAge}.json",
+    "individual_metrics": "individual/{type}_{sex}_{claimAge}_metrics.json",
+    "individual_benefits": "individual/{type}_{sex}_{claimAge}_benefits.json",
+    "individual_marginal": "individual/{type}_{sex}_{claimAge}_marginal.json"
+  }
+}

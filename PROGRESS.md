@@ -16,17 +16,65 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: February 10, 2026
+**Last Updated**: February 28, 2026
 
-**Active Work**: None
+**Active Work**: Static GitHub Pages Benefit Explorer
 
-**Blocked On**: None
+**Blocked On**: Data generation (requires running R pre-computation script)
 
 ---
 
 ## Session Log
 
 *Most recent entries at top.*
+
+### February 28, 2026 (Session 16) — Static GitHub Pages Benefit Explorer
+
+**Task**: Build a static site that replicates the Shiny Benefit Explorer using pre-computed JSON data, deployable to GitHub Pages with no server required.
+
+**Files Created**:
+
+1. **`scripts/precompute_static_data.R`** (~650 lines): R script that runs ssmbar across all input combinations (11 worker types x 2 sexes x 9 claim ages = 198 configs, 22 reform scenarios each) and exports column-oriented JSON. Three computation phases: cohort data, individual metrics+benefits, marginal analysis. Supports `--cores N` parallelization, `--type` filtering, incremental runs (skips existing files).
+
+2. **`docs/index.html`** (533 lines): Single-page app with Bootstrap 5 dark theme, CRFB branding. Two tabs (Individual Worker, Cohort Comparison), sidebar reform selector with 22 radio options across 7 categories, Chart.js charts, metric cards, collapsible data tables with CSV export.
+
+3. **`docs/css/style.css`** (572 lines): CRFB dark theme (navy/light-blue/orange palette), responsive layout with mobile sidebar offcanvas, custom form controls, metric cards, chart containers, data tables.
+
+4. **`docs/js/formatters.js`** (64 lines): Currency, percent, number formatting utilities.
+
+5. **`docs/js/data-loader.js`** (212 lines): Fetch JSON with LRU cache (50 entries), request deduplication, data extraction helpers for cohort/individual/marginal data.
+
+6. **`docs/js/chart-manager.js`** (341 lines): Chart.js v4 chart builders for 6 chart types: benefits-by-age (line), NMTR (bar), and 4 cohort charts (replacement rate, PV benefits, ratio, IRR).
+
+7. **`docs/js/table-manager.js`** (286 lines): HTML table rendering with pagination, CSV export, table builders for benefits, marginal, and cohort data.
+
+8. **`docs/js/ui-controls.js`** (216 lines): Dropdown population, sidebar toggle, reform selector, tab switching, range slider, benefit view toggle (nominal/real).
+
+9. **`docs/js/app.js`** (338 lines): Main controller wiring inputs to data loader, chart manager, and table manager. Handles lazy loading of marginal data, metric card updates with baseline→reform comparison.
+
+10. **`docs/data/manifest.json`** (104 lines): Metadata file indexing all dimensions, reform scenarios, and file path patterns.
+
+**Architecture**: Pre-compute everything in R → export as JSON → vanilla JS reads JSON and renders charts. Changing birth year or reform within same worker config is instant (data already cached). Only changing worker type, sex, or claim age triggers a new file fetch.
+
+**Next Steps**: Run pre-computation script to generate data files, then enable GitHub Pages.
+
+### February 20, 2026 (User commits) — Documentation Cleanup
+
+**Author**: Anthony (manual commits, not Claude session)
+
+**Changes**:
+
+1. **`R/earnings.R` documentation cleanup** (commit `5b6d9e3`):
+   - Removed stale TODO comments (`Document - explain how sex affects benefit calculations`, `Document - add citation to Trustees Report methodology for scaled earnings factors`)
+   - Removed redundant comment about fractional death age weighting (PV functions)
+   - Added descriptive comment for max-earner earnings logic ("Workers who had earnings at the taxable maximum at every year of their careers")
+   - Cleaned up inline comment on max-earner left join ("Left joins tax max by year")
+
+2. **`R/benefit_calculations.R` documentation edits** (commit `375221e`):
+   - Removed `DRC months = (max_drc_age - nra) * 12. Per 42 USC 402(w).` line from `rf_and_drc()` roxygen `@param max_drc_age`
+   - Fixed comment: "January 1 claims" → "January 2 claims" in AIME computation notes
+   - Minor wording: "onwards" → "onward"
+   - Added clarifying comment on AIME earnings window: explains that current-year earnings are excluded because only earnings through the prior year are available to SSA at time of claim
 
 ### February 10, 2026 (Session 15) — Statutory Audit Fixes
 
