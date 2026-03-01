@@ -1017,8 +1017,8 @@ widow_benefit_reform <- function(worker, assumptions, debugg = FALSE) {
       # If no spouse (worker_age_at_spouse_death is NA), use claim_age
       actual_widow_claim_age = if_else(
         is.na(worker_age_at_spouse_death),
-        claim_age,
-        pmax(claim_age, worker_age_at_spouse_death)
+        as.numeric(claim_age),
+        as.numeric(pmax(claim_age, worker_age_at_spouse_death))
       ),
 
       # For DISABLED widow(er)s, actuarial factor is calculated as if claiming at age 60

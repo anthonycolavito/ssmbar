@@ -20,7 +20,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Active Work**: Static GitHub Pages Benefit Explorer
 
-**Blocked On**: Data generation (requires running R pre-computation script)
+**Blocked On**: Nothing — site live at https://anthonycolavito.github.io/ssmbar/
 
 ---
 
@@ -57,6 +57,37 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 **Architecture**: Pre-compute everything in R → export as JSON → vanilla JS reads JSON and renders charts. Changing birth year or reform within same worker config is instant (data already cached). Only changing worker type, sex, or claim age triggers a new file fetch.
 
 **Next Steps**: Run pre-computation script to generate data files, then enable GitHub Pages.
+
+### February 28, 2026 (Session 17) — Data Generation & Bug Fixes
+
+**Task**: Generate pre-computed JSON data for the static site and fix bugs blocking data generation.
+
+**Bug Fix — `if_else()` type mismatch in survivor calculations**:
+- `R/survivor.R` line 295 and `R/reform_functions.R` line 1018: `dplyr::if_else()` for `actual_widow_claim_age` had integer (`claim_age`) vs double (`pmax()` result) type mismatch
+- This caused ALL `calculate_benefits()` calls to silently fail when `claim_age` was an integer (e.g., from `62:70` sequence)
+- Fix: wrap both branches in `as.numeric()` — no change to computed values, just type consistency
+- Classification: coding bug (not benefit rule bug) — the code didn't do what it intended
+- Tests: full suite passes (647 pass, 1 pre-existing unrelated fail)
+
+**Data Generation**:
+- Created `scripts/generate_data.R` (flat serial version) and `scripts/generate_data_parallel.R` (mclapply version)
+- Generated 49 cohort files + 96 individual files (metrics + benefits)
+- All 10 claim_age=65 configs complete (5 worker types × 2 sexes × 23 reform scenarios × 46 birth years)
+- Extra files from other claim ages preserved for potential future use
+- Simplified app to claim_age=65 only (hidden dropdown, manifest updated)
+
+**Files Modified**:
+- `R/survivor.R`: `as.numeric()` cast in `actual_widow_claim_age` if_else
+- `R/reform_functions.R`: same fix
+- `docs/index.html`: hide claim age dropdowns, hardcode 65
+- `docs/data/manifest.json`: claim_ages reduced to [65]
+
+**Files Created**:
+- `scripts/generate_data.R`: flat serial data generator with error logging
+- `scripts/generate_data_parallel.R`: parallel version using mclapply (6 cores)
+- `scripts/precompute_fast.R`: earlier parallel attempt (kept for reference)
+- `docs/data/cohort/*.json`: 49 pre-computed cohort data files
+- `docs/data/individual/*.json`: 96 pre-computed individual data files (metrics + benefits)
 
 ### February 20, 2026 (User commits) — Documentation Cleanup
 

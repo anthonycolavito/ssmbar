@@ -17,7 +17,7 @@
       { "key": "custom_150k", "label": "$150K Earner", "type": "custom", "custom_earnings": 150000 }
     ],
     "sexes": ["male", "female"],
-    "claim_ages": [62, 63, 64, 65, 66, 67, 68, 69, 70],
+    "claim_ages": [65],
     "cohort_birth_years": [1960, 2005],
     "individual_birth_years": [1939, 2010]
   },

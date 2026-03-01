@@ -17,7 +17,19 @@
 #
 # =============================================================================
 
-library(ssmbar)
+# Load ssmbar - try installed package first, fall back to devtools::load_all()
+if (requireNamespace("ssmbar", quietly = TRUE)) {
+  library(ssmbar)
+} else {
+  pkg_root_load <- getwd()
+  if (basename(pkg_root_load) == "scripts") pkg_root_load <- dirname(pkg_root_load)
+  if (file.exists(file.path(pkg_root_load, "DESCRIPTION"))) {
+    cat("Loading ssmbar from source via devtools::load_all()...\n")
+    suppressWarnings(devtools::load_all(pkg_root_load, quiet = TRUE))
+  } else {
+    stop("Cannot find ssmbar package. Run from package root or install the package.")
+  }
+}
 library(jsonlite)
 library(parallel)
 
