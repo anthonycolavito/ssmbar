@@ -257,6 +257,11 @@ a:hover { color: var(--crfb-blue); }
   border-bottom-color: var(--accent-blue);
 }
 
+.inline-select-sm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* --- Spouse Type Row --- */
 .spouse-type-row {
   margin-top: 0.75rem;

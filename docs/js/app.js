@@ -17,9 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById(id)?.addEventListener('change', onHeroChange);
     });
 
-    // Show/hide spouse type on marital change
-    document.getElementById('heroMarital')?.addEventListener('change', updateSpouseTypeVisibility);
-
     // Handle URL hash for tab routing
     const hash = window.location.hash.replace('#', '');
     if (hash === 'cohort') {
@@ -43,8 +40,8 @@ async function onHeroChange() {
   const marital = getHeroMarital();
   const spouseType = marital === 'married' ? getHeroSpouseType() : null;
 
-  // Update spouse type visibility
-  updateSpouseTypeVisibility();
+  // Enforce sex/marital constraints and spouse type visibility
+  updateHeroConstraints();
 
   // Fetch data
   const [cohortData, benefitsData, nmtrData] = await Promise.all([

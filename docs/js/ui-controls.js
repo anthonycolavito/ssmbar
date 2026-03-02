@@ -26,11 +26,31 @@ function getHeroSpouseType() {
   return document.getElementById('heroSpouseType')?.value || 'medium';
 }
 
-function updateSpouseTypeVisibility() {
-  const marital = getHeroMarital();
-  const group = document.getElementById('spouseTypeGroup');
-  if (group) {
-    group.style.display = marital === 'married' ? '' : 'none';
+// =========================================================================
+// Sex/Marital constraint logic
+// =========================================================================
+
+function updateHeroConstraints() {
+  const sex = getHeroSex();
+  const maritalEl = document.getElementById('heroMarital');
+  const spouseGroup = document.getElementById('spouseTypeGroup');
+
+  if (sex === 'unisex') {
+    // Force single when unisex — married requires a specific sex
+    if (maritalEl) {
+      maritalEl.value = 'single';
+      maritalEl.disabled = true;
+    }
+    if (spouseGroup) spouseGroup.style.display = 'none';
+  } else {
+    // Enable married option for male/female
+    if (maritalEl) maritalEl.disabled = false;
+
+    // Show spouse type row when married
+    const marital = getHeroMarital();
+    if (spouseGroup) {
+      spouseGroup.style.display = marital === 'married' ? 'block' : 'none';
+    }
   }
 }
 
