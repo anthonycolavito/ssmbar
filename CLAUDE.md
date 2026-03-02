@@ -158,14 +158,16 @@ See `PROGRESS.md` for complete validation history and methodology.
 
 ## Development Environment
 
-**R Installation Path:**
-```
-C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe
-```
+**Mac:**
+- R 4.0.3 at `/usr/local/bin/Rscript`
+- ssmbar is NOT installed — use `devtools::load_all(".", quiet = TRUE)`
 
-To run tests from command line:
-```powershell
-& 'C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe' -e "devtools::test()"
+**Windows (CRFB):**
+- R 4.5.0 at `C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe`
+
+To run tests:
+```bash
+Rscript -e "devtools::test()"
 ```
 
 ---

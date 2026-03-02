@@ -28,11 +28,11 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
-### March 1, 2026 (Session 19) — Reform Category Restructure
+### March 1, 2026 (Session 19) — Reform Category Restructure + Skill File Cleanup
 
-**Task**: Simplify reform categories on the static site: remove child care credit, consolidate basic minimum benefit into a renamed category, and remove unnecessary "None" radio buttons.
+**Task**: Simplify reform categories on the static site: remove child care credit, consolidate basic minimum benefit into a renamed category, and remove unnecessary "None" radio buttons. Then clean up skill/documentation files for fresh-boot readability.
 
-**Changes**:
+**Changes (Reform Restructure)**:
 - Removed "Provide Earnings Credit for Child Care" reform option entirely
 - Removed "Benefit Enhancements" category (was: basic_minimum, child_care_credit)
 - Moved "Establish a Basic Minimum Benefit" into "Other Reforms" (renamed from "Improve Work Incentives")
@@ -41,12 +41,19 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 - All 1,280 combo keys already exist in pre-generated data (no regeneration needed)
 - 1,024 orphaned child_care_credit combo keys remain in data files (harmless, unused)
 
+**Changes (Skill File Cleanup)**:
+- Trimmed `.claude/skill.md` from ~950 lines to ~200 lines — removed completed refactoring checklists (Phases 1-6) and session changelogs, kept active architecture, rules, and site details
+- Added "Working Rule" to skill.md: search existing notes before approaching any problem
+- Fixed `CLAUDE.md` dev environment section to show both Mac and Windows paths clearly
+
 **Files Modified**:
 - `docs/index.html` — Removed Benefit Enhancements section, removed None radios, renamed group
 - `docs/js/ui-controls.js` — 5 radio groups, initRadioDeselect(), updated clearReform()
 - `docs/js/app.js` — Replaced radio change listeners with initRadioDeselect() call
 - `docs/data/manifest.json` — Removed child_care_credit, merged categories
 - `scripts/generate_combo_data.R` — Updated categories and factories for future regeneration
+- `.claude/skill.md` — Trimmed to ~200 lines of active reference material
+- `CLAUDE.md` — Fixed dev environment paths
 
 ### March 1, 2026 (Session 18) — Reform Combination Rebuild
 
