@@ -33,18 +33,17 @@ function getHeroSpouseType() {
 function updateHeroConstraints() {
   const sex = getHeroSex();
   const maritalEl = document.getElementById('heroMarital');
+  const maritalGroup = document.getElementById('maritalGroup');
   const spouseGroup = document.getElementById('spouseTypeGroup');
 
   if (sex === 'unisex') {
-    // Force single when unisex — married requires a specific sex
-    if (maritalEl) {
-      maritalEl.value = 'single';
-      maritalEl.disabled = true;
-    }
+    // Hide marital entirely when unisex — married requires a specific sex
+    if (maritalEl) maritalEl.value = 'single';
+    if (maritalGroup) maritalGroup.style.display = 'none';
     if (spouseGroup) spouseGroup.style.display = 'none';
   } else {
-    // Enable married option for male/female
-    if (maritalEl) maritalEl.disabled = false;
+    // Show marital option for male/female
+    if (maritalGroup) maritalGroup.style.display = '';
 
     // Show spouse type row when married
     const marital = getHeroMarital();
