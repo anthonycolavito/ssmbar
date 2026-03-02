@@ -257,6 +257,18 @@ a:hover { color: var(--crfb-blue); }
   border-bottom-color: var(--accent-blue);
 }
 
+/* --- Spouse Type Row --- */
+.spouse-type-row {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.spouse-type-row .inline-select {
+  font-size: 1rem;
+}
+
 /* --- Hero Tabs --- */
 .hero-tabs {
   display: flex;
