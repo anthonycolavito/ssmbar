@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: March 2, 2026
 
-**Active Work**: Static GitHub Pages Benefit Explorer — current-law rebuild with sex/marital dimensions
+**Active Work**: Static GitHub Pages Benefit Explorer — spouse type selection + visual redesign
 
 **Blocked On**: Nothing
 
@@ -27,6 +27,47 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 2, 2026 (Session 21) — Visual Redesign + Spouse Type Selection
+
+**Task**: Two-part session: (1) Visual redesign via two-agent collaboration (SS expert + UI expert), then (2) add spouse type selection for married workers (user-requested fix).
+
+**Part 1 — Visual Redesign**:
+Created a two-agent team (ss-expert + ui-expert) who debated and produced `docs/REDESIGN_SPEC.md` (1,239 lines). Then implemented the spec:
+- Light theme replacing dark (#FAFBFC page bg, white cards, dark navbar)
+- Hero section with inline dropdowns ("A medium earner born in 1960 can expect: $X,XXX/month")
+- Narrative flow for individual tab (Your Benefit, Your Return on Taxes Paid, How Your SS Taxes Work)
+- Cohort tab: single chart with pill selector (5 metrics)
+- Collapsed reform sidebar (48px icon strip with lock icon)
+- Unisex default with Male/Female option
+- Inter font, Chart.js light theme configs
+
+**Part 2 — Spouse Type Selection**:
+User noticed married workers assumed same-type spouse with no way to change. Fixed by:
+- Expanded data from 192 configs to 672: 6 primary × 6 spouse types × 2 sexes × 8 birth years (married) + 96 single
+- New dimension key format: `{sex}_married_{spouseType}` (e.g., `male_married_low`, `female_married_high`)
+- Added spouse type dropdown to UI (hidden when single, appears as "to a [type] earner" when married)
+- Updated all JS data lookup functions to pass spouseType parameter through the chain
+- Data generation completed in ~37 min (6 cores, 14 dim keys per type)
+
+**Dimension Key Format**:
+- Single: `male_single`, `female_single`
+- Married: `male_married_very_low`, `male_married_low`, `male_married_medium`, `male_married_high`, `male_married_max`, `male_married_custom_50k` (same for female)
+- 14 keys per worker type × 6 types = 84 total keys across all files
+
+**Files Modified**:
+- `docs/index.html` — Redesigned with hero section, narrative layout, spouse type dropdown
+- `docs/css/style.css` — Complete rewrite: light theme, hero section, narrative sections, collapsed sidebar
+- `docs/js/data-loader.js` — `dimKey(sex, marital, spouseType)`, unisex methods accept spouseType
+- `docs/js/chart-manager.js` — Light theme Chart.js configs, dual-color NMTR, cohort hero chart
+- `docs/js/app.js` — appDataCache includes spouseType, all lookups pass it through
+- `docs/js/ui-controls.js` — `getHeroSpouseType()`, `updateSpouseTypeVisibility()`, cohort narratives
+- `docs/js/table-manager.js` — Simplified with mobile data-label support
+- `scripts/generate_currentlaw_data.R` — Rewritten for 672 configs with all spouse type combos
+
+**Files Added**:
+- `docs/REDESIGN_SPEC.md` — Design spec from two-agent collaboration
+- 18 data JSONs regenerated with new married dimension keys (14 keys per type)
 
 ### March 2, 2026 (Session 20) — Website Rebuild: Current-Law with Sex + Marital Dimensions
 

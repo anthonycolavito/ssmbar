@@ -78,6 +78,18 @@
           <option value="single" selected>Single</option>
           <option value="married">Married</option>
         </select>
+        <span id="spouseTypeGroup" style="display: none;">
+          <span class="customize-label">to a</span>
+          <select id="heroSpouseType" class="inline-select-sm">
+            <option value="very_low">very low</option>
+            <option value="low">low</option>
+            <option value="medium" selected>medium</option>
+            <option value="high">high</option>
+            <option value="max">maximum</option>
+            <option value="custom_50k">$50K</option>
+          </select>
+          <span class="customize-label">earner</span>
+        </span>
       </div>
 
       <!-- Tab bar below hero -->
@@ -201,7 +213,8 @@
         Benefits assume claiming at age 65. Present values discounted at the Trustees'
         real interest rate. Lifetime taxes include both employee and employer shares of
         the payroll tax. Unisex figures average male and female mortality from the
-        Trustees' intermediate assumptions.
+        Trustees' intermediate assumptions. Married figures assume the spouse is the same
+        age, also claims at 65, and earns at the selected spouse earner level.
       </div>
     </div>
 

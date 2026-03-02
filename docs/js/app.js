@@ -13,9 +13,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await dataLoader.init();
 
     // Wire up hero control change listeners
-    ['heroWorkerType', 'heroBirthYear', 'heroSex', 'heroMarital'].forEach(id => {
+    ['heroWorkerType', 'heroBirthYear', 'heroSex', 'heroMarital', 'heroSpouseType'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', onHeroChange);
     });
+
+    // Show/hide spouse type on marital change
+    document.getElementById('heroMarital')?.addEventListener('change', updateSpouseTypeVisibility);
 
     // Handle URL hash for tab routing
     const hash = window.location.hash.replace('#', '');
@@ -38,6 +41,10 @@ async function onHeroChange() {
   const birthYear = getHeroBirthYear();
   const sex = getHeroSex();
   const marital = getHeroMarital();
+  const spouseType = marital === 'married' ? getHeroSpouseType() : null;
+
+  // Update spouse type visibility
+  updateSpouseTypeVisibility();
 
   // Fetch data
   const [cohortData, benefitsData, nmtrData] = await Promise.all([
@@ -46,7 +53,7 @@ async function onHeroChange() {
     dataLoader.getIndividualNMTR(type)
   ]);
 
-  appDataCache = { cohortData, benefitsData, nmtrData, type, birthYear, sex, marital };
+  appDataCache = { cohortData, benefitsData, nmtrData, type, birthYear, sex, marital, spouseType };
 
   // Update hero
   updateHero();
@@ -66,12 +73,12 @@ async function onHeroChange() {
 // =============================================================================
 
 function updateHero() {
-  const { cohortData, birthYear, sex, marital } = appDataCache;
+  const { cohortData, birthYear, sex, marital, spouseType } = appDataCache;
   if (!cohortData) return;
 
   const metrics = sex === 'unisex'
-    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear)
-    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear, spouseType)
+    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear, spouseType);
 
   if (!metrics) return;
 
@@ -115,19 +122,19 @@ function updateIndividualTab() {
 }
 
 function renderIndividualBenefitsChart() {
-  const { benefitsData, cohortData, birthYear, sex, marital } = appDataCache;
+  const { benefitsData, cohortData, birthYear, sex, marital, spouseType } = appDataCache;
   if (!benefitsData) return;
 
   // For unisex, use male series (amounts are identical) and average death age
   const lookupSex = sex === 'unisex' ? 'male' : sex;
-  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear);
+  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear, spouseType);
 
   let deathAge = null;
   if (sex === 'unisex') {
-    const metrics = dataLoader.getUnisexMetrics(cohortData, marital, birthYear);
+    const metrics = dataLoader.getUnisexMetrics(cohortData, marital, birthYear, spouseType);
     deathAge = metrics?.death_age;
   } else {
-    const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+    const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear, spouseType);
     deathAge = metrics?.death_age;
   }
 
@@ -135,11 +142,11 @@ function renderIndividualBenefitsChart() {
 }
 
 function renderIndividualNMTRChart() {
-  const { nmtrData, birthYear, sex, marital } = appDataCache;
+  const { nmtrData, birthYear, sex, marital, spouseType } = appDataCache;
   if (!nmtrData) return;
 
   const lookupSex = sex === 'unisex' ? 'male' : sex;
-  const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, lookupSex, marital, birthYear);
+  const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, lookupSex, marital, birthYear, spouseType);
 
   const section = document.getElementById('nmtrSection');
   if (nmtrSeries) {
@@ -163,13 +170,13 @@ function updateNMTRInsight(nmtrSeries) {
 }
 
 function updateReturnSection() {
-  const { cohortData, birthYear, sex, marital } = appDataCache;
+  const { cohortData, birthYear, sex, marital, spouseType } = appDataCache;
   if (!cohortData) return;
 
   const isMarried = marital === 'married';
   const metrics = sex === 'unisex'
-    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear)
-    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear, spouseType)
+    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear, spouseType);
 
   if (!metrics) return;
 
@@ -190,10 +197,10 @@ function updateReturnSection() {
 }
 
 function renderBenefitsTable() {
-  const { benefitsData, sex, marital, birthYear } = appDataCache;
+  const { benefitsData, sex, marital, birthYear, spouseType } = appDataCache;
   if (!benefitsData) return;
   const lookupSex = sex === 'unisex' ? 'male' : sex;
-  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear);
+  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear, spouseType);
   tableManager.renderBenefitsTable(series);
 }
 
@@ -208,23 +215,23 @@ function updateCohortTab() {
 }
 
 function renderCohortChart() {
-  const { cohortData, sex, marital } = appDataCache;
+  const { cohortData, sex, marital, spouseType } = appDataCache;
   if (!cohortData) return;
 
   const series = sex === 'unisex'
-    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
-    : dataLoader.getCohortSeries(cohortData, sex, marital);
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital, spouseType)
+    : dataLoader.getCohortSeries(cohortData, sex, marital, spouseType);
 
   chartManager.renderCohortHeroChart(series, currentCohortMetric);
 }
 
 function updateCohortSummary() {
-  const { cohortData, sex, marital } = appDataCache;
+  const { cohortData, sex, marital, spouseType } = appDataCache;
   if (!cohortData) return;
 
   const series = sex === 'unisex'
-    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
-    : dataLoader.getCohortSeries(cohortData, sex, marital);
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital, spouseType)
+    : dataLoader.getCohortSeries(cohortData, sex, marital, spouseType);
 
   if (!series) return;
 
@@ -270,12 +277,12 @@ function getCohortMetricFormatter(metric) {
 }
 
 function renderCohortTable() {
-  const { cohortData, sex, marital } = appDataCache;
+  const { cohortData, sex, marital, spouseType } = appDataCache;
   if (!cohortData) return;
 
   const series = sex === 'unisex'
-    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
-    : dataLoader.getCohortSeries(cohortData, sex, marital);
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital, spouseType)
+    : dataLoader.getCohortSeries(cohortData, sex, marital, spouseType);
 
   tableManager.renderCohortTable(series);
 }

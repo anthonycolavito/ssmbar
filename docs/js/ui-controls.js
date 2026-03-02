@@ -22,6 +22,18 @@ function getHeroMarital() {
   return document.getElementById('heroMarital')?.value || 'single';
 }
 
+function getHeroSpouseType() {
+  return document.getElementById('heroSpouseType')?.value || 'medium';
+}
+
+function updateSpouseTypeVisibility() {
+  const marital = getHeroMarital();
+  const group = document.getElementById('spouseTypeGroup');
+  if (group) {
+    group.style.display = marital === 'married' ? '' : 'none';
+  }
+}
+
 // =========================================================================
 // Tab switching
 // =========================================================================

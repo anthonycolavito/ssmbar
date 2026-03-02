@@ -57,10 +57,15 @@ class DataLoader {
   }
 
   // =========================================================================
-  // Build dimension key: "{sex}_{marital}"
+  // Build dimension key
+  //   Single:  "{sex}_single"
+  //   Married: "{sex}_married_{spouseType}"
   // =========================================================================
 
-  dimKey(sex, marital) {
+  dimKey(sex, marital, spouseType) {
+    if (marital === 'married' && spouseType) {
+      return `${sex}_married_${spouseType}`;
+    }
     return `${sex}_${marital}`;
   }
 
@@ -84,8 +89,8 @@ class DataLoader {
   // Data extraction helpers
   // =========================================================================
 
-  getMetricsForBirthYear(cohortData, sex, marital, birthYear) {
-    const key = this.dimKey(sex, marital);
+  getMetricsForBirthYear(cohortData, sex, marital, birthYear, spouseType) {
+    const key = this.dimKey(sex, marital, spouseType);
     const d = cohortData?.data?.[key];
     if (!d) return null;
     const idx = d.birth_years.indexOf(birthYear);
@@ -105,18 +110,18 @@ class DataLoader {
     };
   }
 
-  getBenefitSeries(benefitsData, sex, marital, birthYear) {
-    const key = this.dimKey(sex, marital);
+  getBenefitSeries(benefitsData, sex, marital, birthYear, spouseType) {
+    const key = this.dimKey(sex, marital, spouseType);
     return benefitsData?.data?.[key]?.[String(birthYear)] || null;
   }
 
-  getNMTRSeries(nmtrData, sex, marital, birthYear) {
-    const key = this.dimKey(sex, marital);
+  getNMTRSeries(nmtrData, sex, marital, birthYear, spouseType) {
+    const key = this.dimKey(sex, marital, spouseType);
     return nmtrData?.data?.[key]?.[String(birthYear)] || null;
   }
 
-  getCohortSeries(cohortData, sex, marital) {
-    const key = this.dimKey(sex, marital);
+  getCohortSeries(cohortData, sex, marital, spouseType) {
+    const key = this.dimKey(sex, marital, spouseType);
     return cohortData?.data?.[key] || null;
   }
 
@@ -124,9 +129,9 @@ class DataLoader {
   // Unisex computation — average male and female values
   // =========================================================================
 
-  getUnisexMetrics(cohortData, marital, birthYear) {
-    const maleData = this.getMetricsForBirthYear(cohortData, 'male', marital, birthYear);
-    const femaleData = this.getMetricsForBirthYear(cohortData, 'female', marital, birthYear);
+  getUnisexMetrics(cohortData, marital, birthYear, spouseType) {
+    const maleData = this.getMetricsForBirthYear(cohortData, 'male', marital, birthYear, spouseType);
+    const femaleData = this.getMetricsForBirthYear(cohortData, 'female', marital, birthYear, spouseType);
     if (!maleData || !femaleData) return maleData || femaleData;
 
     return {
@@ -144,9 +149,9 @@ class DataLoader {
     };
   }
 
-  getUnisexCohortSeries(cohortData, marital) {
-    const male = this.getCohortSeries(cohortData, 'male', marital);
-    const female = this.getCohortSeries(cohortData, 'female', marital);
+  getUnisexCohortSeries(cohortData, marital, spouseType) {
+    const male = this.getCohortSeries(cohortData, 'male', marital, spouseType);
+    const female = this.getCohortSeries(cohortData, 'female', marital, spouseType);
     if (!male || !female) return male || female;
 
     return {
