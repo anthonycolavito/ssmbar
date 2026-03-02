@@ -51,9 +51,6 @@ class ChartManager {
     this.charts = {};
   }
 
-  /**
-   * Destroy a chart if it exists
-   */
   destroy(id) {
     if (this.charts[id]) {
       this.charts[id].destroy();
@@ -61,9 +58,6 @@ class ChartManager {
     }
   }
 
-  /**
-   * Get or create a line chart
-   */
   lineChart(canvasId, { labels, datasets, yFormat, yLabel, xLabel, annotation }) {
     this.destroy(canvasId);
     const ctx = document.getElementById(canvasId);
@@ -103,9 +97,6 @@ class ChartManager {
     return this.charts[canvasId];
   }
 
-  /**
-   * Create a bar chart (for NMTR)
-   */
   barChart(canvasId, { labels, datasets, yFormat, yLabel, xLabel, annotation }) {
     this.destroy(canvasId);
     const ctx = document.getElementById(canvasId);
@@ -146,19 +137,32 @@ class ChartManager {
   }
 
   // =========================================================================
-  // Convenience builders for specific chart types
+  // Individual benefits-by-age chart (clips at death age)
   // =========================================================================
 
-  /**
-   * Render individual benefits-by-age chart
-   */
-  renderBenefitsChart(baselineSeries, reformSeries, reformLabel, viewMode = 'nominal') {
+  renderBenefitsChart(baselineSeries, reformSeries, reformLabel, viewMode = 'nominal', deathAge = null) {
     if (!baselineSeries) return;
 
     const field = viewMode === 'real' ? 'real' : 'nominal';
+
+    // Clip data at death age if provided
+    let ages = baselineSeries.ages;
+    let baseData = baselineSeries[field];
+    let refData = reformSeries ? reformSeries[field] : null;
+
+    if (deathAge != null) {
+      const maxAge = Math.floor(deathAge);
+      const clipIdx = ages.findIndex(a => a > maxAge);
+      if (clipIdx > 0) {
+        ages = ages.slice(0, clipIdx);
+        baseData = baseData.slice(0, clipIdx);
+        if (refData) refData = refData.slice(0, clipIdx);
+      }
+    }
+
     const datasets = [{
       label: 'Baseline',
-      data: baselineSeries[field],
+      data: baseData,
       borderColor: CHART_COLORS.baseline,
       backgroundColor: 'rgba(154, 205, 255, 0.1)',
       borderWidth: 2,
@@ -167,10 +171,10 @@ class ChartManager {
       tension: 0.1
     }];
 
-    if (reformSeries) {
+    if (refData) {
       datasets.push({
         label: reformLabel || 'Reform',
-        data: reformSeries[field],
+        data: refData,
         borderColor: CHART_COLORS.reform,
         backgroundColor: 'rgba(243, 97, 7, 0.1)',
         borderWidth: 2,
@@ -181,7 +185,7 @@ class ChartManager {
     }
 
     this.lineChart('benefitsChart', {
-      labels: baselineSeries.ages,
+      labels: ages,
       datasets,
       yFormat: (v) => Fmt.currency(v, { compact: true }),
       yLabel: `Annual Benefit (${viewMode === 'real' ? 'Real' : 'Nominal'} $)`,
@@ -189,9 +193,10 @@ class ChartManager {
     });
   }
 
-  /**
-   * Render NMTR bar chart
-   */
+  // =========================================================================
+  // NMTR bar chart (kept for future use when marginal data exists)
+  // =========================================================================
+
   renderNMTRChart(baselineMarginal, reformMarginal, reformLabel) {
     if (!baselineMarginal) return;
 
@@ -232,9 +237,10 @@ class ChartManager {
     });
   }
 
-  /**
-   * Render a cohort line chart (replacement rate, PV benefits, ratio, or IRR)
-   */
+  // =========================================================================
+  // Cohort charts
+  // =========================================================================
+
   renderCohortChart(canvasId, { baselineData, reformData, reformLabel, field, yFormat, yLabel, annotation }) {
     if (!baselineData) return;
 
@@ -244,8 +250,8 @@ class ChartManager {
       borderColor: CHART_COLORS.baseline,
       backgroundColor: 'transparent',
       borderWidth: 2,
-      pointRadius: 2,
-      pointHoverRadius: 5,
+      pointRadius: 3,
+      pointHoverRadius: 6,
       tension: 0.2
     }];
 
@@ -256,8 +262,8 @@ class ChartManager {
         borderColor: CHART_COLORS.reform,
         backgroundColor: 'transparent',
         borderWidth: 2,
-        pointRadius: 2,
-        pointHoverRadius: 5,
+        pointRadius: 3,
+        pointHoverRadius: 6,
         tension: 0.2
       });
     }
@@ -273,13 +279,21 @@ class ChartManager {
   }
 
   /**
-   * Render all 4 cohort charts
+   * Render all cohort charts (5 charts: initial real benefit, replacement rate, PV, ratio, IRR)
    */
-  renderCohortCharts(baselineData, reformData, reformLabel, replRateField = 'repl_rate_pv') {
-    // Replacement Rate
+  renderCohortCharts(baselineData, reformData, reformLabel) {
+    // Initial Real Monthly Benefit
+    this.renderCohortChart('cohInitBenChart', {
+      baselineData, reformData, reformLabel,
+      field: 'initial_real_benefit',
+      yFormat: (v) => Fmt.currency(v),
+      yLabel: 'Initial Monthly Benefit (2025$)'
+    });
+
+    // Replacement Rate (hardcoded to real_all)
     this.renderCohortChart('cohReplChart', {
       baselineData, reformData, reformLabel,
-      field: replRateField,
+      field: 'repl_rate_real_all',
       yFormat: (v) => Fmt.percent(v, { isRatio: true }),
       yLabel: 'Replacement Rate (%)'
     });

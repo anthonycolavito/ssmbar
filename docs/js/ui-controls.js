@@ -21,7 +21,7 @@ function populateSelect(id, options, defaultValue) {
 }
 
 /**
- * Populate worker type dropdowns (shared between individual and cohort)
+ * Populate worker type dropdowns
  */
 function populateWorkerTypes(selectId, defaultValue = 'medium') {
   const types = [
@@ -30,12 +30,7 @@ function populateWorkerTypes(selectId, defaultValue = 'medium') {
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
     { value: 'max', label: 'Maximum' },
-    { value: 'custom_25k', label: '$25K Earner' },
-    { value: 'custom_50k', label: '$50K Earner' },
-    { value: 'custom_75k', label: '$75K Earner' },
-    { value: 'custom_100k', label: '$100K Earner' },
-    { value: 'custom_125k', label: '$125K Earner' },
-    { value: 'custom_150k', label: '$150K Earner' }
+    { value: 'custom_50k', label: '$50K Earner' }
   ];
   populateSelect(selectId, types, defaultValue);
 }
@@ -52,11 +47,11 @@ function populateClaimAges(selectId, defaultValue = 65) {
 }
 
 /**
- * Populate birth year dropdown
+ * Populate birth year dropdown (every 10th year)
  */
-function populateBirthYears(selectId, min = 1939, max = 2010, defaultValue = 1960) {
+function populateBirthYears(selectId, min = 1940, max = 2010, defaultValue = 1960) {
   const years = [];
-  for (let y = min; y <= max; y++) {
+  for (let y = min; y <= max; y += 10) {
     years.push({ value: String(y), label: String(y) });
   }
   populateSelect(selectId, years, String(defaultValue));
@@ -90,38 +85,68 @@ function toggleReformSection(headerEl) {
   }
 }
 
+// =============================================================================
+// Reform combo key builder
+// =============================================================================
+
+// Category order must match the data generation script
+const REFORM_RADIO_GROUPS = [
+  'reform_pia',
+  'reform_nra',
+  'reform_cola',
+  'reform_taxmax',
+  'reform_work',
+  'reform_enhance'
+];
+
 /**
- * Get currently selected reform (or null for baseline)
+ * Build combo key from the 6 radio button groups.
+ * Returns "baseline" if all are "none", otherwise joins active reform names with "+".
  */
-function getSelectedReform() {
-  const checked = document.querySelector('input[name="reform"]:checked');
-  return checked ? checked.value : null;
+function getComboKey() {
+  const active = [];
+  for (const groupName of REFORM_RADIO_GROUPS) {
+    const checked = document.querySelector(`input[name="${groupName}"]:checked`);
+    if (checked && checked.value !== 'none') {
+      active.push(checked.value);
+    }
+  }
+  return active.length === 0 ? 'baseline' : active.join('+');
 }
 
 /**
- * Clear reform selection
+ * Check if any reform is selected (non-baseline)
+ */
+function hasReformSelected() {
+  return getComboKey() !== 'baseline';
+}
+
+/**
+ * Clear all reform selections (reset to "none")
  */
 function clearReform() {
-  const checked = document.querySelector('input[name="reform"]:checked');
-  if (checked) checked.checked = false;
-  updateReformBadge(null);
+  for (const groupName of REFORM_RADIO_GROUPS) {
+    const noneRadio = document.querySelector(`input[name="${groupName}"][value="none"]`);
+    if (noneRadio) noneRadio.checked = true;
+  }
+  updateReformBadge();
   onInputChange();
 }
 
 /**
  * Update the reform badge display
  */
-function updateReformBadge(reformName) {
+function updateReformBadge() {
   const badge = document.getElementById('selectedReformBadge');
   const noBadge = document.getElementById('noReformBadge');
   const nameEl = document.getElementById('selectedReformName');
 
-  if (reformName) {
+  const comboKey = getComboKey();
+
+  if (comboKey !== 'baseline') {
     badge.style.display = 'block';
     noBadge.style.display = 'none';
-    // Get human-readable label
-    const label = dataLoader.getReformLabel(reformName);
-    nameEl.textContent = label;
+    nameEl.textContent = dataLoader.getReformLabel(comboKey);
   } else {
     badge.style.display = 'none';
     noBadge.style.display = 'block';
@@ -136,19 +161,12 @@ function updateReformBadge(reformName) {
  * Switch between Individual and Cohort tabs
  */
 function switchTab(tabName) {
-  // Update tab buttons
   document.querySelectorAll('#mainTabs .nav-link').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
-
-  // Update tab panes
   document.getElementById('individualPane').classList.toggle('active', tabName === 'individual');
   document.getElementById('cohortPane').classList.toggle('active', tabName === 'cohort');
-
-  // Update URL hash
   window.location.hash = tabName;
-
-  // Trigger data load for the active tab
   onInputChange();
 }
 
@@ -174,36 +192,10 @@ let currentBenefitView = 'nominal';
 
 function toggleBenefitView(mode, btnEl) {
   currentBenefitView = mode;
-  // Update button state
   btnEl.closest('.toggle-group').querySelectorAll('button').forEach(b => {
     b.classList.toggle('active', b.dataset.toggle === mode);
   });
-  // Re-render benefits chart
   renderIndividualBenefitsChart();
-}
-
-// =============================================================================
-// Range slider (cohort birth year range)
-// =============================================================================
-
-function updateRangeSlider() {
-  const minSlider = document.getElementById('cohBirthYearMin');
-  const maxSlider = document.getElementById('cohBirthYearMax');
-  let minVal = parseInt(minSlider.value);
-  let maxVal = parseInt(maxSlider.value);
-
-  // Ensure min <= max
-  if (minVal > maxVal) {
-    minSlider.value = maxVal;
-    minVal = maxVal;
-  }
-
-  document.getElementById('cohBirthYearMinLabel').textContent = minVal;
-  document.getElementById('cohBirthYearMaxLabel').textContent = maxVal;
-
-  // Debounce chart update
-  clearTimeout(updateRangeSlider._timer);
-  updateRangeSlider._timer = setTimeout(() => onInputChange(), 200);
 }
 
 // =============================================================================

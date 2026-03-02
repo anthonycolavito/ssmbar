@@ -173,12 +173,11 @@ class TableManager {
     const columns = [
       { key: 'age', label: 'Age' },
       { key: 'nominal_base', label: 'Nominal (Base)', format: v => Fmt.currency(v) },
-      { key: 'real_base', label: 'Real (Base)', format: v => Fmt.currency(v) },
-      { key: 'bc', label: 'Class' }
+      { key: 'real_base', label: 'Real (Base)', format: v => Fmt.currency(v) }
     ];
 
     if (reformSeries) {
-      columns.splice(3, 0,
+      columns.push(
         { key: 'nominal_reform', label: `Nominal (${reformLabel})`, format: v => Fmt.currency(v) },
         { key: 'real_reform', label: `Real (${reformLabel})`, format: v => Fmt.currency(v) }
       );
@@ -188,8 +187,7 @@ class TableManager {
       const row = {
         age,
         nominal_base: baselineSeries.nominal[i],
-        real_base: baselineSeries.real[i],
-        bc: baselineSeries.bc[i]
+        real_base: baselineSeries.real[i]
       };
       if (reformSeries) {
         row.nominal_reform = reformSeries.nominal?.[i];

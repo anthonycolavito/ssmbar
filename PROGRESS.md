@@ -16,17 +16,63 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: February 28, 2026
+**Last Updated**: March 1, 2026
 
-**Active Work**: Static GitHub Pages Benefit Explorer
+**Active Work**: Static GitHub Pages Benefit Explorer — 3,072 reform combination rebuild
 
-**Blocked On**: Nothing — site live at https://anthonycolavito.github.io/ssmbar/
+**Blocked On**: Nothing
 
 ---
 
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 1, 2026 (Session 18) — Reform Combination Rebuild
+
+**Task**: Rebuild the static site to support 3,072 reform combinations (6 independent categories with 3-4 options each) instead of the previous 22 mutually-exclusive reform scenarios. Simplify to unisex mortality, single replacement rate type, and fewer worker types.
+
+**Key Discovery**: The `sex="all"` parameter in `earnings_generator()` already averages male/female life expectancies internally, eliminating the need to run male+female separately and average. This halved computation from ~294K to ~147K calculations.
+
+**Data Generation Script** (`scripts/generate_combo_data.R`):
+- 6 reform categories: PIA (4), NRA (4), COLA (4), Tax Max (4), Work Incentives (4), Enhancements (3)
+- `expand.grid()` produces 3,072 combinations (including baseline = all "none")
+- Combo key: non-"none" reform names joined with "+" in category order (e.g., `nra_to_68+chained_cpi`)
+- 6 worker types × 3,072 combos × 8 birth years = 147,456 calculations
+- Parallelized with `mclapply()` across 6 cores (one per worker type)
+- Output: 12 files total — `cohort/{type}_65.json` (~2.1MB each) + `individual/{type}_65_benefits.json` (~9MB each)
+- Completed in 281 minutes (~4.7 hours) with only 1 error out of 147,456 calculations
+- Spot-checked baseline and reform values against fresh R calculations — exact match
+
+**Site UI Rebuild**:
+- Sidebar: 6 independent radio button groups (one per reform category) replacing single 22-option list
+- Removed: sex dropdowns, replacement rate dropdown, birth year range slider, obsolete reform options (benefit_cut_5, benefit_cut_10, phase_out_spousal, widow_75_pct, simpson_bowles_combo)
+- Renamed: "Other Reforms" → "Improve Work Incentives"
+- Added: Initial Real Monthly Benefit chart to cohort tab, Replacement Rate metric card to individual tab
+- Benefits chart clips at death age
+- NMTR chart hidden but preserved in HTML for future use
+- Hardcoded replacement rate to `real_all` (average of all real earnings)
+- Cohort tab shows all 8 birth years (1940-2010, every 10th year)
+
+**Files Created**:
+- `scripts/generate_combo_data.R` — New data generation script for 3,072 combos
+- `docs/data/cohort/{type}_65.json` (6 files) — Cohort metrics per combo per birth year
+- `docs/data/individual/{type}_65_benefits.json` (6 files) — By-age benefit series
+
+**Files Modified**:
+- `docs/data/manifest.json` — Updated reform_labels, reform_categories, removed sex dimension
+- `docs/index.html` — 6 radio groups, removed sex/repl dropdowns, added cohort chart
+- `docs/js/data-loader.js` — Simplified paths (no sex), new combo key lookup
+- `docs/js/chart-manager.js` — Death age clipping, 5 cohort charts, point sizing
+- `docs/js/table-manager.js` — Removed bc column
+- `docs/js/ui-controls.js` — 6 radio groups, getComboKey(), clearReform()
+- `docs/js/app.js` — Rewired for combo system, death age clipping, repl_rate metric
+
+**Files Removed**: 145 old sex-specific data files (49 cohort + 96 individual)
+
+**Worker Types**: very_low, low, medium, high, max, custom_50k (removed custom_25k/75k/100k/125k/150k)
+
+**Validation**: Spot-checked medium baseline (1960) and high reform (1980, nra_to_68+chained_cpi) — all values match fresh R calculations exactly.
 
 ### February 28, 2026 (Session 16) — Static GitHub Pages Benefit Explorer
 

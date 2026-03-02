@@ -22,44 +22,21 @@ class DataLoader {
       return this.manifest;
     } catch (err) {
       console.error('DataLoader init failed:', err);
-      // Return a minimal manifest so the app can still render UI
-      this.manifest = { dimensions: {}, reform_scenarios: {}, reform_categories: {} };
+      this.manifest = { dimensions: {}, reform_labels: {}, reform_categories: {} };
       return this.manifest;
     }
-  }
-
-  /**
-   * Build config key from worker type and custom earnings
-   */
-  configKey(workerType, customEarnings) {
-    if (workerType === 'custom' && customEarnings) {
-      return `custom_${customEarnings / 1000}k`;
-    }
-    return workerType;
-  }
-
-  /**
-   * Build file key for cache lookup
-   */
-  _fileKey(category, type, sex, claimAge, suffix = '') {
-    return `${category}/${type}_${sex}_${claimAge}${suffix}`;
   }
 
   /**
    * Fetch a JSON file with caching and request deduplication
    */
   async _fetch(path) {
-    // Check cache
     if (this.cache.has(path)) {
       return this.cache.get(path);
     }
-
-    // Check if already fetching (dedup)
     if (this.pending.has(path)) {
       return this.pending.get(path);
     }
-
-    // Fetch
     const promise = fetch(`${this.basePath}/${path}`)
       .then(resp => {
         if (!resp.ok) throw new Error(`${path}: ${resp.status}`);
@@ -75,7 +52,6 @@ class DataLoader {
         console.warn(`DataLoader: failed to fetch ${path}:`, err.message);
         return null;
       });
-
     this.pending.set(path, promise);
     return promise;
   }
@@ -85,7 +61,6 @@ class DataLoader {
    */
   _cacheSet(key, value) {
     if (this.cache.size >= this.maxCacheSize) {
-      // Evict oldest entry
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
     }
@@ -97,35 +72,24 @@ class DataLoader {
   // =========================================================================
 
   /**
-   * Get cohort data for a config key
+   * Get cohort data (also serves individual metrics)
    */
-  async getCohortData(type, sex, claimAge) {
-    const path = `cohort/${type}_${sex}_${claimAge}.json`;
-    return this._fetch(path);
-  }
-
-  /**
-   * Get individual metrics (scalar summaries per birth year)
-   */
-  async getIndividualMetrics(type, sex, claimAge) {
-    const path = `individual/${type}_${sex}_${claimAge}_metrics.json`;
-    return this._fetch(path);
+  async getCohortData(type) {
+    return this._fetch(`cohort/${type}_65.json`);
   }
 
   /**
    * Get individual benefit series (yearly benefits per birth year)
    */
-  async getIndividualBenefits(type, sex, claimAge) {
-    const path = `individual/${type}_${sex}_${claimAge}_benefits.json`;
-    return this._fetch(path);
+  async getIndividualBenefits(type) {
+    return this._fetch(`individual/${type}_65_benefits.json`);
   }
 
   /**
-   * Get individual marginal analysis data
+   * Get individual marginal analysis data (stub — returns null until NMTR data exists)
    */
-  async getIndividualMarginal(type, sex, claimAge) {
-    const path = `individual/${type}_${sex}_${claimAge}_marginal.json`;
-    return this._fetch(path);
+  async getIndividualMarginal(type) {
+    return null;
   }
 
   // =========================================================================
@@ -133,11 +97,11 @@ class DataLoader {
   // =========================================================================
 
   /**
-   * Extract a single birth year's data from an individual metrics file
+   * Extract a single birth year's metrics from cohort data
    */
-  getMetricsForBirthYear(metricsData, scenario, birthYear) {
-    if (!metricsData?.data?.[scenario]) return null;
-    const d = metricsData.data[scenario];
+  getMetricsForBirthYear(cohortData, comboKey, birthYear) {
+    if (!cohortData?.data?.[comboKey]) return null;
+    const d = cohortData.data[comboKey];
     const idx = d.birth_years.indexOf(birthYear);
     if (idx === -1) return null;
     return {
@@ -145,54 +109,37 @@ class DataLoader {
       pv_benefits: d.pv_benefits[idx],
       pv_taxes: d.pv_taxes[idx],
       ratio: d.ratio[idx],
-      irr: d.irr[idx]
+      irr: d.irr[idx],
+      repl_rate: d.repl_rate_real_all?.[idx],
+      death_age: d.death_age?.[idx]
     };
   }
 
   /**
    * Extract benefit series for a specific birth year
    */
-  getBenefitSeries(benefitsData, scenario, birthYear) {
-    if (!benefitsData?.data?.[scenario]) return null;
-    return benefitsData.data[scenario][String(birthYear)] || null;
+  getBenefitSeries(benefitsData, comboKey, birthYear) {
+    if (!benefitsData?.data?.[comboKey]) return null;
+    return benefitsData.data[comboKey][String(birthYear)] || null;
   }
 
   /**
-   * Extract marginal data for a specific birth year
+   * Extract marginal data for a specific birth year (stub)
    */
-  getMarginalData(marginalData, scenario, birthYear) {
-    if (!marginalData?.data?.[scenario]) return null;
-    return marginalData.data[scenario][String(birthYear)] || null;
+  getMarginalData(marginalData, comboKey, birthYear) {
+    return null;
   }
 
   /**
-   * Extract cohort arrays for a scenario, optionally filtered by birth year range
+   * Extract cohort arrays for a combo key
    */
-  getCohortSeries(cohortData, scenario, minYear = null, maxYear = null) {
-    if (!cohortData?.data?.[scenario]) return null;
-    const d = cohortData.data[scenario];
-
-    if (minYear == null && maxYear == null) return d;
-
-    // Filter by range
-    const startIdx = minYear ? d.birth_years.indexOf(minYear) : 0;
-    const endIdx = maxYear ? d.birth_years.indexOf(maxYear) + 1 : d.birth_years.length;
-
-    if (startIdx === -1 || endIdx === 0) return d;
-
-    const result = {};
-    for (const key of Object.keys(d)) {
-      if (Array.isArray(d[key])) {
-        result[key] = d[key].slice(startIdx, endIdx);
-      } else {
-        result[key] = d[key];
-      }
-    }
-    return result;
+  getCohortSeries(cohortData, comboKey) {
+    if (!cohortData?.data?.[comboKey]) return null;
+    return cohortData.data[comboKey];
   }
 
   /**
-   * Get available scenarios from loaded data
+   * Get available combo keys from loaded data
    */
   getScenarios(data) {
     if (!data?.data) return [];
@@ -200,11 +147,17 @@ class DataLoader {
   }
 
   /**
-   * Get reform label from manifest
+   * Get human-readable label for a combo key
    */
-  getReformLabel(scenarioName) {
-    if (!this.manifest?.reform_scenarios?.[scenarioName]) return scenarioName;
-    return this.manifest.reform_scenarios[scenarioName].label;
+  getReformLabel(comboKey) {
+    if (!comboKey || comboKey === 'baseline') return 'Current Law';
+
+    const labels = this.manifest?.reform_labels || {};
+    const parts = comboKey.split('+');
+
+    // Map each reform to its label, fall back to the key itself
+    const partLabels = parts.map(p => labels[p] || p);
+    return partLabels.join(' + ');
   }
 }
 
