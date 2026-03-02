@@ -6,434 +6,263 @@
   <title>Social Security Benefit Explorer | CRFB</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
 
 <!-- Navbar -->
 <nav class="navbar navbar-dark">
-  <div class="container-fluid">
-    <div class="d-flex align-items-center">
-      <button class="btn btn-sm btn-outline-secondary me-2 sidebar-toggle" onclick="toggleSidebar()">
-        <i class="bi bi-list"></i>
-      </button>
-      <a class="navbar-brand" href="#">Social Security Benefit Explorer</a>
-    </div>
-    <div class="d-flex align-items-center">
-      <ul class="nav nav-tabs border-0 mb-0" id="mainTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="individual-tab" data-tab="individual" onclick="switchTab('individual')">
-            <i class="bi bi-person me-1"></i>Individual Worker
-          </button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="cohort-tab" data-tab="cohort" onclick="switchTab('cohort')">
-            <i class="bi bi-people me-1"></i>Cohort Comparison
-          </button>
-        </li>
-      </ul>
-      <span class="text-muted ms-3" style="font-size: 0.72rem;">ssmbar | 2025 Trustees Report</span>
-    </div>
+  <div class="container-fluid d-flex justify-content-between align-items-center">
+    <a class="navbar-brand" href="#">Social Security Benefit Explorer</a>
+    <span class="navbar-attr">ssmbar | 2025 Trustees Report</span>
   </div>
 </nav>
 
-<!-- Sidebar overlay (mobile) -->
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
 <div class="app-container">
 
-  <!-- Sidebar: Reform Selector -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-title"><i class="bi bi-sliders me-1"></i> Reform Options</div>
-    <div class="sidebar-subtitle" style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 0.5rem;">
-      <i class="bi bi-lock me-1"></i>Reform comparisons coming soon
+  <!-- Sidebar: Collapsed Reform Strip -->
+  <aside class="sidebar-strip" id="sidebarStrip" title="14 reform options coming soon">
+    <div class="strip-lock">
+      <i class="bi bi-lock"></i>
+      <span class="strip-badge">14</span>
     </div>
-
-    <!-- PIA Formula -->
-    <div class="reform-section disabled" data-section="pia_formula">
-      <div class="reform-section-header" onclick="toggleReformSection(this)">
-        <i class="bi bi-calculator section-icon"></i>
-        <span class="section-label">Slow Initial Benefit Growth</span>
-        <i class="bi bi-chevron-down chevron"></i>
-      </div>
-      <div class="reform-options">
-        <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_reduce_fact3" value="reduce_fact3" disabled>
-          <label for="reform_reduce_fact3">Slow Benefit Growth for Top 20% of Earners</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_flat_benefit" value="flat_benefit" disabled>
-          <label for="reform_flat_benefit">Transition to a Flat Benefit</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_simpson_bowles_pia" value="simpson_bowles_pia" disabled>
-          <label for="reform_simpson_bowles_pia">Slow Benefit Growth for Top Half of Earners</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- NRA Changes -->
-    <div class="reform-section disabled" data-section="nra">
-      <div class="reform-section-header" onclick="toggleReformSection(this)">
-        <i class="bi bi-clock section-icon"></i>
-        <span class="section-label">Increase Retirement Age</span>
-        <i class="bi bi-chevron-down chevron"></i>
-      </div>
-      <div class="reform-options">
-        <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_nra_to_68" value="nra_to_68" disabled>
-          <label for="reform_nra_to_68">Raise NRA to 68</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_index_nra" value="index_nra" disabled>
-          <label for="reform_index_nra">Index NRA to Longevity</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_nra_to_69_index" value="nra_to_69_index" disabled>
-          <label for="reform_nra_to_69_index">NRA to 69, then Index</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- COLA Indexing -->
-    <div class="reform-section disabled" data-section="cola">
-      <div class="reform-section-header" onclick="toggleReformSection(this)">
-        <i class="bi bi-graph-up section-icon"></i>
-        <span class="section-label">Modify COLAs</span>
-        <i class="bi bi-chevron-down chevron"></i>
-      </div>
-      <div class="reform-options">
-        <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_chained_cpi" value="chained_cpi" disabled>
-          <label for="reform_chained_cpi">Index COLAs to "Chained CPI"</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_cola_cap" value="cola_cap" disabled>
-          <label for="reform_cola_cap">Cap COLAs for Top Half of Beneficiaries</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_cpi_e" value="cpi_e" disabled>
-          <label for="reform_cpi_e">Index COLAs to "CPI-E"</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tax Max -->
-    <div class="reform-section disabled" data-section="taxmax">
-      <div class="reform-section-header" onclick="toggleReformSection(this)">
-        <i class="bi bi-cash-stack section-icon"></i>
-        <span class="section-label">Increase Taxable Maximum</span>
-        <i class="bi bi-chevron-down chevron"></i>
-      </div>
-      <div class="reform-options">
-        <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_taxmax_90_pct" value="taxmax_90_pct" disabled>
-          <label for="reform_taxmax_90_pct">Raise Tax Max to Cover 90% of Wages</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax" value="eliminate_taxmax" disabled>
-          <label for="reform_eliminate_taxmax">Eliminate Tax Max with Benefit Credit</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax_no_credit" value="eliminate_taxmax_no_credit" disabled>
-          <label for="reform_eliminate_taxmax_no_credit">Eliminate Tax Max without Benefit Credit</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Other Reforms -->
-    <div class="reform-section disabled" data-section="other">
-      <div class="reform-section-header" onclick="toggleReformSection(this)">
-        <i class="bi bi-gear section-icon"></i>
-        <span class="section-label">Other Reforms</span>
-        <i class="bi bi-chevron-down chevron"></i>
-      </div>
-      <div class="reform-options">
-        <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_forty_year_avg" value="forty_year_avg" disabled>
-          <label for="reform_forty_year_avg">Calculate Benefits Based on Highest 40 Years</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_mini_pia" value="mini_pia" disabled>
-          <label for="reform_mini_pia">Apply Benefit Formula to Annual Earnings</label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Clear button -->
-    <button class="btn btn-outline-secondary btn-sm reform-clear-btn" onclick="clearReform()" disabled>
-      <i class="bi bi-x-lg me-1"></i>Clear All Selections
-    </button>
-
-    <div class="selected-reform-badge" id="selectedReformBadge" style="display:none">
-      <div class="badge-label"><i class="bi bi-check-circle me-1"></i>Comparing to:</div>
-      <div class="badge-name" id="selectedReformName"></div>
-    </div>
-
-    <div class="selected-reform-badge" id="noReformBadge">
-      <div class="badge-name text-muted-custom" style="font-size:0.75rem; text-align:center;">
-        Showing current-law baseline only
-      </div>
-    </div>
-
-    <div class="mt-3" style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.5;">
-      <p><i class="bi bi-info-circle me-1"></i>Reform options are visible but disabled. Reform comparisons will be enabled in a future update.</p>
-    </div>
+    <div class="strip-icon" title="Slow Initial Benefit Growth"><i class="bi bi-calculator"></i></div>
+    <div class="strip-icon" title="Increase Retirement Age"><i class="bi bi-clock"></i></div>
+    <div class="strip-icon" title="Modify COLAs"><i class="bi bi-graph-up"></i></div>
+    <div class="strip-icon" title="Increase Taxable Maximum"><i class="bi bi-cash-stack"></i></div>
+    <div class="strip-icon" title="Other Reforms"><i class="bi bi-gear"></i></div>
+    <div class="strip-label">Reforms</div>
   </aside>
 
   <!-- Main Content -->
   <main class="main-content">
 
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <p class="hero-sentence">
+        A <select id="heroWorkerType" class="inline-select">
+          <option value="very_low">very low</option>
+          <option value="low">low</option>
+          <option value="medium" selected>medium</option>
+          <option value="high">high</option>
+          <option value="max">maximum</option>
+          <option value="custom_50k">$50K</option>
+        </select> earner born in
+        <select id="heroBirthYear" class="inline-select">
+          <option value="1940">1940</option>
+          <option value="1950">1950</option>
+          <option value="1960" selected>1960</option>
+          <option value="1970">1970</option>
+          <option value="1980">1980</option>
+          <option value="1990">1990</option>
+          <option value="2000">2000</option>
+          <option value="2010">2010</option>
+        </select> can expect:
+      </p>
+
+      <div class="hero-number">
+        $<span id="heroNominalBenefit">--</span><span class="hero-unit">/month</span>
+      </div>
+      <div class="hero-real-benefit" id="heroRealBenefit"></div>
+      <div class="hero-replacement" id="heroReplacement"></div>
+
+      <div class="hero-customize">
+        <span class="customize-label">Customize:</span>
+        <select id="heroSex" class="inline-select-sm">
+          <option value="unisex" selected>Unisex</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <select id="heroMarital" class="inline-select-sm">
+          <option value="single" selected>Single</option>
+          <option value="married">Married</option>
+        </select>
+      </div>
+
+      <!-- Tab bar below hero -->
+      <div class="hero-tabs" id="mainTabs">
+        <button class="hero-tab active" data-tab="individual" onclick="switchTab('individual')">
+          <i class="bi bi-person me-1"></i>Your Benefits
+        </button>
+        <button class="hero-tab" data-tab="cohort" onclick="switchTab('cohort')">
+          <i class="bi bi-people me-1"></i>Across Generations
+        </button>
+      </div>
+    </section>
+
     <!-- ===== Individual Worker Tab ===== -->
     <div class="tab-pane active" id="individualPane">
 
-      <!-- Worker Configuration -->
-      <div class="card">
-        <div class="card-header bg-primary">Worker Configuration</div>
-        <div class="card-body">
-          <div class="input-row">
-            <div class="input-group-inline">
-              <label class="form-label" for="indWorkerType">Worker Type</label>
-              <select class="form-select" id="indWorkerType"></select>
-            </div>
-            <div class="input-group-inline">
-              <label class="form-label" for="indBirthYear">Birth Year</label>
-              <select class="form-select" id="indBirthYear"></select>
-            </div>
-            <div class="input-group-inline">
-              <label class="form-label">Sex</label>
-              <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="indSex" value="male" checked> Male</label>
-                <label class="radio-label"><input type="radio" name="indSex" value="female"> Female</label>
-              </div>
-            </div>
-            <div class="input-group-inline">
-              <label class="form-label">Marital Status</label>
-              <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="indMarital" value="single" checked> Single</label>
-                <label class="radio-label"><input type="radio" name="indMarital" value="married"> Married</label>
-              </div>
+      <!-- Section 1: Your Benefit -->
+      <section class="narrative-section" style="margin-top: 1.5rem;">
+        <h2 class="section-title">Your Benefit</h2>
+        <p class="section-subtitle">
+          Annual Social Security retirement benefits from age 65 to expected death
+        </p>
+
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Annual Benefits by Age</span>
+            <div class="toggle-group">
+              <button data-toggle="nominal" onclick="toggleBenefitView('nominal', this)">Nominal $</button>
+              <button class="active" data-toggle="real" onclick="toggleBenefitView('real', this)">Today's $</button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Annual Benefits Chart -->
-      <div class="row g-3">
-        <div class="col-12">
-          <div class="card">
-            <div class="card-header bg-info d-flex justify-content-between align-items-center">
-              <span>Annual Benefits by Age</span>
-              <div class="toggle-group">
-                <button data-toggle="nominal" onclick="toggleBenefitView('nominal', this)">Nominal</button>
-                <button class="active" data-toggle="real" onclick="toggleBenefitView('real', this)">Real</button>
-              </div>
-            </div>
-            <div class="card-body p-2">
-              <div class="chart-container" id="benefitsChartContainer">
-                <canvas id="benefitsChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- NMTR Chart -->
-      <div class="row g-3" id="nmtrRow">
-        <div class="col-12">
-          <div class="card">
-            <div class="card-header bg-info">Net Marginal Tax Rate by Age</div>
-            <div class="card-body p-2">
-              <div class="chart-container" id="nmtrChartContainer">
-                <canvas id="nmtrChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Metric Cards Row 1 -->
-      <div class="row g-3 mt-0">
-        <div class="col-md-3"><div class="metric-card" id="metricMonthlyBenefit">
-          <div class="metric-label">Monthly Benefit</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="metricPVBenefits">
-          <div class="metric-label">PV Lifetime Benefits</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="metricPVTaxes">
-          <div class="metric-label">PV Lifetime Taxes</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="metricRatio">
-          <div class="metric-label">Benefit-Tax Ratio</div>
-          <div class="metric-value">--</div>
-        </div></div>
-      </div>
-
-      <!-- Metric Cards Row 2 -->
-      <div class="row g-3 mt-0">
-        <div class="col-md-4"><div class="metric-card" id="metricIRR">
-          <div class="metric-label">Internal Rate of Return</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-4"><div class="metric-card" id="metricReplRate">
-          <div class="metric-label">Replacement Rate</div>
-          <div class="metric-value">--</div>
-        </div></div>
-      </div>
-
-      <!-- Benefits Data Table -->
-      <div class="card mt-3">
-        <div class="collapsible-header" onclick="toggleSection('indBenefitsTable')">
-          <span><i class="bi bi-table me-2"></i>Benefits Data Table</span>
-          <div>
-            <button class="btn btn-outline-secondary btn-sm me-2" onclick="event.stopPropagation(); exportCSV('benefits')">
-              <i class="bi bi-download me-1"></i>CSV
-            </button>
-            <i class="bi bi-chevron-down" id="indBenefitsTableChevron"></i>
-          </div>
-        </div>
-        <div class="collapsible-body collapsed" id="indBenefitsTable">
           <div class="card-body p-2">
-            <div class="data-table-wrapper" id="benefitsTableWrapper"></div>
+            <div class="chart-container" id="benefitsChartContainer">
+              <canvas id="benefitsChart"></canvas>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- Section 2: Your Return on Taxes Paid -->
+      <section class="narrative-section">
+        <h2 class="section-title">Your Return on Taxes Paid</h2>
+        <p class="section-subtitle">
+          How lifetime Social Security benefits compare to lifetime taxes
+        </p>
+
+        <div class="return-summary">
+          <div class="return-ratio">
+            <div class="return-ratio-label">For every $1 in Social Security taxes, you get back</div>
+            <div class="return-ratio-value">$<span id="ratioValue">--</span></div>
+            <div class="return-ratio-sublabel">in lifetime benefits</div>
+          </div>
+
+          <div class="return-details">
+            <div class="return-detail-row">
+              <span class="detail-label">Lifetime Benefits</span>
+              <span class="detail-value" id="pvBenefitsValue">--</span>
+            </div>
+            <div class="return-detail-row">
+              <span class="detail-label">Lifetime Taxes Paid</span>
+              <span class="detail-value" id="pvTaxesValue">--</span>
+            </div>
+            <div class="return-detail-row muted">
+              <span class="detail-label">Effective Rate of Return</span>
+              <span class="detail-value" id="irrValue">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-callout" id="sexInsight" style="display: none;">
+          Women receive the same monthly benefit but collect more over a lifetime
+          due to longer life expectancy.
+          <a href="#" onclick="document.getElementById('heroSex').value='female'; onHeroChange(); return false;">See the difference</a>
+        </div>
+      </section>
+
+      <!-- Section 3: How Your Taxes Work (NMTR) -->
+      <section class="narrative-section" id="nmtrSection">
+        <h2 class="section-title">How Your Social Security Taxes Actually Work</h2>
+        <p class="section-subtitle">
+          Each year you work, your Social Security taxes buy you future retirement
+          benefits. This chart shows how much of each year's taxes are offset by the
+          additional benefits you earn.
+        </p>
+
+        <div class="card">
+          <div class="card-body p-2">
+            <div class="chart-container" id="nmtrChartContainer">
+              <canvas id="nmtrChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-callout" id="nmtrInsight"></div>
+      </section>
+
+      <!-- Section 4: Detailed Data -->
+      <section class="narrative-section">
+        <div class="card">
+          <div class="collapsible-header" onclick="toggleSection('indDataTable')">
+            <span><i class="bi bi-table me-2"></i>Detailed Data Table</span>
+            <div>
+              <button class="btn-outline-sm me-2" onclick="event.stopPropagation(); exportCSV('benefits')">
+                <i class="bi bi-download me-1"></i>Download CSV
+              </button>
+              <i class="bi bi-chevron-down" id="indDataTableChevron"></i>
+            </div>
+          </div>
+          <div class="collapsible-body collapsed" id="indDataTable">
+            <div class="card-body p-2">
+              <div class="data-table-wrapper" id="benefitsTableWrapper"></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Notes -->
-      <div class="card mt-2">
-        <div class="card-body notes-panel">
-          <strong>Notes: </strong>
-          All values under current law. Sex affects life expectancy (mortality tables from 2025 Trustees Report).
-          PV values discounted to age 65, including employer share of payroll taxes.
-          Married workers assume spouse is the same earner type, opposite sex, same birth year, claiming at 65.
-        </div>
+      <div class="notes-panel">
+        <strong>Notes: </strong>
+        All calculations under current law using 2025 Trustees Report assumptions.
+        Benefits assume claiming at age 65. Present values discounted at the Trustees'
+        real interest rate. Lifetime taxes include both employee and employer shares of
+        the payroll tax. Unisex figures average male and female mortality from the
+        Trustees' intermediate assumptions.
       </div>
     </div>
 
     <!-- ===== Cohort Comparison Tab ===== -->
     <div class="tab-pane" id="cohortPane">
 
-      <!-- Cohort Configuration -->
-      <div class="card">
-        <div class="card-header bg-primary">Cohort Configuration</div>
-        <div class="card-body">
-          <div class="input-row">
-            <div class="input-group-inline">
-              <label class="form-label" for="cohWorkerType">Worker Type</label>
-              <select class="form-select" id="cohWorkerType"></select>
-            </div>
-            <div class="input-group-inline">
-              <label class="form-label">Sex</label>
-              <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="cohSex" value="male" checked> Male</label>
-                <label class="radio-label"><input type="radio" name="cohSex" value="female"> Female</label>
-              </div>
-            </div>
-            <div class="input-group-inline">
-              <label class="form-label">Marital Status</label>
-              <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="cohMarital" value="single" checked> Single</label>
-                <label class="radio-label"><input type="radio" name="cohMarital" value="married"> Married</label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <section class="narrative-section" style="margin-top: 1.5rem;">
+        <h2 class="section-title" id="cohortTitle">
+          Each generation's return on Social Security taxes
+        </h2>
+        <p class="section-subtitle" id="cohortSubtitle">
+          A ratio above 1.0 means you receive more in benefits than you paid in taxes
+        </p>
 
-      <!-- Cohort Charts Grid -->
-      <div class="row g-3">
-        <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header bg-info">Initial Real Monthly Benefit by Birth Year</div>
-            <div class="card-body p-2">
-              <div class="chart-container"><canvas id="cohInitBenChart"></canvas></div>
-            </div>
-          </div>
+        <!-- Metric selector pills -->
+        <div class="metric-selector" id="cohortMetricSelector">
+          <button class="metric-btn active" data-metric="ratio" onclick="switchCohortMetric('ratio', this)">Benefit-Tax Ratio</button>
+          <button class="metric-btn" data-metric="initial_real_benefit" onclick="switchCohortMetric('initial_real_benefit', this)">Monthly Benefit</button>
+          <button class="metric-btn" data-metric="repl_rate" onclick="switchCohortMetric('repl_rate', this)">Replacement Rate</button>
+          <button class="metric-btn" data-metric="pv_benefits" onclick="switchCohortMetric('pv_benefits', this)">Lifetime Benefits</button>
+          <button class="metric-btn" data-metric="irr" onclick="switchCohortMetric('irr', this)">Rate of Return</button>
         </div>
-        <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header bg-info">Replacement Rate by Birth Year</div>
-            <div class="card-body p-2">
-              <div class="chart-container"><canvas id="cohReplChart"></canvas></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header bg-info">PV Lifetime Benefits by Birth Year</div>
-            <div class="card-body p-2">
-              <div class="chart-container"><canvas id="cohPVChart"></canvas></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header bg-info">Benefit-Tax Ratio by Birth Year</div>
-            <div class="card-body p-2">
-              <div class="chart-container"><canvas id="cohRatioChart"></canvas></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="card">
-            <div class="card-header bg-info">Internal Rate of Return by Birth Year</div>
-            <div class="card-body p-2">
-              <div class="chart-container"><canvas id="cohIRRChart"></canvas></div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Cohort Summary Cards -->
-      <div class="row g-3 mt-0">
-        <div class="col-md-3"><div class="metric-card" id="cohMetricRepl">
-          <div class="metric-label">Avg Replacement Rate</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="cohMetricPV">
-          <div class="metric-label">Avg PV Benefits</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="cohMetricRatio">
-          <div class="metric-label">Avg Benefit-Tax Ratio</div>
-          <div class="metric-value">--</div>
-        </div></div>
-        <div class="col-md-3"><div class="metric-card" id="cohMetricIRR">
-          <div class="metric-label">Avg IRR</div>
-          <div class="metric-value">--</div>
-        </div></div>
-      </div>
-
-      <!-- Cohort Data Table -->
-      <div class="card mt-3">
-        <div class="collapsible-header" onclick="toggleSection('cohDataTable')">
-          <span><i class="bi bi-table me-2"></i>Cohort Data Table</span>
-          <div>
-            <button class="btn btn-outline-secondary btn-sm me-2" onclick="event.stopPropagation(); exportCSV('cohort')">
-              <i class="bi bi-download me-1"></i>CSV
-            </button>
-            <i class="bi bi-chevron-down" id="cohDataTableChevron"></i>
-          </div>
-        </div>
-        <div class="collapsible-body collapsed" id="cohDataTable">
+        <!-- Single hero chart -->
+        <div class="card">
           <div class="card-body p-2">
-            <div class="data-table-wrapper" id="cohortTableWrapper"></div>
+            <div class="chart-container" style="height: 400px;">
+              <canvas id="cohortHeroChart"></canvas>
+            </div>
           </div>
         </div>
-      </div>
+
+        <!-- Summary stats -->
+        <div class="cohort-summary" id="cohortSummary"></div>
+
+        <!-- Data table (collapsed) -->
+        <div class="card mt-3">
+          <div class="collapsible-header" onclick="toggleSection('cohDataTable')">
+            <span><i class="bi bi-table me-2"></i>Detailed Data Table</span>
+            <div>
+              <button class="btn-outline-sm me-2" onclick="event.stopPropagation(); exportCSV('cohort')">
+                <i class="bi bi-download me-1"></i>Download CSV
+              </button>
+              <i class="bi bi-chevron-down" id="cohDataTableChevron"></i>
+            </div>
+          </div>
+          <div class="collapsible-body collapsed" id="cohDataTable">
+            <div class="card-body p-2">
+              <div class="data-table-wrapper" id="cohortTableWrapper"></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Notes -->
-      <div class="card mt-2">
-        <div class="card-body notes-panel">
-          <strong>Notes: </strong>
-          All metrics under current law for the selected worker type, sex, and marital status across birth years.
-          PV values discounted to age 65, including employer share of payroll taxes.
-          IRR = internal rate of return on lifetime SS taxes.
-        </div>
+      <div class="notes-panel">
+        <strong>Notes: </strong>
+        Each point represents a hypothetical worker with the selected earnings profile
+        who claims benefits at age 65. Benefit-tax ratio compares the present value of
+        lifetime benefits to lifetime taxes (including employer share), both discounted
+        to age 65. All dollar amounts in 2025 constant dollars.
       </div>
     </div>
 

@@ -1,133 +1,44 @@
 // =============================================================================
-// UI Controls — Dropdown population, sidebar, toggle, and event wiring
+// UI Controls — Hero controls, tab switching, collapsible sections
 // =============================================================================
 
-function populateSelect(id, options, defaultValue) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.innerHTML = '';
-  for (const opt of options) {
-    const option = document.createElement('option');
-    option.value = opt.value;
-    option.textContent = opt.label;
-    if (opt.value === defaultValue || opt.value === String(defaultValue)) {
-      option.selected = true;
-    }
-    el.appendChild(option);
-  }
+// =========================================================================
+// Hero state getters
+// =========================================================================
+
+function getHeroWorkerType() {
+  return document.getElementById('heroWorkerType')?.value || 'medium';
 }
 
-function populateWorkerTypes(selectId, defaultValue = 'medium') {
-  const types = [
-    { value: 'very_low', label: 'Very Low' },
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'max', label: 'Maximum' },
-    { value: 'custom_50k', label: '$50K Earner' }
-  ];
-  populateSelect(selectId, types, defaultValue);
+function getHeroBirthYear() {
+  return parseInt(document.getElementById('heroBirthYear')?.value) || 1960;
 }
 
-function populateBirthYears(selectId, min = 1940, max = 2010, defaultValue = 1960) {
-  const years = [];
-  for (let y = min; y <= max; y += 10) {
-    years.push({ value: String(y), label: String(y) });
-  }
-  populateSelect(selectId, years, String(defaultValue));
+function getHeroSex() {
+  return document.getElementById('heroSex')?.value || 'unisex';
 }
 
-// =============================================================================
-// Sidebar controls
-// =============================================================================
-
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('open');
+function getHeroMarital() {
+  return document.getElementById('heroMarital')?.value || 'single';
 }
 
-function toggleReformSection(headerEl) {
-  const section = headerEl.closest('.reform-section');
-  const options = section.querySelector('.reform-options');
-  section.classList.toggle('collapsed');
-  if (options.classList.contains('collapsed')) {
-    options.classList.remove('collapsed');
-  } else {
-    options.classList.add('collapsed');
-  }
-}
-
-// =============================================================================
-// Reform controls (all disabled for current-law mode)
-// =============================================================================
-
-function disableAllReforms() {
-  document.querySelectorAll('.reform-section input[type="radio"]').forEach(radio => {
-    radio.disabled = true;
-  });
-  document.querySelectorAll('.reform-section').forEach(section => {
-    section.classList.add('disabled');
-  });
-}
-
-function getComboKey() {
-  return 'baseline';
-}
-
-function hasReformSelected() {
-  return false;
-}
-
-function clearReform() {
-  // No-op in current-law mode
-}
-
-function updateReformBadge() {
-  const badge = document.getElementById('selectedReformBadge');
-  const noBadge = document.getElementById('noReformBadge');
-  if (badge) badge.style.display = 'none';
-  if (noBadge) noBadge.style.display = 'block';
-}
-
-// =============================================================================
-// Worker dimension state
-// =============================================================================
-
-function getIndSex() {
-  return document.querySelector('input[name="indSex"]:checked')?.value || 'male';
-}
-
-function getIndMarital() {
-  return document.querySelector('input[name="indMarital"]:checked')?.value || 'single';
-}
-
-function getCohSex() {
-  return document.querySelector('input[name="cohSex"]:checked')?.value || 'male';
-}
-
-function getCohMarital() {
-  return document.querySelector('input[name="cohMarital"]:checked')?.value || 'single';
-}
-
-// =============================================================================
+// =========================================================================
 // Tab switching
-// =============================================================================
+// =========================================================================
 
 function switchTab(tabName) {
-  document.querySelectorAll('#mainTabs .nav-link').forEach(btn => {
+  document.querySelectorAll('#mainTabs .hero-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
   document.getElementById('individualPane').classList.toggle('active', tabName === 'individual');
   document.getElementById('cohortPane').classList.toggle('active', tabName === 'cohort');
   window.location.hash = tabName;
-  onInputChange();
+  onHeroChange();
 }
 
-// =============================================================================
+// =========================================================================
 // Collapsible sections
-// =============================================================================
+// =========================================================================
 
 function toggleSection(sectionId) {
   const body = document.getElementById(sectionId);
@@ -139,9 +50,9 @@ function toggleSection(sectionId) {
   }
 }
 
-// =============================================================================
+// =========================================================================
 // Benefit view toggle (nominal/real) — default to real
-// =============================================================================
+// =========================================================================
 
 let currentBenefitView = 'real';
 
@@ -153,9 +64,57 @@ function toggleBenefitView(mode, btnEl) {
   renderIndividualBenefitsChart();
 }
 
-// =============================================================================
+// =========================================================================
+// Cohort metric switcher
+// =========================================================================
+
+let currentCohortMetric = 'ratio';
+
+const COHORT_NARRATIVES = {
+  ratio: {
+    title: "Each generation's return on Social Security taxes",
+    subtitle: 'A ratio above 1.0 means you receive more in benefits than you paid in taxes'
+  },
+  initial_real_benefit: {
+    title: 'How monthly benefits have grown across generations',
+    subtitle: 'Initial monthly benefit at age 65, in 2025 dollars'
+  },
+  repl_rate: {
+    title: 'What share of earnings Social Security replaces',
+    subtitle: 'Higher replacement rates mean Social Security covers more of your pre-retirement income'
+  },
+  pv_benefits: {
+    title: 'Total lifetime Social Security benefits by generation',
+    subtitle: 'Present value of all benefits from age 65 to expected death, discounted to age 65'
+  },
+  irr: {
+    title: 'The effective return on Social Security taxes',
+    subtitle: 'Internal rate of return treating SS taxes as contributions and benefits as payouts'
+  }
+};
+
+function switchCohortMetric(metric, btnEl) {
+  currentCohortMetric = metric;
+
+  // Update active pill
+  document.querySelectorAll('#cohortMetricSelector .metric-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.metric === metric);
+  });
+
+  // Update narrative text
+  const narrative = COHORT_NARRATIVES[metric] || COHORT_NARRATIVES.ratio;
+  const titleEl = document.getElementById('cohortTitle');
+  const subEl = document.getElementById('cohortSubtitle');
+  if (titleEl) titleEl.textContent = narrative.title;
+  if (subEl) subEl.textContent = narrative.subtitle;
+
+  // Re-render chart
+  renderCohortChart();
+}
+
+// =========================================================================
 // CSV Export
-// =============================================================================
+// =========================================================================
 
 function exportCSV(tableId) {
   const now = new Date().toISOString().slice(0, 10);

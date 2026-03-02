@@ -84,9 +84,6 @@ class DataLoader {
   // Data extraction helpers
   // =========================================================================
 
-  /**
-   * Extract metrics for a single birth year from cohort data
-   */
   getMetricsForBirthYear(cohortData, sex, marital, birthYear) {
     const key = this.dimKey(sex, marital);
     const d = cohortData?.data?.[key];
@@ -108,33 +105,63 @@ class DataLoader {
     };
   }
 
-  /**
-   * Extract benefit series for a specific birth year
-   */
   getBenefitSeries(benefitsData, sex, marital, birthYear) {
     const key = this.dimKey(sex, marital);
     return benefitsData?.data?.[key]?.[String(birthYear)] || null;
   }
 
-  /**
-   * Extract NMTR series for a specific birth year
-   */
   getNMTRSeries(nmtrData, sex, marital, birthYear) {
     const key = this.dimKey(sex, marital);
     return nmtrData?.data?.[key]?.[String(birthYear)] || null;
   }
 
-  /**
-   * Extract cohort-level arrays (all birth years) for charts
-   */
   getCohortSeries(cohortData, sex, marital) {
     const key = this.dimKey(sex, marital);
     return cohortData?.data?.[key] || null;
   }
 
-  /**
-   * Get human-readable reform label
-   */
+  // =========================================================================
+  // Unisex computation — average male and female values
+  // =========================================================================
+
+  getUnisexMetrics(cohortData, marital, birthYear) {
+    const maleData = this.getMetricsForBirthYear(cohortData, 'male', marital, birthYear);
+    const femaleData = this.getMetricsForBirthYear(cohortData, 'female', marital, birthYear);
+    if (!maleData || !femaleData) return maleData || femaleData;
+
+    return {
+      monthly_benefit: maleData.monthly_benefit,
+      initial_real_benefit: maleData.initial_real_benefit,
+      repl_rate: maleData.repl_rate,
+      pv_benefits: (maleData.pv_benefits + femaleData.pv_benefits) / 2,
+      pv_taxes: maleData.pv_taxes,
+      ratio: (maleData.ratio + femaleData.ratio) / 2,
+      irr: (maleData.irr + femaleData.irr) / 2,
+      death_age: (maleData.death_age + femaleData.death_age) / 2,
+      couple_pv_benefits: maleData.couple_pv_benefits,
+      couple_pv_taxes: maleData.couple_pv_taxes,
+      couple_ratio: maleData.couple_ratio
+    };
+  }
+
+  getUnisexCohortSeries(cohortData, marital) {
+    const male = this.getCohortSeries(cohortData, 'male', marital);
+    const female = this.getCohortSeries(cohortData, 'female', marital);
+    if (!male || !female) return male || female;
+
+    return {
+      birth_years: male.birth_years,
+      monthly_benefit: male.monthly_benefit,
+      initial_real_benefit: male.initial_real_benefit,
+      repl_rate: male.repl_rate,
+      pv_benefits: male.pv_benefits.map((v, i) => (v + female.pv_benefits[i]) / 2),
+      pv_taxes: male.pv_taxes,
+      ratio: male.ratio.map((v, i) => (v + female.ratio[i]) / 2),
+      irr: male.irr.map((v, i) => (v + female.irr[i]) / 2),
+      death_age: male.death_age.map((v, i) => (v + female.death_age[i]) / 2)
+    };
+  }
+
   getReformLabel(comboKey) {
     if (!comboKey || comboKey === 'baseline') return 'Current Law';
     const labels = this.manifest?.reform_labels || {};

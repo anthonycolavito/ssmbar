@@ -15,7 +15,7 @@ class TableManager {
     this.tables[id] = { columns, rows };
 
     if (!rows || rows.length === 0) {
-      wrapper.innerHTML = '<div class="text-muted-custom text-center p-3" style="font-size:0.8rem">No data available</div>';
+      wrapper.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem; font-size: 0.8rem;">No data available</div>';
       return;
     }
 
@@ -41,7 +41,7 @@ class TableManager {
       for (const col of columns) {
         const val = row[col.key];
         const formatted = col.format ? col.format(val) : (val ?? '--');
-        html += `<td>${formatted}</td>`;
+        html += `<td data-label="${col.label}">${formatted}</td>`;
       }
       html += '</tr>';
     }
@@ -103,7 +103,7 @@ class TableManager {
     const columns = [
       { key: 'age', label: 'Age' },
       { key: 'nominal', label: 'Nominal ($)', format: v => Fmt.currency(v) },
-      { key: 'real', label: 'Real ($)', format: v => Fmt.currency(v) }
+      { key: 'real', label: "Today's ($)", format: v => Fmt.currency(v) }
     ];
 
     const rows = series.ages.map((age, i) => ({
@@ -115,21 +115,21 @@ class TableManager {
     this.render('benefitsTableWrapper', { columns, rows, id: 'benefits' });
   }
 
-  renderCohortTable(data, reformData, reformLabel, replField) {
+  renderCohortTable(data) {
     if (!data) return;
 
     const columns = [
       { key: 'birth_year', label: 'Birth Year' },
       { key: 'repl', label: 'Repl Rate', format: v => Fmt.percent(v) },
-      { key: 'pv', label: 'PV Benefits', format: v => Fmt.currency(v, { compact: true }) },
-      { key: 'ratio', label: 'Ratio', format: v => Fmt.number(v) },
-      { key: 'irr', label: 'IRR', format: v => Fmt.percent(v) },
+      { key: 'pv', label: 'Lifetime Benefits', format: v => Fmt.currency(v, { compact: true }) },
+      { key: 'ratio', label: 'Benefit-Tax Ratio', format: v => Fmt.number(v) },
+      { key: 'irr', label: 'Rate of Return', format: v => Fmt.percent(v) },
       { key: 'death_age', label: 'Life Exp.', format: v => v != null ? v.toFixed(1) : '--' }
     ];
 
     const rows = data.birth_years.map((by, i) => ({
       birth_year: by,
-      repl: data[replField]?.[i],
+      repl: data.repl_rate?.[i],
       pv: data.pv_benefits[i],
       ratio: data.ratio[i],
       irr: data.irr[i],

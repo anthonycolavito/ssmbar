@@ -2,8 +2,7 @@
 // App — Main controller, event wiring, data flow
 // =============================================================================
 
-let indDataCache = {};
-let cohDataCache = {};
+let appDataCache = {};
 
 // =============================================================================
 // Initialization
@@ -13,30 +12,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await dataLoader.init();
 
-    // Populate dropdowns (both tabs)
-    populateWorkerTypes('indWorkerType', 'medium');
-    populateWorkerTypes('cohWorkerType', 'medium');
-    populateBirthYears('indBirthYear', 1940, 2010, 1960);
-
-    // Wire up input change listeners — individual tab
-    ['indBirthYear', 'indWorkerType'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', onInputChange);
+    // Wire up hero control change listeners
+    ['heroWorkerType', 'heroBirthYear', 'heroSex', 'heroMarital'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', onHeroChange);
     });
-    document.querySelectorAll('input[name="indSex"], input[name="indMarital"]').forEach(r => {
-      r.addEventListener('change', onInputChange);
-    });
-
-    // Wire up input change listeners — cohort tab
-    ['cohWorkerType'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', onInputChange);
-    });
-    document.querySelectorAll('input[name="cohSex"], input[name="cohMarital"]').forEach(r => {
-      r.addEventListener('change', onInputChange);
-    });
-
-    // Disable all reform buttons
-    disableAllReforms();
-    updateReformBadge();
 
     // Handle URL hash for tab routing
     const hash = window.location.hash.replace('#', '');
@@ -51,16 +30,76 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // =============================================================================
-// Main input change handler
+// Main change handler — triggered by any hero control change
 // =============================================================================
 
-async function onInputChange() {
+async function onHeroChange() {
+  const type = getHeroWorkerType();
+  const birthYear = getHeroBirthYear();
+  const sex = getHeroSex();
+  const marital = getHeroMarital();
+
+  // Fetch data
+  const [cohortData, benefitsData, nmtrData] = await Promise.all([
+    dataLoader.getCohortData(type),
+    dataLoader.getIndividualBenefits(type),
+    dataLoader.getIndividualNMTR(type)
+  ]);
+
+  appDataCache = { cohortData, benefitsData, nmtrData, type, birthYear, sex, marital };
+
+  // Update hero
+  updateHero();
+
+  // Update active tab
   const activeTab = document.getElementById('individualPane').classList.contains('active')
     ? 'individual' : 'cohort';
   if (activeTab === 'individual') {
-    await updateIndividualTab();
+    updateIndividualTab();
   } else {
-    await updateCohortTab();
+    updateCohortTab();
+  }
+}
+
+// =============================================================================
+// Hero Section
+// =============================================================================
+
+function updateHero() {
+  const { cohortData, birthYear, sex, marital } = appDataCache;
+  if (!cohortData) return;
+
+  const metrics = sex === 'unisex'
+    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear)
+    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+
+  if (!metrics) return;
+
+  // Monthly benefit
+  const nomEl = document.getElementById('heroNominalBenefit');
+  if (nomEl) {
+    nomEl.textContent = metrics.monthly_benefit != null
+      ? Math.round(metrics.monthly_benefit).toLocaleString('en-US')
+      : '--';
+  }
+
+  // Real benefit subtitle
+  const realEl = document.getElementById('heroRealBenefit');
+  if (realEl && metrics.initial_real_benefit != null) {
+    const realVal = Math.round(metrics.initial_real_benefit).toLocaleString('en-US');
+    realEl.textContent = `$${realVal}/month in today's dollars`;
+  }
+
+  // Replacement rate
+  const replEl = document.getElementById('heroReplacement');
+  if (replEl && metrics.repl_rate != null) {
+    replEl.innerHTML = `That replaces <strong>${(metrics.repl_rate * 100).toFixed(1)}%</strong> of pre-retirement earnings`;
+  }
+
+  // Show sex insight when unisex is selected
+  const insightEl = document.getElementById('sexInsight');
+  if (insightEl) {
+    insightEl.style.display = sex === 'unisex' ? '' : 'none';
   }
 }
 
@@ -68,147 +107,177 @@ async function onInputChange() {
 // Individual Tab
 // =============================================================================
 
-async function updateIndividualTab() {
-  try {
-    const type = document.getElementById('indWorkerType').value;
-    const birthYear = parseInt(document.getElementById('indBirthYear').value);
-    const sex = getIndSex();
-    const marital = getIndMarital();
-
-    showLoading('benefitsChartContainer');
-
-    // Fetch all three data files for this worker type
-    const [cohortData, benefitsData, nmtrData] = await Promise.all([
-      dataLoader.getCohortData(type),
-      dataLoader.getIndividualBenefits(type),
-      dataLoader.getIndividualNMTR(type)
-    ]);
-
-    indDataCache = { cohortData, benefitsData, nmtrData, type, birthYear, sex, marital };
-
-    hideLoading('benefitsChartContainer');
-
-    // Extract metrics for selected configuration
-    const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
-    updateIndividualMetrics(metrics, marital === 'married');
-
-    // Benefits chart
-    renderIndividualBenefitsChart();
-
-    // NMTR chart
-    renderIndividualNMTRChart();
-
-    // Benefits table
-    const benefitSeries = dataLoader.getBenefitSeries(benefitsData, sex, marital, birthYear);
-    tableManager.renderBenefitsTable(benefitSeries);
-
-  } catch (err) {
-    console.error('updateIndividualTab error:', err);
-  }
+function updateIndividualTab() {
+  renderIndividualBenefitsChart();
+  renderIndividualNMTRChart();
+  updateReturnSection();
+  renderBenefitsTable();
 }
 
 function renderIndividualBenefitsChart() {
-  const { benefitsData, cohortData, birthYear, sex, marital } = indDataCache;
+  const { benefitsData, cohortData, birthYear, sex, marital } = appDataCache;
   if (!benefitsData) return;
 
-  const series = dataLoader.getBenefitSeries(benefitsData, sex, marital, birthYear);
-  const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
-  const deathAge = metrics?.death_age;
+  // For unisex, use male series (amounts are identical) and average death age
+  const lookupSex = sex === 'unisex' ? 'male' : sex;
+  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear);
 
-  chartManager.renderBenefitsChart(series, null, null, currentBenefitView, deathAge);
+  let deathAge = null;
+  if (sex === 'unisex') {
+    const metrics = dataLoader.getUnisexMetrics(cohortData, marital, birthYear);
+    deathAge = metrics?.death_age;
+  } else {
+    const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+    deathAge = metrics?.death_age;
+  }
+
+  chartManager.renderBenefitsChart(series, currentBenefitView, deathAge);
 }
 
 function renderIndividualNMTRChart() {
-  const { nmtrData, birthYear, sex, marital } = indDataCache;
+  const { nmtrData, birthYear, sex, marital } = appDataCache;
   if (!nmtrData) return;
 
-  const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, sex, marital, birthYear);
+  const lookupSex = sex === 'unisex' ? 'male' : sex;
+  const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, lookupSex, marital, birthYear);
+
+  const section = document.getElementById('nmtrSection');
   if (nmtrSeries) {
-    document.getElementById('nmtrRow').style.display = '';
-    chartManager.renderNMTRChart(nmtrSeries, null, null);
+    if (section) section.style.display = '';
+    chartManager.renderNMTRChart(nmtrSeries);
+    updateNMTRInsight(nmtrSeries);
   } else {
-    document.getElementById('nmtrRow').style.display = 'none';
+    if (section) section.style.display = 'none';
   }
 }
 
-function updateIndividualMetrics(data, isMarried) {
-  const metrics = [
-    { id: 'metricMonthlyBenefit', key: 'monthly_benefit', format: v => Fmt.currency(v), label: 'Monthly Benefit' },
-    { id: 'metricPVBenefits', key: isMarried ? 'couple_pv_benefits' : 'pv_benefits', format: v => Fmt.currency(v, { compact: true }), label: isMarried ? 'PV Couple Benefits' : 'PV Lifetime Benefits' },
-    { id: 'metricPVTaxes', key: isMarried ? 'couple_pv_taxes' : 'pv_taxes', format: v => Fmt.currency(v, { compact: true }), label: isMarried ? 'PV Couple Taxes' : 'PV Lifetime Taxes' },
-    { id: 'metricRatio', key: isMarried ? 'couple_ratio' : 'ratio', format: v => Fmt.number(v), label: 'Benefit-Tax Ratio' },
-    { id: 'metricIRR', key: 'irr', format: v => Fmt.percent(v), label: 'Internal Rate of Return' },
-    { id: 'metricReplRate', key: 'repl_rate', format: v => Fmt.percent(v), label: 'Replacement Rate' }
-  ];
+function updateNMTRInsight(nmtrSeries) {
+  const insightEl = document.getElementById('nmtrInsight');
+  if (!insightEl || !nmtrSeries) return;
 
-  for (const m of metrics) {
-    const el = document.getElementById(m.id);
-    if (!el) continue;
+  const nmtrVals = nmtrSeries.nmtr.filter(v => v != null);
+  const offsetCount = nmtrVals.filter(v => v < 0).length;
+  const pct = Math.round((offsetCount / nmtrVals.length) * 100);
 
-    const val = data?.[m.key];
-    if (val == null) {
-      el.innerHTML = `<div class="metric-label">${m.label}</div><div class="metric-value">--</div>`;
-      continue;
-    }
+  insightEl.innerHTML = `For this worker, <strong>${pct}%</strong> of career Social Security taxes were fully offset by increased future benefits.`;
+}
 
-    const colorClass = m.key.includes('ratio') ? (val >= 1 ? 'positive' : 'negative') :
-                        m.key === 'irr' ? (val >= 0 ? 'positive' : 'negative') : '';
-    el.innerHTML = `
-      <div class="metric-label">${m.label}</div>
-      <div class="metric-value ${colorClass}">${m.format(val)}</div>
-    `;
-  }
+function updateReturnSection() {
+  const { cohortData, birthYear, sex, marital } = appDataCache;
+  if (!cohortData) return;
+
+  const isMarried = marital === 'married';
+  const metrics = sex === 'unisex'
+    ? dataLoader.getUnisexMetrics(cohortData, marital, birthYear)
+    : dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+
+  if (!metrics) return;
+
+  const ratio = isMarried ? metrics.couple_ratio : metrics.ratio;
+  const pvBen = isMarried ? metrics.couple_pv_benefits : metrics.pv_benefits;
+  const pvTax = isMarried ? metrics.couple_pv_taxes : metrics.pv_taxes;
+  const irr = metrics.irr;
+
+  const ratioEl = document.getElementById('ratioValue');
+  const pvBenEl = document.getElementById('pvBenefitsValue');
+  const pvTaxEl = document.getElementById('pvTaxesValue');
+  const irrEl = document.getElementById('irrValue');
+
+  if (ratioEl) ratioEl.textContent = ratio != null ? ratio.toFixed(2) : '--';
+  if (pvBenEl) pvBenEl.textContent = pvBen != null ? Fmt.currency(pvBen, { compact: true }) : '--';
+  if (pvTaxEl) pvTaxEl.textContent = pvTax != null ? Fmt.currency(pvTax, { compact: true }) : '--';
+  if (irrEl) irrEl.textContent = irr != null ? Fmt.percent(irr) : '--';
+}
+
+function renderBenefitsTable() {
+  const { benefitsData, sex, marital, birthYear } = appDataCache;
+  if (!benefitsData) return;
+  const lookupSex = sex === 'unisex' ? 'male' : sex;
+  const series = dataLoader.getBenefitSeries(benefitsData, lookupSex, marital, birthYear);
+  tableManager.renderBenefitsTable(series);
 }
 
 // =============================================================================
 // Cohort Tab
 // =============================================================================
 
-async function updateCohortTab() {
-  try {
-    const type = document.getElementById('cohWorkerType').value;
-    const sex = getCohSex();
-    const marital = getCohMarital();
+function updateCohortTab() {
+  renderCohortChart();
+  updateCohortSummary();
+  renderCohortTable();
+}
 
-    const cohortData = await dataLoader.getCohortData(type);
-    if (!cohortData) { console.error('Failed to load cohort data for', type); return; }
+function renderCohortChart() {
+  const { cohortData, sex, marital } = appDataCache;
+  if (!cohortData) return;
 
-    cohDataCache = { cohortData, type, sex, marital };
+  const series = sex === 'unisex'
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
+    : dataLoader.getCohortSeries(cohortData, sex, marital);
 
-    const series = dataLoader.getCohortSeries(cohortData, sex, marital);
-    chartManager.renderCohortCharts(series, null, null);
-    updateCohortMetrics(series);
-    tableManager.renderCohortTable(series, null, null, 'repl_rate');
+  chartManager.renderCohortHeroChart(series, currentCohortMetric);
+}
 
-  } catch (err) {
-    console.error('updateCohortTab error:', err);
+function updateCohortSummary() {
+  const { cohortData, sex, marital } = appDataCache;
+  if (!cohortData) return;
+
+  const series = sex === 'unisex'
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
+    : dataLoader.getCohortSeries(cohortData, sex, marital);
+
+  if (!series) return;
+
+  const summaryEl = document.getElementById('cohortSummary');
+  if (!summaryEl) return;
+
+  const data = series[currentCohortMetric];
+  if (!data || data.length === 0) { summaryEl.innerHTML = ''; return; }
+
+  const valid = data.filter(v => v != null && !isNaN(v));
+  const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const latest = data[data.length - 1];
+
+  const fmt = getCohortMetricFormatter(currentCohortMetric);
+
+  summaryEl.innerHTML = `
+    <div class="cohort-stat">
+      <div class="stat-label">Average</div>
+      <div class="stat-value">${fmt(avg)}</div>
+    </div>
+    <div class="cohort-stat">
+      <div class="stat-label">Earliest (${series.birth_years[0]})</div>
+      <div class="stat-value">${fmt(data[0])}</div>
+    </div>
+    <div class="cohort-stat">
+      <div class="stat-label">Latest (${series.birth_years[series.birth_years.length - 1]})</div>
+      <div class="stat-value">${fmt(latest)}</div>
+    </div>
+  `;
+}
+
+function getCohortMetricFormatter(metric) {
+  switch (metric) {
+    case 'ratio': return (v) => v != null ? v.toFixed(2) : '--';
+    case 'initial_real_benefit': return (v) => v != null ? Fmt.currency(v) : '--';
+    case 'repl_rate': return (v) => v != null ? Fmt.percent(v) : '--';
+    case 'pv_benefits': return (v) => v != null ? Fmt.currency(v, { compact: true }) : '--';
+    case 'irr': return (v) => v != null ? Fmt.percent(v) : '--';
+    default: return (v) => v != null ? String(v) : '--';
   }
 }
 
-function updateCohortMetrics(data) {
-  if (!data) return;
+function renderCohortTable() {
+  const { cohortData, sex, marital } = appDataCache;
+  if (!cohortData) return;
 
-  const avg = (arr) => {
-    if (!arr) return null;
-    const valid = arr.filter(v => v != null && !isNaN(v));
-    return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
-  };
+  const series = sex === 'unisex'
+    ? dataLoader.getUnisexCohortSeries(cohortData, marital)
+    : dataLoader.getCohortSeries(cohortData, sex, marital);
 
-  const metrics = [
-    { id: 'cohMetricRepl', field: 'repl_rate', label: 'Avg Replacement Rate', format: v => Fmt.percent(v) },
-    { id: 'cohMetricPV', field: 'pv_benefits', label: 'Avg PV Benefits', format: v => Fmt.currency(v, { compact: true }) },
-    { id: 'cohMetricRatio', field: 'ratio', label: 'Avg Benefit-Tax Ratio', format: v => Fmt.number(v) },
-    { id: 'cohMetricIRR', field: 'irr', label: 'Avg IRR', format: v => Fmt.percent(v) }
-  ];
-
-  for (const m of metrics) {
-    const el = document.getElementById(m.id);
-    if (!el) continue;
-    const val = avg(data[m.field]);
-    el.innerHTML = val != null
-      ? `<div class="metric-label">${m.label}</div><div class="metric-value">${m.format(val)}</div>`
-      : `<div class="metric-label">${m.label}</div><div class="metric-value">--</div>`;
-  }
+  tableManager.renderCohortTable(series);
 }
 
 // =============================================================================
