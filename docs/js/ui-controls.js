@@ -2,9 +2,6 @@
 // UI Controls — Dropdown population, sidebar, toggle, and event wiring
 // =============================================================================
 
-/**
- * Populate a <select> element with options
- */
 function populateSelect(id, options, defaultValue) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -20,9 +17,6 @@ function populateSelect(id, options, defaultValue) {
   }
 }
 
-/**
- * Populate worker type dropdowns
- */
 function populateWorkerTypes(selectId, defaultValue = 'medium') {
   const types = [
     { value: 'very_low', label: 'Very Low' },
@@ -35,20 +29,6 @@ function populateWorkerTypes(selectId, defaultValue = 'medium') {
   populateSelect(selectId, types, defaultValue);
 }
 
-/**
- * Populate claim age dropdown
- */
-function populateClaimAges(selectId, defaultValue = 65) {
-  const ages = [];
-  for (let a = 62; a <= 70; a++) {
-    ages.push({ value: String(a), label: String(a) });
-  }
-  populateSelect(selectId, ages, String(defaultValue));
-}
-
-/**
- * Populate birth year dropdown (every 10th year)
- */
 function populateBirthYears(selectId, min = 1940, max = 2010, defaultValue = 1960) {
   const years = [];
   for (let y = min; y <= max; y += 10) {
@@ -61,9 +41,6 @@ function populateBirthYears(selectId, min = 1940, max = 2010, defaultValue = 196
 // Sidebar controls
 // =============================================================================
 
-/**
- * Toggle sidebar visibility (mobile)
- */
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebarOverlay');
@@ -71,9 +48,6 @@ function toggleSidebar() {
   overlay.classList.toggle('open');
 }
 
-/**
- * Toggle a reform section's collapsed state
- */
 function toggleReformSection(headerEl) {
   const section = headerEl.closest('.reform-section');
   const options = section.querySelector('.reform-options');
@@ -86,100 +60,61 @@ function toggleReformSection(headerEl) {
 }
 
 // =============================================================================
-// Reform combo key builder
+// Reform controls (all disabled for current-law mode)
 // =============================================================================
 
-// Category order must match the data generation script
-const REFORM_RADIO_GROUPS = [
-  'reform_pia',
-  'reform_nra',
-  'reform_cola',
-  'reform_taxmax',
-  'reform_other'
-];
+function disableAllReforms() {
+  document.querySelectorAll('.reform-section input[type="radio"]').forEach(radio => {
+    radio.disabled = true;
+  });
+  document.querySelectorAll('.reform-section').forEach(section => {
+    section.classList.add('disabled');
+  });
+}
 
-/**
- * Build combo key from the 5 radio button groups.
- * Returns "baseline" if none selected, otherwise joins active reform names with "+".
- */
 function getComboKey() {
-  const active = [];
-  for (const groupName of REFORM_RADIO_GROUPS) {
-    const checked = document.querySelector(`input[name="${groupName}"]:checked`);
-    if (checked) {
-      active.push(checked.value);
-    }
-  }
-  return active.length === 0 ? 'baseline' : active.join('+');
+  return 'baseline';
 }
 
-/**
- * Check if any reform is selected (non-baseline)
- */
 function hasReformSelected() {
-  return getComboKey() !== 'baseline';
+  return false;
 }
 
-/**
- * Clear all reform selections (deselect all radios)
- */
 function clearReform() {
-  for (const groupName of REFORM_RADIO_GROUPS) {
-    document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => r.checked = false);
-  }
-  updateReformBadge();
-  onInputChange();
+  // No-op in current-law mode
 }
 
-/**
- * Enable click-to-deselect on radio buttons (no "None" option needed)
- */
-function initRadioDeselect() {
-  for (const groupName of REFORM_RADIO_GROUPS) {
-    document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
-      radio.addEventListener('click', function () {
-        if (this._wasChecked) {
-          this.checked = false;
-          this._wasChecked = false;
-        } else {
-          // Unmark siblings
-          document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => r._wasChecked = false);
-          this._wasChecked = true;
-        }
-        updateReformBadge();
-        onInputChange();
-      });
-    });
-  }
-}
-
-/**
- * Update the reform badge display
- */
 function updateReformBadge() {
   const badge = document.getElementById('selectedReformBadge');
   const noBadge = document.getElementById('noReformBadge');
-  const nameEl = document.getElementById('selectedReformName');
+  if (badge) badge.style.display = 'none';
+  if (noBadge) noBadge.style.display = 'block';
+}
 
-  const comboKey = getComboKey();
+// =============================================================================
+// Worker dimension state
+// =============================================================================
 
-  if (comboKey !== 'baseline') {
-    badge.style.display = 'block';
-    noBadge.style.display = 'none';
-    nameEl.textContent = dataLoader.getReformLabel(comboKey);
-  } else {
-    badge.style.display = 'none';
-    noBadge.style.display = 'block';
-  }
+function getIndSex() {
+  return document.querySelector('input[name="indSex"]:checked')?.value || 'male';
+}
+
+function getIndMarital() {
+  return document.querySelector('input[name="indMarital"]:checked')?.value || 'single';
+}
+
+function getCohSex() {
+  return document.querySelector('input[name="cohSex"]:checked')?.value || 'male';
+}
+
+function getCohMarital() {
+  return document.querySelector('input[name="cohMarital"]:checked')?.value || 'single';
 }
 
 // =============================================================================
 // Tab switching
 // =============================================================================
 
-/**
- * Switch between Individual and Cohort tabs
- */
 function switchTab(tabName) {
   document.querySelectorAll('#mainTabs .nav-link').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -205,10 +140,10 @@ function toggleSection(sectionId) {
 }
 
 // =============================================================================
-// Benefit view toggle (nominal/real)
+// Benefit view toggle (nominal/real) — default to real
 // =============================================================================
 
-let currentBenefitView = 'nominal';
+let currentBenefitView = 'real';
 
 function toggleBenefitView(mode, btnEl) {
   currentBenefitView = mode;

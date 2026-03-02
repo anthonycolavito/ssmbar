@@ -194,6 +194,13 @@ body {
 
 .reform-section:hover { border-left-color: var(--border-hover); }
 
+.reform-section.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.reform-section.disabled:hover { border-left-color: var(--border); }
+
 .reform-section-header {
   display: flex;
   align-items: center;
@@ -340,6 +347,27 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 120px;
+}
+
+/* --- Radio Groups (Sex / Marital) --- */
+.radio-group {
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.radio-label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.radio-label input[type="radio"] {
+  accent-color: var(--crfb-orange);
+  margin: 0;
 }
 
 /* --- Data Tables --- */

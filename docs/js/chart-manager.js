@@ -293,7 +293,7 @@ class ChartManager {
     // Replacement Rate (hardcoded to real_all)
     this.renderCohortChart('cohReplChart', {
       baselineData, reformData, reformLabel,
-      field: 'repl_rate_real_all',
+      field: 'repl_rate',
       yFormat: (v) => Fmt.percent(v, { isRatio: true }),
       yLabel: 'Replacement Rate (%)'
     });

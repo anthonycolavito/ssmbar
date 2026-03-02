@@ -2,8 +2,6 @@
 // App — Main controller, event wiring, data flow
 // =============================================================================
 
-// State
-let currentTab = 'individual';
 let indDataCache = {};
 let cohDataCache = {};
 
@@ -15,26 +13,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await dataLoader.init();
 
-    // Populate dropdowns
+    // Populate dropdowns (both tabs)
     populateWorkerTypes('indWorkerType', 'medium');
     populateWorkerTypes('cohWorkerType', 'medium');
-    populateClaimAges('indClaimAge', 65);
-    populateClaimAges('cohClaimAge', 65);
     populateBirthYears('indBirthYear', 1940, 2010, 1960);
 
-    // Wire up input change listeners
-    const indInputs = ['indBirthYear', 'indClaimAge', 'indWorkerType'];
-    indInputs.forEach(id => {
+    // Wire up input change listeners — individual tab
+    ['indBirthYear', 'indWorkerType'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', onInputChange);
     });
-
-    const cohInputs = ['cohWorkerType', 'cohClaimAge'];
-    cohInputs.forEach(id => {
-      document.getElementById(id)?.addEventListener('change', onInputChange);
+    document.querySelectorAll('input[name="indSex"], input[name="indMarital"]').forEach(r => {
+      r.addEventListener('change', onInputChange);
     });
 
-    // Wire up reform radio buttons with click-to-deselect
-    initRadioDeselect();
+    // Wire up input change listeners — cohort tab
+    ['cohWorkerType'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', onInputChange);
+    });
+    document.querySelectorAll('input[name="cohSex"], input[name="cohMarital"]').forEach(r => {
+      r.addEventListener('change', onInputChange);
+    });
+
+    // Disable all reform buttons
+    disableAllReforms();
+    updateReformBadge();
 
     // Handle URL hash for tab routing
     const hash = window.location.hash.replace('#', '');
@@ -55,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function onInputChange() {
   const activeTab = document.getElementById('individualPane').classList.contains('active')
     ? 'individual' : 'cohort';
-
   if (activeTab === 'individual') {
     await updateIndividualTab();
   } else {
@@ -69,75 +70,73 @@ async function onInputChange() {
 
 async function updateIndividualTab() {
   try {
-  const type = document.getElementById('indWorkerType').value;
-  const birthYear = parseInt(document.getElementById('indBirthYear').value);
-  const comboKey = getComboKey();
+    const type = document.getElementById('indWorkerType').value;
+    const birthYear = parseInt(document.getElementById('indBirthYear').value);
+    const sex = getIndSex();
+    const marital = getIndMarital();
 
-  showLoading('benefitsChartContainer');
+    showLoading('benefitsChartContainer');
 
-  // Fetch cohort data (for metrics) and benefits data (for chart)
-  const [cohortData, benefitsData] = await Promise.all([
-    dataLoader.getCohortData(type),
-    dataLoader.getIndividualBenefits(type)
-  ]);
+    // Fetch all three data files for this worker type
+    const [cohortData, benefitsData, nmtrData] = await Promise.all([
+      dataLoader.getCohortData(type),
+      dataLoader.getIndividualBenefits(type),
+      dataLoader.getIndividualNMTR(type)
+    ]);
 
-  if (!cohortData) console.error('Failed to load cohort data for', type);
-  if (!benefitsData) console.error('Failed to load benefits data for', type);
+    indDataCache = { cohortData, benefitsData, nmtrData, type, birthYear, sex, marital };
 
-  indDataCache = { cohortData, benefitsData, type, birthYear, comboKey };
+    hideLoading('benefitsChartContainer');
 
-  hideLoading('benefitsChartContainer');
+    // Extract metrics for selected configuration
+    const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+    updateIndividualMetrics(metrics, marital === 'married');
 
-  // Extract metrics for selected birth year
-  const baselineMetrics = dataLoader.getMetricsForBirthYear(cohortData, 'baseline', birthYear);
-  const reformMetrics = comboKey !== 'baseline'
-    ? dataLoader.getMetricsForBirthYear(cohortData, comboKey, birthYear) : null;
+    // Benefits chart
+    renderIndividualBenefitsChart();
 
-  // Update metric cards
-  updateIndividualMetrics(baselineMetrics, reformMetrics, comboKey !== 'baseline' ? comboKey : null);
+    // NMTR chart
+    renderIndividualNMTRChart();
 
-  // Benefits chart
-  renderIndividualBenefitsChart();
+    // Benefits table
+    const benefitSeries = dataLoader.getBenefitSeries(benefitsData, sex, marital, birthYear);
+    tableManager.renderBenefitsTable(benefitSeries);
 
-  // Benefits table
-  const baselineSeries = dataLoader.getBenefitSeries(benefitsData, 'baseline', birthYear);
-  const reformSeries = comboKey !== 'baseline'
-    ? dataLoader.getBenefitSeries(benefitsData, comboKey, birthYear) : null;
-  const reformLabel = comboKey !== 'baseline' ? dataLoader.getReformLabel(comboKey) : null;
-  tableManager.renderBenefitsTable(baselineSeries, reformSeries, reformLabel);
   } catch (err) {
     console.error('updateIndividualTab error:', err);
   }
 }
 
-/**
- * Render/re-render benefits chart (called on view toggle too)
- */
 function renderIndividualBenefitsChart() {
-  const { benefitsData, cohortData, birthYear, comboKey } = indDataCache;
+  const { benefitsData, cohortData, birthYear, sex, marital } = indDataCache;
   if (!benefitsData) return;
 
-  const baselineSeries = dataLoader.getBenefitSeries(benefitsData, 'baseline', birthYear);
-  const reformSeries = comboKey !== 'baseline'
-    ? dataLoader.getBenefitSeries(benefitsData, comboKey, birthYear) : null;
-  const reformLabel = comboKey !== 'baseline' ? dataLoader.getReformLabel(comboKey) : null;
+  const series = dataLoader.getBenefitSeries(benefitsData, sex, marital, birthYear);
+  const metrics = dataLoader.getMetricsForBirthYear(cohortData, sex, marital, birthYear);
+  const deathAge = metrics?.death_age;
 
-  // Get death age from cohort data for clipping
-  const baselineMetrics = dataLoader.getMetricsForBirthYear(cohortData, 'baseline', birthYear);
-  const deathAge = baselineMetrics?.death_age;
-
-  chartManager.renderBenefitsChart(baselineSeries, reformSeries, reformLabel, currentBenefitView, deathAge);
+  chartManager.renderBenefitsChart(series, null, null, currentBenefitView, deathAge);
 }
 
-/**
- * Update individual metric cards
- */
-function updateIndividualMetrics(baseline, reformed, comboKey) {
+function renderIndividualNMTRChart() {
+  const { nmtrData, birthYear, sex, marital } = indDataCache;
+  if (!nmtrData) return;
+
+  const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, sex, marital, birthYear);
+  if (nmtrSeries) {
+    document.getElementById('nmtrRow').style.display = '';
+    chartManager.renderNMTRChart(nmtrSeries, null, null);
+  } else {
+    document.getElementById('nmtrRow').style.display = 'none';
+  }
+}
+
+function updateIndividualMetrics(data, isMarried) {
   const metrics = [
     { id: 'metricMonthlyBenefit', key: 'monthly_benefit', format: v => Fmt.currency(v), label: 'Monthly Benefit' },
-    { id: 'metricPVBenefits', key: 'pv_benefits', format: v => Fmt.currency(v, { compact: true }), label: 'PV Lifetime Benefits' },
-    { id: 'metricPVTaxes', key: 'pv_taxes', format: v => Fmt.currency(v, { compact: true }), label: 'PV Lifetime Taxes' },
-    { id: 'metricRatio', key: 'ratio', format: v => Fmt.number(v), label: 'Benefit-Tax Ratio' },
+    { id: 'metricPVBenefits', key: isMarried ? 'couple_pv_benefits' : 'pv_benefits', format: v => Fmt.currency(v, { compact: true }), label: isMarried ? 'PV Couple Benefits' : 'PV Lifetime Benefits' },
+    { id: 'metricPVTaxes', key: isMarried ? 'couple_pv_taxes' : 'pv_taxes', format: v => Fmt.currency(v, { compact: true }), label: isMarried ? 'PV Couple Taxes' : 'PV Lifetime Taxes' },
+    { id: 'metricRatio', key: isMarried ? 'couple_ratio' : 'ratio', format: v => Fmt.number(v), label: 'Benefit-Tax Ratio' },
     { id: 'metricIRR', key: 'irr', format: v => Fmt.percent(v), label: 'Internal Rate of Return' },
     { id: 'metricReplRate', key: 'repl_rate', format: v => Fmt.percent(v), label: 'Replacement Rate' }
   ];
@@ -146,34 +145,18 @@ function updateIndividualMetrics(baseline, reformed, comboKey) {
     const el = document.getElementById(m.id);
     if (!el) continue;
 
-    const baseVal = baseline?.[m.key];
-    const refVal = reformed?.[m.key];
-
-    if (baseVal == null) {
+    const val = data?.[m.key];
+    if (val == null) {
       el.innerHTML = `<div class="metric-label">${m.label}</div><div class="metric-value">--</div>`;
       continue;
     }
 
-    if (comboKey && refVal != null) {
-      const pctChange = baseVal !== 0 ? ((refVal - baseVal) / Math.abs(baseVal)) * 100 : 0;
-      const dirClass = Fmt.directionClass(pctChange);
-      el.innerHTML = `
-        <div class="metric-label">${m.label}</div>
-        <div class="metric-comparison">
-          <span class="baseline-val">${m.format(baseVal)}</span>
-          <span class="arrow">&rarr;</span>
-          <span class="reform-val ${dirClass}">${m.format(refVal)}</span>
-        </div>
-        <div class="metric-change ${dirClass}">${Fmt.change(pctChange)}</div>
-      `;
-    } else {
-      const colorClass = m.key === 'ratio' ? (baseVal >= 1 ? 'positive' : 'negative') :
-                          m.key === 'irr' ? (baseVal >= 0 ? 'positive' : 'negative') : '';
-      el.innerHTML = `
-        <div class="metric-label">${m.label}</div>
-        <div class="metric-value ${colorClass}">${m.format(baseVal)}</div>
-      `;
-    }
+    const colorClass = m.key.includes('ratio') ? (val >= 1 ? 'positive' : 'negative') :
+                        m.key === 'irr' ? (val >= 0 ? 'positive' : 'negative') : '';
+    el.innerHTML = `
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-value ${colorClass}">${m.format(val)}</div>
+    `;
   }
 }
 
@@ -183,38 +166,27 @@ function updateIndividualMetrics(baseline, reformed, comboKey) {
 
 async function updateCohortTab() {
   try {
-  const type = document.getElementById('cohWorkerType').value;
-  const comboKey = getComboKey();
+    const type = document.getElementById('cohWorkerType').value;
+    const sex = getCohSex();
+    const marital = getCohMarital();
 
-  const cohortData = await dataLoader.getCohortData(type);
-  if (!cohortData) { console.error('Failed to load cohort data for', type); return; }
+    const cohortData = await dataLoader.getCohortData(type);
+    if (!cohortData) { console.error('Failed to load cohort data for', type); return; }
 
-  cohDataCache = { cohortData, type, comboKey };
+    cohDataCache = { cohortData, type, sex, marital };
 
-  // Extract baseline and reform data (full birth year range, no filtering)
-  const baselineData = dataLoader.getCohortSeries(cohortData, 'baseline');
-  const reformData = comboKey !== 'baseline'
-    ? dataLoader.getCohortSeries(cohortData, comboKey) : null;
-  const reformLabel = comboKey !== 'baseline' ? dataLoader.getReformLabel(comboKey) : null;
+    const series = dataLoader.getCohortSeries(cohortData, sex, marital);
+    chartManager.renderCohortCharts(series, null, null);
+    updateCohortMetrics(series);
+    tableManager.renderCohortTable(series, null, null, 'repl_rate');
 
-  // Render charts (hardcoded to repl_rate_real_all)
-  chartManager.renderCohortCharts(baselineData, reformData, reformLabel);
-
-  // Update summary metrics
-  updateCohortMetrics(baselineData, reformData, reformLabel);
-
-  // Update table
-  tableManager.renderCohortTable(baselineData, reformData, reformLabel, 'repl_rate_real_all');
   } catch (err) {
     console.error('updateCohortTab error:', err);
   }
 }
 
-/**
- * Update cohort summary metric cards
- */
-function updateCohortMetrics(baselineData, reformData, reformLabel) {
-  if (!baselineData) return;
+function updateCohortMetrics(data) {
+  if (!data) return;
 
   const avg = (arr) => {
     if (!arr) return null;
@@ -223,49 +195,19 @@ function updateCohortMetrics(baselineData, reformData, reformLabel) {
   };
 
   const metrics = [
-    { id: 'cohMetricRepl', field: 'repl_rate_real_all', label: 'Avg Replacement Rate', format: v => Fmt.percent(v) },
+    { id: 'cohMetricRepl', field: 'repl_rate', label: 'Avg Replacement Rate', format: v => Fmt.percent(v) },
     { id: 'cohMetricPV', field: 'pv_benefits', label: 'Avg PV Benefits', format: v => Fmt.currency(v, { compact: true }) },
     { id: 'cohMetricRatio', field: 'ratio', label: 'Avg Benefit-Tax Ratio', format: v => Fmt.number(v) },
     { id: 'cohMetricIRR', field: 'irr', label: 'Avg IRR', format: v => Fmt.percent(v) }
   ];
 
   for (const m of metrics) {
-    const baseAvg = avg(baselineData[m.field]);
-    const refAvg = reformData ? avg(reformData[m.field]) : null;
-    updateSingleMetric(m.id, m.label, baseAvg, refAvg, reformLabel, m.format);
-  }
-}
-
-/**
- * Generic metric card updater
- */
-function updateSingleMetric(elementId, label, baseVal, refVal, reformName, formatFn, opts = {}) {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-
-  if (baseVal == null) {
-    el.innerHTML = `<div class="metric-label">${label}</div><div class="metric-value">--</div>`;
-    return;
-  }
-
-  if (reformName && refVal != null) {
-    const diff = refVal - baseVal;
-    const pctChange = baseVal !== 0 ? (diff / Math.abs(baseVal)) * 100 : 0;
-    const dirClass = Fmt.directionClass(pctChange, opts);
-    el.innerHTML = `
-      <div class="metric-label">${label}</div>
-      <div class="metric-comparison">
-        <span class="baseline-val">${formatFn(baseVal)}</span>
-        <span class="arrow">&rarr;</span>
-        <span class="reform-val ${dirClass}">${formatFn(refVal)}</span>
-      </div>
-      <div class="metric-change ${dirClass}">${Fmt.change(pctChange)}</div>
-    `;
-  } else {
-    el.innerHTML = `
-      <div class="metric-label">${label}</div>
-      <div class="metric-value">${formatFn(baseVal)}</div>
-    `;
+    const el = document.getElementById(m.id);
+    if (!el) continue;
+    const val = avg(data[m.field]);
+    el.innerHTML = val != null
+      ? `<div class="metric-label">${m.label}</div><div class="metric-value">${m.format(val)}</div>`
+      : `<div class="metric-label">${m.label}</div><div class="metric-value">--</div>`;
   }
 }
 

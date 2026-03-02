@@ -21,7 +21,6 @@
       <a class="navbar-brand" href="#">Social Security Benefit Explorer</a>
     </div>
     <div class="d-flex align-items-center">
-      <!-- Tab navigation -->
       <ul class="nav nav-tabs border-0 mb-0" id="mainTabs" role="tablist">
         <li class="nav-item" role="presentation">
           <button class="nav-link active" id="individual-tab" data-tab="individual" onclick="switchTab('individual')">
@@ -46,11 +45,13 @@
 
   <!-- Sidebar: Reform Selector -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-title"><i class="bi bi-sliders me-1"></i> Build a Reform Package</div>
-    <div class="sidebar-subtitle">Select up to one option from each category to compare against baseline</div>
+    <div class="sidebar-title"><i class="bi bi-sliders me-1"></i> Reform Options</div>
+    <div class="sidebar-subtitle" style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 0.5rem;">
+      <i class="bi bi-lock me-1"></i>Reform comparisons coming soon
+    </div>
 
     <!-- PIA Formula -->
-    <div class="reform-section" data-section="pia_formula">
+    <div class="reform-section disabled" data-section="pia_formula">
       <div class="reform-section-header" onclick="toggleReformSection(this)">
         <i class="bi bi-calculator section-icon"></i>
         <span class="section-label">Slow Initial Benefit Growth</span>
@@ -58,22 +59,22 @@
       </div>
       <div class="reform-options">
         <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_reduce_fact3" value="reduce_fact3">
+          <input type="radio" name="reform_pia" id="reform_reduce_fact3" value="reduce_fact3" disabled>
           <label for="reform_reduce_fact3">Slow Benefit Growth for Top 20% of Earners</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_flat_benefit" value="flat_benefit">
+          <input type="radio" name="reform_pia" id="reform_flat_benefit" value="flat_benefit" disabled>
           <label for="reform_flat_benefit">Transition to a Flat Benefit</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_pia" id="reform_simpson_bowles_pia" value="simpson_bowles_pia">
+          <input type="radio" name="reform_pia" id="reform_simpson_bowles_pia" value="simpson_bowles_pia" disabled>
           <label for="reform_simpson_bowles_pia">Slow Benefit Growth for Top Half of Earners</label>
         </div>
       </div>
     </div>
 
     <!-- NRA Changes -->
-    <div class="reform-section" data-section="nra">
+    <div class="reform-section disabled" data-section="nra">
       <div class="reform-section-header" onclick="toggleReformSection(this)">
         <i class="bi bi-clock section-icon"></i>
         <span class="section-label">Increase Retirement Age</span>
@@ -81,22 +82,22 @@
       </div>
       <div class="reform-options">
         <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_nra_to_68" value="nra_to_68">
+          <input type="radio" name="reform_nra" id="reform_nra_to_68" value="nra_to_68" disabled>
           <label for="reform_nra_to_68">Raise NRA to 68</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_index_nra" value="index_nra">
+          <input type="radio" name="reform_nra" id="reform_index_nra" value="index_nra" disabled>
           <label for="reform_index_nra">Index NRA to Longevity</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_nra" id="reform_nra_to_69_index" value="nra_to_69_index">
+          <input type="radio" name="reform_nra" id="reform_nra_to_69_index" value="nra_to_69_index" disabled>
           <label for="reform_nra_to_69_index">NRA to 69, then Index</label>
         </div>
       </div>
     </div>
 
     <!-- COLA Indexing -->
-    <div class="reform-section" data-section="cola">
+    <div class="reform-section disabled" data-section="cola">
       <div class="reform-section-header" onclick="toggleReformSection(this)">
         <i class="bi bi-graph-up section-icon"></i>
         <span class="section-label">Modify COLAs</span>
@@ -104,22 +105,22 @@
       </div>
       <div class="reform-options">
         <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_chained_cpi" value="chained_cpi">
+          <input type="radio" name="reform_cola" id="reform_chained_cpi" value="chained_cpi" disabled>
           <label for="reform_chained_cpi">Index COLAs to "Chained CPI"</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_cola_cap" value="cola_cap">
+          <input type="radio" name="reform_cola" id="reform_cola_cap" value="cola_cap" disabled>
           <label for="reform_cola_cap">Cap COLAs for Top Half of Beneficiaries</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_cola" id="reform_cpi_e" value="cpi_e">
+          <input type="radio" name="reform_cola" id="reform_cpi_e" value="cpi_e" disabled>
           <label for="reform_cpi_e">Index COLAs to "CPI-E"</label>
         </div>
       </div>
     </div>
 
     <!-- Tax Max -->
-    <div class="reform-section" data-section="taxmax">
+    <div class="reform-section disabled" data-section="taxmax">
       <div class="reform-section-header" onclick="toggleReformSection(this)">
         <i class="bi bi-cash-stack section-icon"></i>
         <span class="section-label">Increase Taxable Maximum</span>
@@ -127,22 +128,22 @@
       </div>
       <div class="reform-options">
         <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_taxmax_90_pct" value="taxmax_90_pct">
+          <input type="radio" name="reform_taxmax" id="reform_taxmax_90_pct" value="taxmax_90_pct" disabled>
           <label for="reform_taxmax_90_pct">Raise Tax Max to Cover 90% of Wages</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax" value="eliminate_taxmax">
+          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax" value="eliminate_taxmax" disabled>
           <label for="reform_eliminate_taxmax">Eliminate Tax Max with Benefit Credit</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax_no_credit" value="eliminate_taxmax_no_credit">
+          <input type="radio" name="reform_taxmax" id="reform_eliminate_taxmax_no_credit" value="eliminate_taxmax_no_credit" disabled>
           <label for="reform_eliminate_taxmax_no_credit">Eliminate Tax Max without Benefit Credit</label>
         </div>
       </div>
     </div>
 
     <!-- Other Reforms -->
-    <div class="reform-section" data-section="other">
+    <div class="reform-section disabled" data-section="other">
       <div class="reform-section-header" onclick="toggleReformSection(this)">
         <i class="bi bi-gear section-icon"></i>
         <span class="section-label">Other Reforms</span>
@@ -150,30 +151,21 @@
       </div>
       <div class="reform-options">
         <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_forty_year_avg" value="forty_year_avg">
+          <input type="radio" name="reform_other" id="reform_forty_year_avg" value="forty_year_avg" disabled>
           <label for="reform_forty_year_avg">Calculate Benefits Based on Highest 40 Years</label>
         </div>
         <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_repeal_ret" value="repeal_ret">
-          <label for="reform_repeal_ret">Repeal the Retirement Earnings Test</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_mini_pia" value="mini_pia">
+          <input type="radio" name="reform_other" id="reform_mini_pia" value="mini_pia" disabled>
           <label for="reform_mini_pia">Apply Benefit Formula to Annual Earnings</label>
-        </div>
-        <div class="reform-option">
-          <input type="radio" name="reform_other" id="reform_basic_minimum" value="basic_minimum">
-          <label for="reform_basic_minimum">Establish a Basic Minimum Benefit</label>
         </div>
       </div>
     </div>
 
     <!-- Clear button -->
-    <button class="btn btn-outline-secondary btn-sm reform-clear-btn" onclick="clearReform()">
+    <button class="btn btn-outline-secondary btn-sm reform-clear-btn" onclick="clearReform()" disabled>
       <i class="bi bi-x-lg me-1"></i>Clear All Selections
     </button>
 
-    <!-- Selected summary -->
     <div class="selected-reform-badge" id="selectedReformBadge" style="display:none">
       <div class="badge-label"><i class="bi bi-check-circle me-1"></i>Comparing to:</div>
       <div class="badge-name" id="selectedReformName"></div>
@@ -181,13 +173,12 @@
 
     <div class="selected-reform-badge" id="noReformBadge">
       <div class="badge-name text-muted-custom" style="font-size:0.75rem; text-align:center;">
-        No reforms selected (showing baseline only)
+        Showing current-law baseline only
       </div>
     </div>
 
-    <!-- Info -->
     <div class="mt-3" style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.5;">
-      <p><i class="bi bi-info-circle me-1"></i>Select one option from each category to build a reform package. Charts show baseline vs. your package.</p>
+      <p><i class="bi bi-info-circle me-1"></i>Reform options are visible but disabled. Reform comparisons will be enabled in a future update.</p>
     </div>
   </aside>
 
@@ -197,33 +188,46 @@
     <!-- ===== Individual Worker Tab ===== -->
     <div class="tab-pane active" id="individualPane">
 
-      <!-- Input Row -->
+      <!-- Worker Configuration -->
       <div class="card">
         <div class="card-header bg-primary">Worker Configuration</div>
         <div class="card-body">
           <div class="input-row">
             <div class="input-group-inline">
+              <label class="form-label" for="indWorkerType">Worker Type</label>
+              <select class="form-select" id="indWorkerType"></select>
+            </div>
+            <div class="input-group-inline">
               <label class="form-label" for="indBirthYear">Birth Year</label>
               <select class="form-select" id="indBirthYear"></select>
             </div>
-            <select class="form-select" id="indClaimAge" hidden><option value="65" selected>65</option></select>
             <div class="input-group-inline">
-              <label class="form-label" for="indWorkerType">Worker Type</label>
-              <select class="form-select" id="indWorkerType"></select>
+              <label class="form-label">Sex</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="indSex" value="male" checked> Male</label>
+                <label class="radio-label"><input type="radio" name="indSex" value="female"> Female</label>
+              </div>
+            </div>
+            <div class="input-group-inline">
+              <label class="form-label">Marital Status</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="indMarital" value="single" checked> Single</label>
+                <label class="radio-label"><input type="radio" name="indMarital" value="married"> Married</label>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Charts Row: Benefits -->
+      <!-- Annual Benefits Chart -->
       <div class="row g-3">
         <div class="col-12">
           <div class="card">
             <div class="card-header bg-info d-flex justify-content-between align-items-center">
               <span>Annual Benefits by Age</span>
               <div class="toggle-group">
-                <button class="active" data-toggle="nominal" onclick="toggleBenefitView('nominal', this)">Nominal</button>
-                <button data-toggle="real" onclick="toggleBenefitView('real', this)">Real</button>
+                <button data-toggle="nominal" onclick="toggleBenefitView('nominal', this)">Nominal</button>
+                <button class="active" data-toggle="real" onclick="toggleBenefitView('real', this)">Real</button>
               </div>
             </div>
             <div class="card-body p-2">
@@ -235,8 +239,8 @@
         </div>
       </div>
 
-      <!-- NMTR chart (hidden — will be enabled when marginal data is generated) -->
-      <div class="row g-3" id="nmtrRow" style="display:none">
+      <!-- NMTR Chart -->
+      <div class="row g-3" id="nmtrRow">
         <div class="col-12">
           <div class="card">
             <div class="card-header bg-info">Net Marginal Tax Rate by Age</div>
@@ -281,7 +285,7 @@
         </div></div>
       </div>
 
-      <!-- Collapsible data tables -->
+      <!-- Benefits Data Table -->
       <div class="card mt-3">
         <div class="collapsible-header" onclick="toggleSection('indBenefitsTable')">
           <span><i class="bi bi-table me-2"></i>Benefits Data Table</span>
@@ -303,10 +307,9 @@
       <div class="card mt-2">
         <div class="card-body notes-panel">
           <strong>Notes: </strong>
-          All values calculated for specified worker configuration (unisex mortality).
-          PV values discounted to age 65 using Trustees' discount factors.
-          Benefits shown after actuarial adjustments and COLAs.
-          Reforms effective 2030.
+          All values under current law. Sex affects life expectancy (mortality tables from 2025 Trustees Report).
+          PV values discounted to age 65, including employer share of payroll taxes.
+          Married workers assume spouse is the same earner type, opposite sex, same birth year, claiming at 65.
         </div>
       </div>
     </div>
@@ -314,7 +317,7 @@
     <!-- ===== Cohort Comparison Tab ===== -->
     <div class="tab-pane" id="cohortPane">
 
-      <!-- Input Row -->
+      <!-- Cohort Configuration -->
       <div class="card">
         <div class="card-header bg-primary">Cohort Configuration</div>
         <div class="card-body">
@@ -323,12 +326,25 @@
               <label class="form-label" for="cohWorkerType">Worker Type</label>
               <select class="form-select" id="cohWorkerType"></select>
             </div>
-            <select class="form-select" id="cohClaimAge" hidden><option value="65" selected>65</option></select>
+            <div class="input-group-inline">
+              <label class="form-label">Sex</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="cohSex" value="male" checked> Male</label>
+                <label class="radio-label"><input type="radio" name="cohSex" value="female"> Female</label>
+              </div>
+            </div>
+            <div class="input-group-inline">
+              <label class="form-label">Marital Status</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="cohMarital" value="single" checked> Single</label>
+                <label class="radio-label"><input type="radio" name="cohMarital" value="married"> Married</label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Charts Grid -->
+      <!-- Cohort Charts Grid -->
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="card">
@@ -372,7 +388,7 @@
         </div>
       </div>
 
-      <!-- Cohort Metric Summary Cards -->
+      <!-- Cohort Summary Cards -->
       <div class="row g-3 mt-0">
         <div class="col-md-3"><div class="metric-card" id="cohMetricRepl">
           <div class="metric-label">Avg Replacement Rate</div>
@@ -414,9 +430,9 @@
       <div class="card mt-2">
         <div class="card-body notes-panel">
           <strong>Notes: </strong>
-          All metrics calculated for specified worker configuration across birth years.
-          PV values discounted to age 65.
-          IRR = internal rate of return on lifetime SS taxes (including employer share).
+          All metrics under current law for the selected worker type, sex, and marital status across birth years.
+          PV values discounted to age 65, including employer share of payroll taxes.
+          IRR = internal rate of return on lifetime SS taxes.
         </div>
       </div>
     </div>

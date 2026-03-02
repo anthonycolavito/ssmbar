@@ -16,9 +16,9 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: March 1, 2026
+**Last Updated**: March 2, 2026
 
-**Active Work**: Static GitHub Pages Benefit Explorer — reform category restructure
+**Active Work**: Static GitHub Pages Benefit Explorer — current-law rebuild with sex/marital dimensions
 
 **Blocked On**: Nothing
 
@@ -27,6 +27,39 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 2, 2026 (Session 20) — Website Rebuild: Current-Law with Sex + Marital Dimensions
+
+**Task**: Complete rebuild of the Benefit Explorer website per `SSMBAR_WEBSITE_REBUILD_INSTRUCTIONS.md`. Switched from reform-combination data (1,280 combos) to current-law-only mode with 192 worker configurations (6 worker types × 2 sexes × 8 birth years × 2 marital statuses). Added NMTR (Net Marginal Tax Rate) chart. All reform buttons visible but disabled (greyed out).
+
+**Subtasks Completed**:
+1. **Task 1 — Basic Minimum Benefit Investigation**: Tested BMB reform across all 48 configurations. ALL showed zero supplement (pre-2026 eligibility for older cohorts, benefits too high for newer ones). BMB amounts not AWI-indexed (known bug, deferred by user).
+2. **Task 2 — Remove Repeal RET + BMB**: Removed `repeal_ret` and `basic_minimum` from HTML, manifest, and generate_combo_data.R.
+3. **Task 6 — Review Existing Work**: Inventoried reusable functions: `calculate_benefits()` supports sex/spouse params, `net_marginal_tax_rate()` works, `couple_measures()` available.
+4. **Task 3+4 — Data Generation**: Created `scripts/generate_currentlaw_data.R` to generate all 192 configs with NMTR. Spouse assumption: same worker type, opposite sex, same birth year, claim age 65. Outputs 18 JSON files (6 cohort, 6 benefits, 6 NMTR). Include employer taxes.
+5. **Task 5 — UI Rebuild**: Rewrote all JS files and HTML. Added Sex and Marital Status radio buttons to both tabs. Default view: Real dollars. NMTR chart visible. Married workers show couple-level PV metrics. Added 3 CSS rules: `.radio-group`, `.radio-label`, `.reform-section.disabled`.
+
+**Data Schema**:
+- Cohort: `docs/data/cohort/{type}.json` — `{meta, data: {male_single: {birth_years, monthly_benefit, pv_benefits, pv_taxes, ratio, irr, repl_rate, initial_real_benefit, death_age, couple_*}, ...}}`
+- Benefits: `docs/data/individual/{type}_benefits.json` — `{meta, data: {male_single: {"1940": {ages, nominal, real}, ...}, ...}}`
+- NMTR: `docs/data/individual/{type}_nmtr.json` — `{meta, data: {male_single: {"1940": {ages, nmtr, earnings, ss_tax, delta_pv}, ...}, ...}}`
+
+**Files Modified**:
+- `docs/index.html` — Complete rewrite: sex/marital radios on both tabs, reforms disabled, NMTR visible
+- `docs/css/style.css` — Added `.radio-group`, `.radio-label`, `.reform-section.disabled` rules
+- `docs/data/manifest.json` — New schema with data_mode, sexes, marital_statuses, file_patterns
+- `docs/js/data-loader.js` — Rewritten: dimKey(sex, marital), meta/data wrapper handling, NMTR fetcher
+- `docs/js/app.js` — Rewritten: 4-dimension data flow, NMTR rendering, married-aware metrics
+- `docs/js/chart-manager.js` — Changed `repl_rate_real_all` to `repl_rate`
+- `docs/js/table-manager.js` — Simplified without reform comparisons, added death_age column
+- `docs/js/ui-controls.js` — Rewritten: sex/marital getters, disabled reforms, real default
+- `scripts/generate_combo_data.R` — Removed repeal_ret and basic_minimum
+- `scripts/generate_currentlaw_data.R` — NEW: generates 192 current-law configurations with NMTR
+
+**Files Added**: 18 new data JSONs (6 cohort, 6 benefits, 6 NMTR)
+**Files Removed**: 11 old `_65` suffixed data JSONs
+
+**Test Results**: 647 passed, 1 pre-existing failure (`expect_no_error` not available in installed testthat version), 2 skips, 1 warning.
 
 ### March 1, 2026 (Session 19) — Reform Category Restructure + Skill File Cleanup
 

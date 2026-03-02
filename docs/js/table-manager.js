@@ -4,15 +4,10 @@
 
 class TableManager {
   constructor() {
-    this.tables = {};  // Store table data for export
+    this.tables = {};
     this.pageSize = 20;
   }
 
-  /**
-   * Render an HTML table into a wrapper element
-   * @param {string} wrapperId - DOM id of wrapper div
-   * @param {object} config - { columns, rows, id }
-   */
   render(wrapperId, { columns, rows, id }) {
     const wrapper = document.getElementById(wrapperId);
     if (!wrapper) return;
@@ -24,78 +19,21 @@ class TableManager {
       return;
     }
 
-    const totalPages = Math.ceil(rows.length / this.pageSize);
-    let currentPage = 0;
-
-    const renderPage = (page) => {
-      currentPage = page;
-      const start = page * this.pageSize;
-      const end = Math.min(start + this.pageSize, rows.length);
-      const pageRows = rows.slice(start, end);
-
-      let html = '<table class="data-table"><thead><tr>';
-      for (const col of columns) {
-        html += `<th>${col.label}</th>`;
-      }
-      html += '</tr></thead><tbody>';
-
-      for (const row of pageRows) {
-        html += '<tr>';
-        for (const col of columns) {
-          const val = row[col.key];
-          const formatted = col.format ? col.format(val) : (val ?? '--');
-          html += `<td>${formatted}</td>`;
-        }
-        html += '</tr>';
-      }
-      html += '</tbody></table>';
-
-      // Pagination
-      if (totalPages > 1) {
-        html += '<div class="table-controls">';
-        html += `<span>Showing ${start + 1}-${end} of ${rows.length}</span>`;
-        html += '<div class="pagination">';
-        if (currentPage > 0) {
-          html += `<button onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${page - 1})">Prev</button>`;
-        }
-        for (let p = 0; p < totalPages; p++) {
-          const active = p === currentPage ? ' active' : '';
-          html += `<button class="${active}" onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${p})">${p + 1}</button>`;
-        }
-        if (currentPage < totalPages - 1) {
-          html += `<button onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${page + 1})">Next</button>`;
-        }
-        html += '</div></div>';
-      }
-
-      wrapper.innerHTML = html;
-    };
-
-    renderPage(0);
+    this._renderPage(wrapperId, id, 0);
   }
 
-  /**
-   * Navigate to a specific page
-   */
-  navigatePage(wrapperId, id, page) {
-    const tableData = this.tables[id];
-    if (!tableData) return;
-    this.render(wrapperId, { ...tableData, id });
-    // Re-render starts at page 0; we need to build a stateful approach
-    // Simpler: re-render with offset
+  _renderPage(wrapperId, id, page) {
     const wrapper = document.getElementById(wrapperId);
     if (!wrapper) return;
 
-    const { columns, rows } = tableData;
+    const { columns, rows } = this.tables[id];
     const totalPages = Math.ceil(rows.length / this.pageSize);
     const start = page * this.pageSize;
     const end = Math.min(start + this.pageSize, rows.length);
     const pageRows = rows.slice(start, end);
 
     let html = '<table class="data-table"><thead><tr>';
-    for (const col of columns) {
-      html += `<th>${col.label}</th>`;
-    }
+    for (const col of columns) html += `<th>${col.label}</th>`;
     html += '</tr></thead><tbody>';
 
     for (const row of pageRows) {
@@ -113,25 +51,21 @@ class TableManager {
       html += '<div class="table-controls">';
       html += `<span>Showing ${start + 1}-${end} of ${rows.length}</span>`;
       html += '<div class="pagination">';
-      if (page > 0) {
-        html += `<button onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${page - 1})">Prev</button>`;
-      }
+      if (page > 0) html += `<button onclick="tableManager.navigatePage('${wrapperId}','${id}',${page - 1})">Prev</button>`;
       for (let p = 0; p < totalPages; p++) {
-        const active = p === page ? ' active' : '';
-        html += `<button class="${active}" onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${p})">${p + 1}</button>`;
+        html += `<button class="${p === page ? 'active' : ''}" onclick="tableManager.navigatePage('${wrapperId}','${id}',${p})">${p + 1}</button>`;
       }
-      if (page < totalPages - 1) {
-        html += `<button onclick="tableManager.navigatePage('${wrapperId}', '${id}', ${page + 1})">Next</button>`;
-      }
+      if (page < totalPages - 1) html += `<button onclick="tableManager.navigatePage('${wrapperId}','${id}',${page + 1})">Next</button>`;
       html += '</div></div>';
     }
 
     wrapper.innerHTML = html;
   }
 
-  /**
-   * Export table data as CSV
-   */
+  navigatePage(wrapperId, id, page) {
+    this._renderPage(wrapperId, id, page);
+  }
+
   exportCSV(id, filename) {
     const tableData = this.tables[id];
     if (!tableData) return;
@@ -143,7 +77,6 @@ class TableManager {
         let val = row[col.key];
         if (val == null) return '';
         val = String(val);
-        // Escape commas and quotes
         if (val.includes(',') || val.includes('"') || val.includes('\n')) {
           val = '"' + val.replace(/"/g, '""') + '"';
         }
@@ -161,124 +94,50 @@ class TableManager {
   }
 
   // =========================================================================
-  // Table builders for specific views
+  // Table builders
   // =========================================================================
 
-  /**
-   * Build benefits data table
-   */
-  renderBenefitsTable(baselineSeries, reformSeries, reformLabel) {
-    if (!baselineSeries) return;
+  renderBenefitsTable(series) {
+    if (!series) return;
 
     const columns = [
       { key: 'age', label: 'Age' },
-      { key: 'nominal_base', label: 'Nominal (Base)', format: v => Fmt.currency(v) },
-      { key: 'real_base', label: 'Real (Base)', format: v => Fmt.currency(v) }
+      { key: 'nominal', label: 'Nominal ($)', format: v => Fmt.currency(v) },
+      { key: 'real', label: 'Real ($)', format: v => Fmt.currency(v) }
     ];
 
-    if (reformSeries) {
-      columns.push(
-        { key: 'nominal_reform', label: `Nominal (${reformLabel})`, format: v => Fmt.currency(v) },
-        { key: 'real_reform', label: `Real (${reformLabel})`, format: v => Fmt.currency(v) }
-      );
-    }
-
-    const rows = baselineSeries.ages.map((age, i) => {
-      const row = {
-        age,
-        nominal_base: baselineSeries.nominal[i],
-        real_base: baselineSeries.real[i]
-      };
-      if (reformSeries) {
-        row.nominal_reform = reformSeries.nominal?.[i];
-        row.real_reform = reformSeries.real?.[i];
-      }
-      return row;
-    });
+    const rows = series.ages.map((age, i) => ({
+      age,
+      nominal: series.nominal[i],
+      real: series.real[i]
+    }));
 
     this.render('benefitsTableWrapper', { columns, rows, id: 'benefits' });
   }
 
-  /**
-   * Build marginal analysis data table
-   */
-  renderMarginalTable(baselineMarginal, reformMarginal, reformLabel) {
-    if (!baselineMarginal) return;
-
-    const columns = [
-      { key: 'age', label: 'Age' },
-      { key: 'earnings', label: 'Earnings', format: v => Fmt.currency(v) },
-      { key: 'nmtr_base', label: 'NMTR (Base)', format: v => Fmt.percent(v) },
-      { key: 'delta_pv_base', label: 'Delta PV (Base)', format: v => Fmt.currency(v) }
-    ];
-
-    if (reformMarginal) {
-      columns.push(
-        { key: 'nmtr_reform', label: `NMTR (${reformLabel})`, format: v => Fmt.percent(v) },
-        { key: 'delta_pv_reform', label: `Delta PV (${reformLabel})`, format: v => Fmt.currency(v) }
-      );
-    }
-
-    const rows = baselineMarginal.ages.map((age, i) => {
-      const row = {
-        age,
-        earnings: baselineMarginal.earnings[i],
-        nmtr_base: baselineMarginal.nmtr[i],
-        delta_pv_base: baselineMarginal.delta_pv?.[i]
-      };
-      if (reformMarginal) {
-        row.nmtr_reform = reformMarginal.nmtr?.[i];
-        row.delta_pv_reform = reformMarginal.delta_pv?.[i];
-      }
-      return row;
-    });
-
-    this.render('marginalTableWrapper', { columns, rows, id: 'marginal' });
-  }
-
-  /**
-   * Build cohort data table
-   */
-  renderCohortTable(baselineData, reformData, reformLabel, replField) {
-    if (!baselineData) return;
+  renderCohortTable(data, reformData, reformLabel, replField) {
+    if (!data) return;
 
     const columns = [
       { key: 'birth_year', label: 'Birth Year' },
-      { key: 'repl_base', label: 'Repl% (Base)', format: v => Fmt.percent(v) },
-      { key: 'pv_base', label: 'PV Ben (Base)', format: v => Fmt.currency(v, { compact: true }) },
-      { key: 'ratio_base', label: 'Ratio (Base)', format: v => Fmt.number(v) },
-      { key: 'irr_base', label: 'IRR% (Base)', format: v => Fmt.percent(v) }
+      { key: 'repl', label: 'Repl Rate', format: v => Fmt.percent(v) },
+      { key: 'pv', label: 'PV Benefits', format: v => Fmt.currency(v, { compact: true }) },
+      { key: 'ratio', label: 'Ratio', format: v => Fmt.number(v) },
+      { key: 'irr', label: 'IRR', format: v => Fmt.percent(v) },
+      { key: 'death_age', label: 'Life Exp.', format: v => v != null ? v.toFixed(1) : '--' }
     ];
 
-    if (reformData) {
-      columns.push(
-        { key: 'repl_reform', label: `Repl% (${reformLabel})`, format: v => Fmt.percent(v) },
-        { key: 'pv_reform', label: `PV Ben (${reformLabel})`, format: v => Fmt.currency(v, { compact: true }) },
-        { key: 'ratio_reform', label: `Ratio (${reformLabel})`, format: v => Fmt.number(v) },
-        { key: 'irr_reform', label: `IRR% (${reformLabel})`, format: v => Fmt.percent(v) }
-      );
-    }
-
-    const rows = baselineData.birth_years.map((by, i) => {
-      const row = {
-        birth_year: by,
-        repl_base: baselineData[replField]?.[i],
-        pv_base: baselineData.pv_benefits[i],
-        ratio_base: baselineData.ratio[i],
-        irr_base: baselineData.irr[i]
-      };
-      if (reformData) {
-        row.repl_reform = reformData[replField]?.[i];
-        row.pv_reform = reformData.pv_benefits[i];
-        row.ratio_reform = reformData.ratio[i];
-        row.irr_reform = reformData.irr[i];
-      }
-      return row;
-    });
+    const rows = data.birth_years.map((by, i) => ({
+      birth_year: by,
+      repl: data[replField]?.[i],
+      pv: data.pv_benefits[i],
+      ratio: data.ratio[i],
+      irr: data.irr[i],
+      death_age: data.death_age?.[i]
+    }));
 
     this.render('cohortTableWrapper', { columns, rows, id: 'cohort' });
   }
 }
 
-// Global instance
 const tableManager = new TableManager();

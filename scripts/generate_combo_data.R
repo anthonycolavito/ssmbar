@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# Generate pre-computed data for all 3,072 reform combinations
+# Generate pre-computed data for all 768 reform combinations
 # =============================================================================
 #
 # Writes:
@@ -54,9 +54,7 @@ reform_factories <- list(
   eliminate_taxmax = function() reform_eliminate_taxmax(2030),
   eliminate_taxmax_no_credit = function() reform_eliminate_taxmax_no_credit(2030),
   forty_year_avg = function() reform_40_year_averaging(2030),
-  repeal_ret = function() reform_repeal_ret(2030),
-  mini_pia = function() reform_mini_pia(2030, 10),
-  basic_minimum = function() reform_basic_minimum(900, 1342, 2030)
+  mini_pia = function() reform_mini_pia(2030, 10)
 )
 
 categories <- list(
@@ -64,7 +62,7 @@ categories <- list(
   nra = c("none", "nra_to_68", "index_nra", "nra_to_69_index"),
   cola = c("none", "chained_cpi", "cola_cap", "cpi_e"),
   taxmax = c("none", "taxmax_90_pct", "eliminate_taxmax", "eliminate_taxmax_no_credit"),
-  other = c("none", "forty_year_avg", "repeal_ret", "mini_pia", "basic_minimum")
+  other = c("none", "forty_year_avg", "mini_pia")
 )
 
 combos <- expand.grid(categories, stringsAsFactors = FALSE)

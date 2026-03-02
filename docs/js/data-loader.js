@@ -5,15 +5,12 @@
 class DataLoader {
   constructor() {
     this.cache = new Map();
-    this.pending = new Map();  // Request deduplication
+    this.pending = new Map();
     this.manifest = null;
     this.maxCacheSize = 50;
     this.basePath = 'data';
   }
 
-  /**
-   * Initialize: fetch manifest.json
-   */
   async init() {
     try {
       const resp = await fetch(`${this.basePath}/manifest.json`);
@@ -27,16 +24,10 @@ class DataLoader {
     }
   }
 
-  /**
-   * Fetch a JSON file with caching and request deduplication
-   */
   async _fetch(path) {
-    if (this.cache.has(path)) {
-      return this.cache.get(path);
-    }
-    if (this.pending.has(path)) {
-      return this.pending.get(path);
-    }
+    if (this.cache.has(path)) return this.cache.get(path);
+    if (this.pending.has(path)) return this.pending.get(path);
+
     const url = `${this.basePath}/${path}`;
     const promise = fetch(url)
       .then(resp => {
@@ -46,7 +37,6 @@ class DataLoader {
       .then(data => {
         this.pending.delete(path);
         this._cacheSet(path, data);
-        console.log(`DataLoader: loaded ${path} (${Object.keys(data?.data || {}).length} keys)`);
         return data;
       })
       .catch(err => {
@@ -58,9 +48,6 @@ class DataLoader {
     return promise;
   }
 
-  /**
-   * Set cache entry with LRU eviction
-   */
   _cacheSet(key, value) {
     if (this.cache.size >= this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
@@ -70,28 +57,27 @@ class DataLoader {
   }
 
   // =========================================================================
-  // Public API
+  // Build dimension key: "{sex}_{marital}"
   // =========================================================================
 
-  /**
-   * Get cohort data (also serves individual metrics)
-   */
+  dimKey(sex, marital) {
+    return `${sex}_${marital}`;
+  }
+
+  // =========================================================================
+  // Public API — file fetchers
+  // =========================================================================
+
   async getCohortData(type) {
-    return this._fetch(`cohort/${type}_65.json`);
+    return this._fetch(`cohort/${type}.json`);
   }
 
-  /**
-   * Get individual benefit series (yearly benefits per birth year)
-   */
   async getIndividualBenefits(type) {
-    return this._fetch(`individual/${type}_65_benefits.json`);
+    return this._fetch(`individual/${type}_benefits.json`);
   }
 
-  /**
-   * Get individual marginal analysis data (stub — returns null until NMTR data exists)
-   */
-  async getIndividualMarginal(type) {
-    return null;
+  async getIndividualNMTR(type) {
+    return this._fetch(`individual/${type}_nmtr.json`);
   }
 
   // =========================================================================
@@ -99,11 +85,12 @@ class DataLoader {
   // =========================================================================
 
   /**
-   * Extract a single birth year's metrics from cohort data
+   * Extract metrics for a single birth year from cohort data
    */
-  getMetricsForBirthYear(cohortData, comboKey, birthYear) {
-    if (!cohortData?.data?.[comboKey]) return null;
-    const d = cohortData.data[comboKey];
+  getMetricsForBirthYear(cohortData, sex, marital, birthYear) {
+    const key = this.dimKey(sex, marital);
+    const d = cohortData?.data?.[key];
+    if (!d) return null;
     const idx = d.birth_years.indexOf(birthYear);
     if (idx === -1) return null;
     return {
@@ -112,56 +99,48 @@ class DataLoader {
       pv_taxes: d.pv_taxes[idx],
       ratio: d.ratio[idx],
       irr: d.irr[idx],
-      repl_rate: d.repl_rate_real_all?.[idx],
-      death_age: d.death_age?.[idx]
+      repl_rate: d.repl_rate[idx],
+      death_age: d.death_age?.[idx],
+      initial_real_benefit: d.initial_real_benefit?.[idx],
+      couple_pv_benefits: d.couple_pv_benefits?.[idx],
+      couple_pv_taxes: d.couple_pv_taxes?.[idx],
+      couple_ratio: d.couple_ratio?.[idx]
     };
   }
 
   /**
    * Extract benefit series for a specific birth year
    */
-  getBenefitSeries(benefitsData, comboKey, birthYear) {
-    if (!benefitsData?.data?.[comboKey]) return null;
-    return benefitsData.data[comboKey][String(birthYear)] || null;
+  getBenefitSeries(benefitsData, sex, marital, birthYear) {
+    const key = this.dimKey(sex, marital);
+    return benefitsData?.data?.[key]?.[String(birthYear)] || null;
   }
 
   /**
-   * Extract marginal data for a specific birth year (stub)
+   * Extract NMTR series for a specific birth year
    */
-  getMarginalData(marginalData, comboKey, birthYear) {
-    return null;
+  getNMTRSeries(nmtrData, sex, marital, birthYear) {
+    const key = this.dimKey(sex, marital);
+    return nmtrData?.data?.[key]?.[String(birthYear)] || null;
   }
 
   /**
-   * Extract cohort arrays for a combo key
+   * Extract cohort-level arrays (all birth years) for charts
    */
-  getCohortSeries(cohortData, comboKey) {
-    if (!cohortData?.data?.[comboKey]) return null;
-    return cohortData.data[comboKey];
+  getCohortSeries(cohortData, sex, marital) {
+    const key = this.dimKey(sex, marital);
+    return cohortData?.data?.[key] || null;
   }
 
   /**
-   * Get available combo keys from loaded data
-   */
-  getScenarios(data) {
-    if (!data?.data) return [];
-    return Object.keys(data.data);
-  }
-
-  /**
-   * Get human-readable label for a combo key
+   * Get human-readable reform label
    */
   getReformLabel(comboKey) {
     if (!comboKey || comboKey === 'baseline') return 'Current Law';
-
     const labels = this.manifest?.reform_labels || {};
     const parts = comboKey.split('+');
-
-    // Map each reform to its label, fall back to the key itself
-    const partLabels = parts.map(p => labels[p] || p);
-    return partLabels.join(' + ');
+    return parts.map(p => labels[p] || p).join(' + ');
   }
 }
 
-// Global instance
 const dataLoader = new DataLoader();

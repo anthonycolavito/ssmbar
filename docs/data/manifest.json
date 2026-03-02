@@ -1,19 +1,29 @@
 {
-  "generated": "2026-03-01T00:00:00",
+  "generated": "2026-03-02T00:00:00",
   "package_version": "0.0.0.9001",
   "data_source": "2025 Trustees Report",
+  "data_mode": "current_law",
   "dimensions": {
     "worker_types": [
-      { "key": "very_low", "label": "Very Low Earner", "type": "very_low", "custom_earnings": null },
-      { "key": "low", "label": "Low Earner", "type": "low", "custom_earnings": null },
-      { "key": "medium", "label": "Medium Earner", "type": "medium", "custom_earnings": null },
-      { "key": "high", "label": "High Earner", "type": "high", "custom_earnings": null },
-      { "key": "max", "label": "Maximum Earner", "type": "max", "custom_earnings": null },
-      { "key": "custom_50k", "label": "$50K Earner", "type": "custom", "custom_earnings": 50000 }
+      { "key": "very_low", "label": "Very Low Earner" },
+      { "key": "low", "label": "Low Earner" },
+      { "key": "medium", "label": "Medium Earner" },
+      { "key": "high", "label": "High Earner" },
+      { "key": "max", "label": "Maximum Earner" },
+      { "key": "custom_50k", "label": "$50K Earner" }
     ],
-    "claim_ages": [65],
-    "birth_years": [1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010]
+    "sexes": [
+      { "key": "male", "label": "Male" },
+      { "key": "female", "label": "Female" }
+    ],
+    "marital_statuses": [
+      { "key": "single", "label": "Single" },
+      { "key": "married", "label": "Married" }
+    ],
+    "birth_years": [1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010],
+    "claim_ages": [65]
   },
+  "spouse_assumption": "Same worker type, opposite sex, same birth year, claim age 65",
   "reform_labels": {
     "reduce_fact3": "Slow Benefit Growth for Top 20% of Earners",
     "flat_benefit": "Transition to a Flat Benefit",
@@ -28,9 +38,7 @@
     "eliminate_taxmax": "Eliminate Tax Max with Benefit Credit",
     "eliminate_taxmax_no_credit": "Eliminate Tax Max without Benefit Credit",
     "forty_year_avg": "Calculate Benefits Based on Highest 40 Years",
-    "repeal_ret": "Repeal the Retirement Earnings Test",
-    "mini_pia": "Apply Benefit Formula to Annual Earnings",
-    "basic_minimum": "Establish a Basic Minimum Benefit"
+    "mini_pia": "Apply Benefit Formula to Annual Earnings"
   },
   "reform_categories": {
     "pia_formula": {
@@ -60,12 +68,13 @@
     "other": {
       "label": "Other Reforms",
       "icon": "bi-gear",
-      "reforms": ["forty_year_avg", "repeal_ret", "mini_pia", "basic_minimum"],
+      "reforms": ["forty_year_avg", "mini_pia"],
       "exclusive": true
     }
   },
   "file_patterns": {
-    "cohort": "cohort/{type}_65.json",
-    "individual_benefits": "individual/{type}_65_benefits.json"
+    "cohort": "cohort/{type}.json",
+    "individual_benefits": "individual/{type}_benefits.json",
+    "individual_nmtr": "individual/{type}_nmtr.json"
   }
 }
