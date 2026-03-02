@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: March 1, 2026
 
-**Active Work**: Static GitHub Pages Benefit Explorer — 3,072 reform combination rebuild
+**Active Work**: Static GitHub Pages Benefit Explorer — reform category restructure
 
 **Blocked On**: Nothing
 
@@ -27,6 +27,26 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 1, 2026 (Session 19) — Reform Category Restructure
+
+**Task**: Simplify reform categories on the static site: remove child care credit, consolidate basic minimum benefit into a renamed category, and remove unnecessary "None" radio buttons.
+
+**Changes**:
+- Removed "Provide Earnings Credit for Child Care" reform option entirely
+- Removed "Benefit Enhancements" category (was: basic_minimum, child_care_credit)
+- Moved "Establish a Basic Minimum Benefit" into "Other Reforms" (renamed from "Improve Work Incentives")
+- Removed "None" radio buttons from all 5 categories — added click-to-deselect behavior instead
+- Reform categories reduced from 6 to 5; combo count reduced from 3,072 to 1,280
+- All 1,280 combo keys already exist in pre-generated data (no regeneration needed)
+- 1,024 orphaned child_care_credit combo keys remain in data files (harmless, unused)
+
+**Files Modified**:
+- `docs/index.html` — Removed Benefit Enhancements section, removed None radios, renamed group
+- `docs/js/ui-controls.js` — 5 radio groups, initRadioDeselect(), updated clearReform()
+- `docs/js/app.js` — Replaced radio change listeners with initRadioDeselect() call
+- `docs/data/manifest.json` — Removed child_care_credit, merged categories
+- `scripts/generate_combo_data.R` — Updated categories and factories for future regeneration
 
 ### March 1, 2026 (Session 18) — Reform Combination Rebuild
 

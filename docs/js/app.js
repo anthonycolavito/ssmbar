@@ -33,15 +33,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById(id)?.addEventListener('change', onInputChange);
     });
 
-    // Wire up all reform radio buttons (6 groups)
-    REFORM_RADIO_GROUPS.forEach(groupName => {
-      document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
-        radio.addEventListener('change', () => {
-          updateReformBadge();
-          onInputChange();
-        });
-      });
-    });
+    // Wire up reform radio buttons with click-to-deselect
+    initRadioDeselect();
 
     // Handle URL hash for tab routing
     const hash = window.location.hash.replace('#', '');

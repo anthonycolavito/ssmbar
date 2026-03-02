@@ -95,19 +95,18 @@ const REFORM_RADIO_GROUPS = [
   'reform_nra',
   'reform_cola',
   'reform_taxmax',
-  'reform_work',
-  'reform_enhance'
+  'reform_other'
 ];
 
 /**
- * Build combo key from the 6 radio button groups.
- * Returns "baseline" if all are "none", otherwise joins active reform names with "+".
+ * Build combo key from the 5 radio button groups.
+ * Returns "baseline" if none selected, otherwise joins active reform names with "+".
  */
 function getComboKey() {
   const active = [];
   for (const groupName of REFORM_RADIO_GROUPS) {
     const checked = document.querySelector(`input[name="${groupName}"]:checked`);
-    if (checked && checked.value !== 'none') {
+    if (checked) {
       active.push(checked.value);
     }
   }
@@ -122,15 +121,36 @@ function hasReformSelected() {
 }
 
 /**
- * Clear all reform selections (reset to "none")
+ * Clear all reform selections (deselect all radios)
  */
 function clearReform() {
   for (const groupName of REFORM_RADIO_GROUPS) {
-    const noneRadio = document.querySelector(`input[name="${groupName}"][value="none"]`);
-    if (noneRadio) noneRadio.checked = true;
+    document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => r.checked = false);
   }
   updateReformBadge();
   onInputChange();
+}
+
+/**
+ * Enable click-to-deselect on radio buttons (no "None" option needed)
+ */
+function initRadioDeselect() {
+  for (const groupName of REFORM_RADIO_GROUPS) {
+    document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
+      radio.addEventListener('click', function () {
+        if (this._wasChecked) {
+          this.checked = false;
+          this._wasChecked = false;
+        } else {
+          // Unmark siblings
+          document.querySelectorAll(`input[name="${groupName}"]`).forEach(r => r._wasChecked = false);
+          this._wasChecked = true;
+        }
+        updateReformBadge();
+        onInputChange();
+      });
+    });
+  }
 }
 
 /**

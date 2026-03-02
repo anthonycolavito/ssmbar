@@ -30,8 +30,7 @@
     "forty_year_avg": "Calculate Benefits Based on Highest 40 Years",
     "repeal_ret": "Repeal the Retirement Earnings Test",
     "mini_pia": "Apply Benefit Formula to Annual Earnings",
-    "basic_minimum": "Establish a Basic Minimum Benefit",
-    "child_care_credit": "Provide Earnings Credit for Child Care"
+    "basic_minimum": "Establish a Basic Minimum Benefit"
   },
   "reform_categories": {
     "pia_formula": {
@@ -58,16 +57,10 @@
       "reforms": ["taxmax_90_pct", "eliminate_taxmax", "eliminate_taxmax_no_credit"],
       "exclusive": true
     },
-    "work_incentives": {
-      "label": "Improve Work Incentives",
+    "other": {
+      "label": "Other Reforms",
       "icon": "bi-gear",
-      "reforms": ["forty_year_avg", "repeal_ret", "mini_pia"],
-      "exclusive": true
-    },
-    "enhancements": {
-      "label": "Benefit Enhancements",
-      "icon": "bi-plus-circle",
-      "reforms": ["basic_minimum", "child_care_credit"],
+      "reforms": ["forty_year_avg", "repeal_ret", "mini_pia", "basic_minimum"],
       "exclusive": true
     }
   },
