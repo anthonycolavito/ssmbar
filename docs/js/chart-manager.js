@@ -212,7 +212,13 @@ class ChartManager {
   renderNMTRChart(nmtrSeries) {
     if (!nmtrSeries) return;
 
-    const nmtrPct = nmtrSeries.nmtr.map(v => v != null ? v * 100 : null);
+    const NMTR_FLOOR = -50;
+    const NMTR_CEIL = 20;
+    const nmtrPct = nmtrSeries.nmtr.map(v => {
+      if (v == null) return null;
+      const pct = v * 100;
+      return Math.max(NMTR_FLOOR, Math.min(NMTR_CEIL, pct));
+    });
 
     const datasets = [{
       label: 'Net Tax Rate',
