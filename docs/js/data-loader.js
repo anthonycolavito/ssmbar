@@ -37,19 +37,21 @@ class DataLoader {
     if (this.pending.has(path)) {
       return this.pending.get(path);
     }
-    const promise = fetch(`${this.basePath}/${path}`)
+    const url = `${this.basePath}/${path}`;
+    const promise = fetch(url)
       .then(resp => {
-        if (!resp.ok) throw new Error(`${path}: ${resp.status}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
         return resp.json();
       })
       .then(data => {
         this.pending.delete(path);
         this._cacheSet(path, data);
+        console.log(`DataLoader: loaded ${path} (${Object.keys(data?.data || {}).length} keys)`);
         return data;
       })
       .catch(err => {
         this.pending.delete(path);
-        console.warn(`DataLoader: failed to fetch ${path}:`, err.message);
+        console.error(`DataLoader: failed to fetch ${url}:`, err);
         return null;
       });
     this.pending.set(path, promise);

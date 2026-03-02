@@ -12,42 +12,46 @@ let cohDataCache = {};
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await dataLoader.init();
+  try {
+    await dataLoader.init();
 
-  // Populate dropdowns
-  populateWorkerTypes('indWorkerType', 'medium');
-  populateWorkerTypes('cohWorkerType', 'medium');
-  populateClaimAges('indClaimAge', 65);
-  populateClaimAges('cohClaimAge', 65);
-  populateBirthYears('indBirthYear', 1940, 2010, 1960);
+    // Populate dropdowns
+    populateWorkerTypes('indWorkerType', 'medium');
+    populateWorkerTypes('cohWorkerType', 'medium');
+    populateClaimAges('indClaimAge', 65);
+    populateClaimAges('cohClaimAge', 65);
+    populateBirthYears('indBirthYear', 1940, 2010, 1960);
 
-  // Wire up input change listeners
-  const indInputs = ['indBirthYear', 'indClaimAge', 'indWorkerType'];
-  indInputs.forEach(id => {
-    document.getElementById(id)?.addEventListener('change', onInputChange);
-  });
+    // Wire up input change listeners
+    const indInputs = ['indBirthYear', 'indClaimAge', 'indWorkerType'];
+    indInputs.forEach(id => {
+      document.getElementById(id)?.addEventListener('change', onInputChange);
+    });
 
-  const cohInputs = ['cohWorkerType', 'cohClaimAge'];
-  cohInputs.forEach(id => {
-    document.getElementById(id)?.addEventListener('change', onInputChange);
-  });
+    const cohInputs = ['cohWorkerType', 'cohClaimAge'];
+    cohInputs.forEach(id => {
+      document.getElementById(id)?.addEventListener('change', onInputChange);
+    });
 
-  // Wire up all reform radio buttons (6 groups)
-  REFORM_RADIO_GROUPS.forEach(groupName => {
-    document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
-      radio.addEventListener('change', () => {
-        updateReformBadge();
-        onInputChange();
+    // Wire up all reform radio buttons (6 groups)
+    REFORM_RADIO_GROUPS.forEach(groupName => {
+      document.querySelectorAll(`input[name="${groupName}"]`).forEach(radio => {
+        radio.addEventListener('change', () => {
+          updateReformBadge();
+          onInputChange();
+        });
       });
     });
-  });
 
-  // Handle URL hash for tab routing
-  const hash = window.location.hash.replace('#', '');
-  if (hash === 'cohort') {
-    switchTab('cohort');
-  } else {
-    switchTab('individual');
+    // Handle URL hash for tab routing
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'cohort') {
+      switchTab('cohort');
+    } else {
+      switchTab('individual');
+    }
+  } catch (err) {
+    console.error('Init error:', err);
   }
 });
 
@@ -71,6 +75,7 @@ async function onInputChange() {
 // =============================================================================
 
 async function updateIndividualTab() {
+  try {
   const type = document.getElementById('indWorkerType').value;
   const birthYear = parseInt(document.getElementById('indBirthYear').value);
   const comboKey = getComboKey();
@@ -82,6 +87,9 @@ async function updateIndividualTab() {
     dataLoader.getCohortData(type),
     dataLoader.getIndividualBenefits(type)
   ]);
+
+  if (!cohortData) console.error('Failed to load cohort data for', type);
+  if (!benefitsData) console.error('Failed to load benefits data for', type);
 
   indDataCache = { cohortData, benefitsData, type, birthYear, comboKey };
 
@@ -104,6 +112,9 @@ async function updateIndividualTab() {
     ? dataLoader.getBenefitSeries(benefitsData, comboKey, birthYear) : null;
   const reformLabel = comboKey !== 'baseline' ? dataLoader.getReformLabel(comboKey) : null;
   tableManager.renderBenefitsTable(baselineSeries, reformSeries, reformLabel);
+  } catch (err) {
+    console.error('updateIndividualTab error:', err);
+  }
 }
 
 /**
@@ -178,11 +189,12 @@ function updateIndividualMetrics(baseline, reformed, comboKey) {
 // =============================================================================
 
 async function updateCohortTab() {
+  try {
   const type = document.getElementById('cohWorkerType').value;
   const comboKey = getComboKey();
 
   const cohortData = await dataLoader.getCohortData(type);
-  if (!cohortData) return;
+  if (!cohortData) { console.error('Failed to load cohort data for', type); return; }
 
   cohDataCache = { cohortData, type, comboKey };
 
@@ -200,6 +212,9 @@ async function updateCohortTab() {
 
   // Update table
   tableManager.renderCohortTable(baselineData, reformData, reformLabel, 'repl_rate_real_all');
+  } catch (err) {
+    console.error('updateCohortTab error:', err);
+  }
 }
 
 /**
