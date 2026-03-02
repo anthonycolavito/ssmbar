@@ -97,10 +97,21 @@ class ChartManager {
     return this.charts[canvasId];
   }
 
-  barChart(canvasId, { labels, datasets, yFormat, yLabel, xLabel, annotation }) {
+  barChart(canvasId, { labels, datasets, yFormat, yLabel, xLabel, annotation, yMin, yMax }) {
     this.destroy(canvasId);
     const ctx = document.getElementById(canvasId);
     if (!ctx) return null;
+
+    const yScale = {
+      ...CHART_DEFAULTS.scales.y,
+      title: yLabel ? { display: true, text: yLabel, color: '#6b7280', font: { family: 'Inter', size: 12 } } : undefined,
+      ticks: {
+        ...CHART_DEFAULTS.scales.y.ticks,
+        callback: yFormat || undefined
+      }
+    };
+    if (yMin != null) yScale.min = yMin;
+    if (yMax != null) yScale.max = yMax;
 
     const config = {
       type: 'bar',
@@ -121,14 +132,7 @@ class ChartManager {
             ...CHART_DEFAULTS.scales.x,
             title: xLabel ? { display: true, text: xLabel, color: '#6b7280', font: { family: 'Inter', size: 12 } } : undefined
           },
-          y: {
-            ...CHART_DEFAULTS.scales.y,
-            title: yLabel ? { display: true, text: yLabel, color: '#6b7280', font: { family: 'Inter', size: 12 } } : undefined,
-            ticks: {
-              ...CHART_DEFAULTS.scales.y.ticks,
-              callback: yFormat || undefined
-            }
-          }
+          y: yScale
         }
       }
     };
@@ -240,7 +244,9 @@ class ChartManager {
       yFormat: (v) => v.toFixed(0) + '%',
       yLabel: 'Net Tax Rate (%)',
       xLabel: 'Age',
-      annotation
+      annotation,
+      yMin: -50,
+      yMax: 20
     });
   }
 
