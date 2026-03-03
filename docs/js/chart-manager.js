@@ -145,7 +145,7 @@ class ChartManager {
   // Individual benefits-by-age chart (clips at death age)
   // =========================================================================
 
-  renderBenefitsChart(baselineSeries, viewMode = 'real', deathAge = null) {
+  renderBenefitsChart(baselineSeries, viewMode = 'real', deathAge = null, reformSeries = null) {
     if (!baselineSeries) return;
 
     const field = viewMode === 'real' ? 'real' : 'nominal';
@@ -162,7 +162,7 @@ class ChartManager {
     }
 
     const datasets = [{
-      label: viewMode === 'real' ? "Today's Dollars" : 'Nominal Dollars',
+      label: 'Current Law',
       data: baseData,
       borderColor: CHART_COLORS.line,
       backgroundColor: CHART_COLORS.fill,
@@ -172,6 +172,41 @@ class ChartManager {
       fill: true,
       tension: 0.2
     }];
+
+    // Add reform overlay if present
+    if (reformSeries) {
+      let reformAges = reformSeries.ages;
+      let reformData = reformSeries[field];
+
+      // Clip reform data to same age range
+      if (deathAge != null) {
+        const maxAge = Math.floor(deathAge);
+        const clipIdx = reformAges.findIndex(a => a > maxAge);
+        if (clipIdx > 0) {
+          reformAges = reformAges.slice(0, clipIdx);
+          reformData = reformData.slice(0, clipIdx);
+        }
+      }
+
+      // Align reform data to baseline ages
+      const alignedReformData = ages.map(age => {
+        const idx = reformAges.indexOf(age);
+        return idx >= 0 ? reformData[idx] : null;
+      });
+
+      datasets.push({
+        label: 'With Reform',
+        data: alignedReformData,
+        borderColor: CHART_COLORS.reform,
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        fill: false,
+        tension: 0.2
+      });
+    }
 
     const annotation = {};
     if (deathAge != null) {
@@ -254,7 +289,7 @@ class ChartManager {
   // Cohort single hero chart
   // =========================================================================
 
-  renderCohortHeroChart(series, metric) {
+  renderCohortHeroChart(series, metric, reformSeries = null) {
     if (!series) return;
 
     const configs = {
@@ -315,6 +350,28 @@ class ChartManager {
       pointBackgroundColor: CHART_COLORS.line,
       tension: 0.3
     }];
+
+    // Add reform overlay if present
+    if (reformSeries && reformSeries[metric]) {
+      // Align reform data to baseline birth years (reform may have fewer years)
+      const alignedData = series.birth_years.map(by => {
+        const idx = reformSeries.birth_years.indexOf(by);
+        return idx >= 0 ? reformSeries[metric][idx] : null;
+      });
+
+      datasets.push({
+        label: 'With Reform',
+        data: alignedData,
+        borderColor: CHART_COLORS.reform,
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        borderDash: [6, 4],
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: CHART_COLORS.reform,
+        tension: 0.3
+      });
+    }
 
     this.lineChart('cohortHeroChart', {
       labels: series.birth_years,

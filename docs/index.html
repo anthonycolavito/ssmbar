@@ -21,18 +21,73 @@
 
 <div class="app-container">
 
-  <!-- Sidebar: Collapsed Reform Strip -->
-  <aside class="sidebar-strip" id="sidebarStrip" title="14 reform options coming soon">
-    <div class="strip-lock">
-      <i class="bi bi-lock"></i>
-      <span class="strip-badge">14</span>
+  <!-- Sidebar: Reform Panel -->
+  <aside class="reform-sidebar" id="reformSidebar">
+    <div class="sidebar-header" onclick="toggleSidebar()">
+      <span class="sidebar-title">Reforms</span>
+      <i class="bi bi-chevron-left sidebar-toggle" id="sidebarToggle"></i>
     </div>
-    <div class="strip-icon" title="Slow Initial Benefit Growth"><i class="bi bi-calculator"></i></div>
-    <div class="strip-icon" title="Increase Retirement Age"><i class="bi bi-clock"></i></div>
-    <div class="strip-icon" title="Modify COLAs"><i class="bi bi-graph-up"></i></div>
-    <div class="strip-icon" title="Increase Taxable Maximum"><i class="bi bi-cash-stack"></i></div>
-    <div class="strip-icon" title="Other Reforms"><i class="bi bi-gear"></i></div>
-    <div class="strip-label">Reforms</div>
+
+    <div class="sidebar-body" id="sidebarBody">
+      <!-- PIA Category -->
+      <div class="reform-category" data-category="pia">
+        <div class="category-header" onclick="toggleReformCategory('pia')">
+          <i class="bi bi-calculator category-icon"></i>
+          <span class="category-label">Slow Initial Benefit Growth</span>
+          <i class="bi bi-chevron-down category-chevron" id="pia-chevron"></i>
+        </div>
+        <div class="category-body" id="pia-body">
+          <button class="reform-option" data-category="pia" data-reform="reduce_fact3"
+                  onclick="selectReform('pia', 'reduce_fact3', this)">
+            Reduce Top Factor to 5%
+          </button>
+          <button class="reform-option" data-category="pia" data-reform="flat_benefit"
+                  onclick="selectReform('pia', 'flat_benefit', this)">
+            Transition to Flat Benefit
+          </button>
+          <button class="reform-option" data-category="pia" data-reform="simpson_bowles_pia"
+                  onclick="selectReform('pia', 'simpson_bowles_pia', this)">
+            Simpson-Bowles PIA
+          </button>
+        </div>
+      </div>
+
+      <!-- NRA Category -->
+      <div class="reform-category locked" data-category="nra">
+        <div class="category-header">
+          <i class="bi bi-clock category-icon"></i>
+          <span class="category-label">Increase Retirement Age</span>
+          <i class="bi bi-lock category-lock"></i>
+        </div>
+      </div>
+
+      <!-- COLA Category -->
+      <div class="reform-category locked" data-category="cola">
+        <div class="category-header">
+          <i class="bi bi-graph-up category-icon"></i>
+          <span class="category-label">Modify COLAs</span>
+          <i class="bi bi-lock category-lock"></i>
+        </div>
+      </div>
+
+      <!-- Tax Max Category -->
+      <div class="reform-category locked" data-category="taxmax">
+        <div class="category-header">
+          <i class="bi bi-cash-stack category-icon"></i>
+          <span class="category-label">Increase Taxable Maximum</span>
+          <i class="bi bi-lock category-lock"></i>
+        </div>
+      </div>
+
+      <!-- Other Reforms Category -->
+      <div class="reform-category locked" data-category="other">
+        <div class="category-header">
+          <i class="bi bi-gear category-icon"></i>
+          <span class="category-label">Other Reforms</span>
+          <i class="bi bi-lock category-lock"></i>
+        </div>
+      </div>
+    </div>
   </aside>
 
   <!-- Main Content -->
@@ -66,6 +121,7 @@
       </div>
       <div class="hero-real-benefit" id="heroRealBenefit"></div>
       <div class="hero-replacement" id="heroReplacement"></div>
+      <div class="hero-reform-comparison" id="heroReformComparison" style="display: none;"></div>
 
       <div class="hero-customize">
         <span class="customize-label">Customize:</span>
@@ -165,6 +221,10 @@
           Women receive the same monthly benefit but collect more over a lifetime
           due to longer life expectancy.
           <a href="#" onclick="document.getElementById('heroSex').value='female'; onHeroChange(); return false;">See the difference</a>
+        </div>
+
+        <div class="insight-callout" id="reformMarriedNote" style="display: none;">
+          Reform impact shown for single workers only. Married figures reflect current law.
         </div>
       </section>
 

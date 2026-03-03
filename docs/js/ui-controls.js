@@ -144,6 +144,62 @@ function switchCohortMetric(metric, btnEl) {
 }
 
 // =========================================================================
+// Reform sidebar
+// =========================================================================
+
+// Active reform state: { pia: 'reduce_fact3', nra: null, cola: null, ... }
+const activeReforms = {};
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('reformSidebar');
+  sidebar.classList.toggle('collapsed');
+}
+
+function toggleReformCategory(category) {
+  const body = document.getElementById(category + '-body');
+  const chevron = document.getElementById(category + '-chevron');
+  if (!body) return;
+  body.classList.toggle('open');
+  if (chevron) chevron.classList.toggle('open');
+}
+
+function selectReform(category, reformName, btn) {
+  // Click-to-deselect: if already active, clear it
+  if (activeReforms[category] === reformName) {
+    activeReforms[category] = null;
+    btn.classList.remove('active');
+  } else {
+    // Deselect previous in this category
+    const catBody = document.getElementById(category + '-body');
+    if (catBody) {
+      catBody.querySelectorAll('.reform-option').forEach(b => b.classList.remove('active'));
+    }
+    activeReforms[category] = reformName;
+    btn.classList.add('active');
+  }
+  onHeroChange();
+}
+
+function getActiveComboKey() {
+  const parts = [];
+  // Category order: pia, nra, cola, taxmax, other
+  for (const cat of ['pia', 'nra', 'cola', 'taxmax', 'other']) {
+    if (activeReforms[cat]) parts.push(activeReforms[cat]);
+  }
+  return parts.length > 0 ? parts.join('+') : null;
+}
+
+function hasActiveReform() {
+  return getActiveComboKey() !== null;
+}
+
+function getActiveReformLabel() {
+  const comboKey = getActiveComboKey();
+  if (!comboKey) return null;
+  return dataLoader.getReformLabel(comboKey);
+}
+
+// =========================================================================
 // CSV Export
 // =========================================================================
 

@@ -70,7 +70,7 @@ class DataLoader {
   }
 
   // =========================================================================
-  // Public API — file fetchers
+  // Public API — file fetchers (current law)
   // =========================================================================
 
   async getCohortData(type) {
@@ -83,6 +83,47 @@ class DataLoader {
 
   async getIndividualNMTR(type) {
     return this._fetch(`individual/${type}_nmtr.json`);
+  }
+
+  // =========================================================================
+  // Public API — reform data fetchers
+  // =========================================================================
+
+  async getReformCohortData(type) {
+    return this._fetch(`reform/cohort/${type}.json`);
+  }
+
+  async getReformIndividualData(type) {
+    return this._fetch(`reform/individual/${type}.json`);
+  }
+
+  // =========================================================================
+  // Reform data extraction helpers
+  // =========================================================================
+
+  getReformMetrics(reformCohortData, comboKey, birthYear) {
+    const d = reformCohortData?.data?.[comboKey];
+    if (!d) return null;
+    const idx = d.birth_years.indexOf(birthYear);
+    if (idx === -1) return null;
+    return {
+      monthly_benefit: d.monthly_benefit[idx],
+      pv_benefits: d.pv_benefits[idx],
+      pv_taxes: d.pv_taxes[idx],
+      ratio: d.ratio[idx],
+      irr: d.irr[idx],
+      repl_rate: d.repl_rate[idx],
+      death_age: d.death_age?.[idx],
+      initial_real_benefit: d.initial_real_benefit?.[idx]
+    };
+  }
+
+  getReformBenefitSeries(reformIndData, comboKey, birthYear) {
+    return reformIndData?.data?.[comboKey]?.[String(birthYear)] || null;
+  }
+
+  getReformCohortSeries(reformCohortData, comboKey) {
+    return reformCohortData?.data?.[comboKey] || null;
   }
 
   // =========================================================================

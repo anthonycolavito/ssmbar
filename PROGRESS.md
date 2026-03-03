@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: March 2, 2026
 
-**Active Work**: Static GitHub Pages Benefit Explorer — spouse type selection + visual redesign
+**Active Work**: Benefit Explorer — Reform Implementation (PIA, NRA, COLA categories)
 
 **Blocked On**: Nothing
 
@@ -27,6 +27,34 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 2, 2026 (Session 22) — Reform Implementation: PIA Category
+
+**Task**: Unlock first 3 reform categories (PIA, NRA, COLA) in the Benefit Explorer with interactive sidebar, data generation, and chart overlays. This commit covers PIA reforms only.
+
+**Subtasks Completed**:
+1. **Data Generation Script**: Created `scripts/generate_reform_data.R` accepting `--categories pia,nra,cola`. Generates reform JSON files in `docs/data/reform/`. Uses sex="all", single only. Smart skip logic: PIA/NRA reforms skip birth years where worker turns 62 before effective_year (1940, 1950, 1960 for PIA eff. 2030); COLA reforms skip only 1940 (dead before 2026). Combo keys are non-"none" reform names joined with "+" in category order.
+2. **PIA Reform Data**: Generated 3 combo keys × 6 worker types × 5 birth years (1970-2010) = 90 configs in 0.2 min. Three reforms: reduce_fact3 (top factor to 5%), flat_benefit (transition to flat), simpson_bowles_pia (4-bracket 90/30/10/5).
+3. **Interactive Sidebar**: Replaced locked 48px strip with 260px reform sidebar panel. PIA category expandable with 3 click-to-deselect option buttons. NRA, COLA, Tax Max, Other shown as locked headers. Collapsible sidebar toggle.
+4. **Reform Data Pipeline**: Added `getReformCohortData()`, `getReformIndividualData()`, `getReformMetrics()`, `getReformBenefitSeries()`, `getReformCohortSeries()` to data-loader.js. App.js fetches reform data when a reform is selected.
+5. **Chart Overlays**: Benefits chart and cohort chart show orange dashed line for reform scenario when active. Legend auto-enables for 2+ datasets. Reform data aligned to baseline birth years (reform may have fewer years).
+6. **Hero Comparison**: Reform comparison div below hero number shows reform benefit + delta (amount and %) when a reform is selected. Shows "No impact for this birth year" when reform doesn't affect selected cohort.
+7. **Return Section**: Shows reform ratio delta alongside baseline when active.
+8. **Married Note**: When reform is active and married is selected, shows note: "Reform impact shown for single workers only."
+
+**Files Added**:
+- `scripts/generate_reform_data.R` — Reform data generation script
+- `docs/data/reform/cohort/{type}.json` × 6 — Reform cohort metrics
+- `docs/data/reform/individual/{type}.json` × 6 — Reform benefit series
+
+**Files Modified**:
+- `docs/index.html` — Sidebar restructure, hero reform comparison div, married note
+- `docs/css/style.css` — Reform sidebar styles, category headers, reform option pills
+- `docs/js/ui-controls.js` — `activeReforms`, `selectReform()`, `getActiveComboKey()`, sidebar toggle
+- `docs/js/data-loader.js` — Reform data fetching and extraction methods
+- `docs/js/chart-manager.js` — Reform overlay on benefits and cohort charts (orange dashed line)
+- `docs/js/app.js` — Reform data fetching in onHeroChange(), hero comparison, return section comparison
+- `docs/data/manifest.json` — Added active_reform_categories, reform file patterns
 
 ### March 2, 2026 (Session 21) — Visual Redesign + Spouse Type Selection
 

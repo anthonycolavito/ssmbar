@@ -98,59 +98,174 @@ a:hover { color: var(--crfb-blue); }
   overflow-y: auto;
 }
 
-/* --- Sidebar Strip (48px collapsed) --- */
-.sidebar-strip {
-  width: 48px;
-  min-width: 48px;
+/* --- Reform Sidebar --- */
+.reform-sidebar {
+  width: 260px;
+  min-width: 260px;
   background: var(--bg-dark);
   border-right: 1px solid var(--border-dark);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 1rem 0;
-  gap: 1.25rem;
   position: sticky;
   top: 56px;
   max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  transition: width 0.25s ease, min-width 0.25s ease;
 }
 
-.strip-lock {
-  position: relative;
+.reform-sidebar.collapsed {
+  width: 48px;
+  min-width: 48px;
+}
+
+.reform-sidebar.collapsed .sidebar-body { display: none; }
+.reform-sidebar.collapsed .sidebar-title { display: none; }
+.reform-sidebar.collapsed .sidebar-toggle { transform: rotate(180deg); }
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.sidebar-title {
+  color: var(--text-on-dark);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-toggle {
   color: var(--text-muted-dark);
-  font-size: 1rem;
+  font-size: 0.85rem;
+  transition: transform 0.25s ease;
 }
 
-.strip-badge {
-  position: absolute;
-  top: -6px;
-  right: -10px;
+.sidebar-body {
+  padding: 0.5rem 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Category */
+.reform-category {
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.reform-category.locked { opacity: 0.5; }
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.reform-category.locked .category-header { cursor: default; }
+.category-header:hover { background-color: var(--bg-dark-card); }
+.reform-category.locked .category-header:hover { background-color: transparent; }
+
+.category-icon {
+  color: var(--text-muted-dark);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.category-label {
+  color: var(--text-on-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-chevron {
+  color: var(--text-muted-dark);
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.category-chevron.open { transform: rotate(180deg); }
+
+.category-lock {
+  color: var(--text-muted-dark);
+  font-size: 0.7rem;
+}
+
+/* Category body (reform options) */
+.category-body {
+  padding: 0.25rem 0.75rem 0.5rem;
+  display: none;
+}
+
+.category-body.open { display: block; }
+
+/* Reform option pill buttons */
+.reform-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1.5px solid var(--border-dark);
+  color: var(--text-muted-dark);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  margin-bottom: 0.35rem;
+  transition: all 0.15s;
+}
+
+.reform-option:hover {
+  border-color: var(--accent-orange);
+  color: var(--text-on-dark);
+}
+
+.reform-option.active {
+  background: var(--accent-orange);
+  border-color: var(--accent-orange);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Active reform count badge on category header */
+.category-header .active-badge {
   background: var(--accent-orange);
   color: #fff;
   font-size: 0.6rem;
   font-weight: 700;
-  padding: 1px 4px;
+  padding: 1px 5px;
   border-radius: 8px;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
-.strip-icon {
-  color: var(--text-muted-dark);
+/* Hero reform comparison */
+.hero-reform-comparison {
+  margin-top: 0.5rem;
   font-size: 0.95rem;
-  cursor: default;
-  opacity: 0.5;
+  color: var(--text-secondary);
 }
 
-.strip-icon:hover { opacity: 0.8; }
-
-.strip-label {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 0.65rem;
-  color: var(--text-muted-dark);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-top: auto;
+.hero-reform-comparison .reform-label {
+  font-size: 0.78rem;
+  color: var(--accent-orange);
+  font-weight: 600;
 }
+
+.hero-reform-comparison .reform-delta {
+  font-weight: 700;
+}
+
+.hero-reform-comparison .reform-delta.negative { color: var(--color-negative); }
+.hero-reform-comparison .reform-delta.positive { color: var(--color-positive); }
 
 /* --- Hero Section --- */
 .hero-section {
@@ -685,9 +800,12 @@ a:hover { color: var(--crfb-blue); }
    Responsive
    ============================================================================= */
 
-/* Tablet: hide sidebar strip */
+/* Tablet: collapse sidebar */
 @media (max-width: 1199px) {
-  .sidebar-strip { display: none; }
+  .reform-sidebar { width: 48px; min-width: 48px; }
+  .reform-sidebar .sidebar-body { display: none; }
+  .reform-sidebar .sidebar-title { display: none; }
+  .reform-sidebar .sidebar-toggle { transform: rotate(180deg); }
 }
 
 /* Mobile */
