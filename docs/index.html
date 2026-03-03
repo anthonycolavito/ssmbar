@@ -76,11 +76,25 @@
       </div>
 
       <!-- COLA Category -->
-      <div class="reform-category locked" data-category="cola">
-        <div class="category-header">
+      <div class="reform-category" data-category="cola">
+        <div class="category-header" onclick="toggleReformCategory('cola')">
           <i class="bi bi-graph-up category-icon"></i>
           <span class="category-label">Modify COLAs</span>
-          <i class="bi bi-lock category-lock"></i>
+          <i class="bi bi-chevron-down category-chevron" id="cola-chevron"></i>
+        </div>
+        <div class="category-body" id="cola-body">
+          <button class="reform-option" data-category="cola" data-reform="chained_cpi"
+                  onclick="selectReform('cola', 'chained_cpi', this)">
+            Chained CPI
+          </button>
+          <button class="reform-option" data-category="cola" data-reform="cola_cap"
+                  onclick="selectReform('cola', 'cola_cap', this)">
+            Cap COLAs
+          </button>
+          <button class="reform-option" data-category="cola" data-reform="cpi_e"
+                  onclick="selectReform('cola', 'cpi_e', this)">
+            CPI-E (Elderly)
+          </button>
         </div>
       </div>
 

@@ -30,6 +30,14 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ### March 2, 2026 (Session 22) — Reform Implementation: PIA, NRA, COLA Categories
 
+**Commit 3: COLA Reforms**
+- Regenerated data with `--categories pia,nra,cola` → 63 combo keys × 6 types in 4.8 min
+- COLA reforms (effective_year=2026, calendar year phase-in): skip only 1940 (dead before 2026)
+- COLA combos use 7 birth years (1950-2010), PIA/NRA-only combos still use 5 (1970-2010)
+- Unlocked COLA category in sidebar with 3 options: Chained CPI, Cap COLAs, CPI-E (Elderly)
+- Updated manifest: `active_reform_categories` now includes all 3: ["pia", "nra", "cola"]
+- Three COLA reforms: chained_cpi (index to chained CPI), cola_cap (cap COLAs for top half), cpi_e (index to CPI-E elderly)
+
 **Commit 2: NRA Reforms**
 - Regenerated data with `--categories pia,nra` → 15 combo keys × 6 types × 5 BYs = 450 configs in 0.9 min
 - Unlocked NRA category in sidebar with 3 options: Raise NRA to 68, Index NRA to Longevity, NRA to 69 Then Index
