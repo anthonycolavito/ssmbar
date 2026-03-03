@@ -244,13 +244,13 @@ class ChartManager {
   // NMTR bar chart with dual colors
   // =========================================================================
 
-  renderNMTRChart(nmtrSeries) {
+  renderNMTRChart(nmtrSeries, reformNmtrSeries = null) {
     if (!nmtrSeries) return;
 
     const nmtrPct = nmtrSeries.nmtr.map(v => v != null ? v * 100 : null);
 
     const datasets = [{
-      label: 'Net Tax Rate',
+      label: 'Current Law',
       data: nmtrPct,
       backgroundColor: (ctx) => {
         const val = ctx.dataset.data[ctx.dataIndex];
@@ -262,6 +262,30 @@ class ChartManager {
       },
       borderWidth: 1
     }];
+
+    // Add reform NMTR overlay as a line
+    if (reformNmtrSeries) {
+      const alignedReformPct = nmtrSeries.ages.map(age => {
+        const idx = reformNmtrSeries.ages.indexOf(age);
+        return idx >= 0 && reformNmtrSeries.nmtr[idx] != null
+          ? reformNmtrSeries.nmtr[idx] * 100 : null;
+      });
+
+      datasets.push({
+        label: 'With Reform',
+        type: 'line',
+        data: alignedReformPct,
+        borderColor: CHART_COLORS.reform,
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        fill: false,
+        tension: 0.2,
+        order: 0
+      });
+    }
 
     const annotation = {
       zeroLine: {

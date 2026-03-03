@@ -285,6 +285,33 @@ extract_benefit_series <- function(worker, by, assumptions) {
 }
 
 # =============================================================================
+# Compute NMTR for one reform worker (uses reform pipeline)
+# =============================================================================
+
+compute_nmtr_reform <- function(worker, assumptions) {
+  nmtr <- tryCatch(
+    net_marginal_tax_rate(worker, assumptions, include_employer = TRUE,
+                          use_reform_pipeline = TRUE),
+    error = function(e) {
+      cat(sprintf("  NMTR error: %s\n", e$message))
+      NULL
+    }
+  )
+  if (is.null(nmtr)) return(NULL)
+
+  nmtr_rows <- nmtr[!is.na(nmtr$net_marginal_tax_rate) & nmtr$age >= 21 & nmtr$age <= 64, ]
+  if (nrow(nmtr_rows) == 0) return(NULL)
+
+  list(
+    ages = as.integer(nmtr_rows$age),
+    nmtr = round(nmtr_rows$net_marginal_tax_rate, 6),
+    earnings = round(nmtr_rows$earnings, 0),
+    ss_tax = round(nmtr_rows$ss_tax, 0),
+    delta_pv = round(nmtr_rows$delta_pv_benefits, 0)
+  )
+}
+
+# =============================================================================
 # Process one worker type: all combos × all applicable birth years
 # =============================================================================
 
@@ -300,6 +327,7 @@ process_worker_type <- function(wconfig) {
   # Output structures keyed by combo key
   coh_data <- list()   # combo_key -> cohort metrics
   ind_data <- list()   # combo_key -> {birth_year -> benefit series}
+  nmtr_data <- list()  # combo_key -> {birth_year -> nmtr series}
 
   total_combos <- nrow(combo_grid)
   for (ci in seq_len(total_combos)) {
@@ -327,6 +355,7 @@ process_worker_type <- function(wconfig) {
     death_arr <- numeric(n_by)
 
     ben_by_year <- list()
+    nmtr_by_year <- list()
 
     for (bi in seq_along(birth_years)) {
       by <- birth_years[bi]
@@ -375,6 +404,58 @@ process_worker_type <- function(wconfig) {
     ind_data[[combo_key]] <- ben_by_year
   }
 
+  # =========================================================================
+  # Second pass: compute NMTR in parallel across all (combo, birth_year) configs
+  # =========================================================================
+
+  cat(sprintf("[%s] %s: Starting NMTR computation (parallel, %d cores)...\n",
+      format(Sys.time(), "%H:%M:%S"), wkey, n_cores))
+
+  # Build list of all (combo, birth_year) configs to compute
+  nmtr_configs <- list()
+  for (ci in seq_len(total_combos)) {
+    combo_row <- combo_grid[ci, , drop = FALSE]
+    combo_key <- combo_keys[ci]
+    birth_years <- get_birth_years_for_combo(combo_row)
+    reform_list <- build_reforms(combo_row)
+    reformed_assumptions <- apply_reforms(tr2025, reform_list, check_exclusivity = FALSE)
+    for (by in birth_years) {
+      nmtr_configs[[length(nmtr_configs) + 1]] <- list(
+        combo_key = combo_key,
+        birth_year = by,
+        wtype = wtype,
+        custom_earn = custom_earn,
+        reformed_assumptions = reformed_assumptions
+      )
+    }
+  }
+
+  cat(sprintf("[%s] %s: %d NMTR configs to compute\n",
+      format(Sys.time(), "%H:%M:%S"), wkey, length(nmtr_configs)))
+
+  nmtr_results <- parallel::mclapply(nmtr_configs, function(cfg) {
+    worker <- tryCatch(
+      compute_reform_config(cfg$wtype, cfg$custom_earn, cfg$birth_year, cfg$reformed_assumptions),
+      error = function(e) NULL
+    )
+    if (is.null(worker)) return(NULL)
+    nmtr_result <- compute_nmtr_reform(worker, cfg$reformed_assumptions)
+    list(combo_key = cfg$combo_key, birth_year = cfg$birth_year, nmtr = nmtr_result)
+  }, mc.cores = n_cores)
+
+  # Assemble NMTR results into nested structure: combo_key -> {birth_year -> nmtr}
+  nmtr_data <- list()
+  for (res in nmtr_results) {
+    if (is.null(res) || is.null(res$nmtr)) next
+    ck <- res$combo_key
+    by_str <- as.character(res$birth_year)
+    if (is.null(nmtr_data[[ck]])) nmtr_data[[ck]] <- list()
+    nmtr_data[[ck]][[by_str]] <- res$nmtr
+  }
+
+  cat(sprintf("[%s] %s: NMTR done (%d combos with data)\n",
+      format(Sys.time(), "%H:%M:%S"), wkey, length(nmtr_data)))
+
   # Write cohort file
   coh_out <- list(
     meta = list(
@@ -400,6 +481,19 @@ process_worker_type <- function(wconfig) {
   ind_file <- file.path(out_dir, "individual", sprintf("%s.json", wkey))
   write(toJSON(ind_out, auto_unbox = TRUE, digits = 0), ind_file)
   cat(sprintf("  Wrote %s (%.1f KB)\n", ind_file, file.info(ind_file)$size / 1024))
+
+  # Write NMTR file
+  nmtr_out <- list(
+    meta = list(
+      worker_type = wkey, claim_age = claim_age, sex = "all",
+      include_employer = TRUE,
+      method = "Cumulative stopping-point (reform pipeline), discounted to working year t"
+    ),
+    data = nmtr_data
+  )
+  nmtr_file <- file.path(out_dir, "individual", sprintf("%s_nmtr.json", wkey))
+  write(toJSON(nmtr_out, auto_unbox = TRUE, digits = 6), nmtr_file)
+  cat(sprintf("  Wrote %s (%.1f KB)\n", nmtr_file, file.info(nmtr_file)$size / 1024))
 
   elapsed <- as.numeric(difftime(Sys.time(), t0, units = "mins"))
   cat(sprintf("[%s] %s COMPLETE in %.1f minutes\n", format(Sys.time(), "%H:%M:%S"), wkey, elapsed))

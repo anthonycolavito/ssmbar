@@ -42,6 +42,16 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 - When reform data is missing for early birth years (e.g., 1940/1950/1960 for PIA reforms), the cohort chart now uses baseline values instead of leaving gaps
 - This makes the reform line span the full chart — reform equals baseline for unaffected cohorts
 
+**Add reform NMTR (Net Marginal Tax Rate) computation and chart overlay**
+- R-side: Added `use_reform_pipeline` parameter to `marginal_benefit_analysis()` and `net_marginal_tax_rate()` in `R/analytic_functions.R` — swaps in `aime_reform()`, `pia_reform()`, `cola_reform()` for reforms that need them (flat_benefit, simpson_bowles 4th bracket, cola_cap)
+- R-side: Added `compute_nmtr_reform()` helper to `scripts/generate_reform_data.R` with parallel NMTR second pass using `mclapply` across all (combo, birth_year) configs
+- Generated 6 NMTR JSON files (`docs/data/reform/individual/{type}_nmtr.json`) for all 63 combo keys
+- JS-side: Added `getReformNMTRData()` and `getReformNMTRSeries()` to `data-loader.js`
+- JS-side: `app.js` now fetches reform NMTR when a reform is active and passes to chart renderer
+- JS-side: `chart-manager.js` `renderNMTRChart()` now accepts optional reform series, shown as orange dashed line overlay on the baseline bar chart
+- Spot-checked: chained_cpi shows small upward NMTR shift (correct — lower benefits), flat_benefit shows dramatic NMTR increase for medium earners (correct — no marginal benefit from extra work)
+- Updated `manifest.json` file_patterns with `reform_nmtr`
+
 ### March 2, 2026 (Session 22) — Reform Implementation: PIA, NRA, COLA Categories
 
 **Commit 3: COLA Reforms**

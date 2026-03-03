@@ -78,6 +78,7 @@
     "individual_benefits": "individual/{type}_benefits.json",
     "individual_nmtr": "individual/{type}_nmtr.json",
     "reform_cohort": "reform/cohort/{type}.json",
-    "reform_individual": "reform/individual/{type}.json"
+    "reform_individual": "reform/individual/{type}.json",
+    "reform_nmtr": "reform/individual/{type}_nmtr.json"
   }
 }

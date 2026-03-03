@@ -58,16 +58,18 @@ async function onHeroChange() {
   if (comboKey) {
     fetches.push(dataLoader.getReformCohortData(type));
     fetches.push(dataLoader.getReformIndividualData(type));
+    fetches.push(dataLoader.getReformNMTRData(type));
   }
 
   const results = await Promise.all(fetches);
   const [cohortData, benefitsData, nmtrData] = results;
   const reformCohortData = comboKey ? results[3] : null;
   const reformIndData = comboKey ? results[4] : null;
+  const reformNmtrData = comboKey ? results[5] : null;
 
   appDataCache = {
     cohortData, benefitsData, nmtrData,
-    reformCohortData, reformIndData,
+    reformCohortData, reformIndData, reformNmtrData,
     type, birthYear, sex, marital, spouseType, comboKey
   };
 
@@ -200,16 +202,22 @@ function renderIndividualBenefitsChart() {
 }
 
 function renderIndividualNMTRChart() {
-  const { nmtrData, birthYear, sex, marital, spouseType } = appDataCache;
+  const { nmtrData, reformNmtrData, birthYear, sex, marital, spouseType, comboKey } = appDataCache;
   if (!nmtrData) return;
 
   const lookupSex = sex === 'unisex' ? 'male' : sex;
   const nmtrSeries = dataLoader.getNMTRSeries(nmtrData, lookupSex, marital, birthYear, spouseType);
 
+  // Get reform NMTR series if active
+  let reformNmtrSeries = null;
+  if (comboKey && reformNmtrData) {
+    reformNmtrSeries = dataLoader.getReformNMTRSeries(reformNmtrData, comboKey, birthYear);
+  }
+
   const section = document.getElementById('nmtrSection');
   if (nmtrSeries) {
     if (section) section.style.display = '';
-    chartManager.renderNMTRChart(nmtrSeries);
+    chartManager.renderNMTRChart(nmtrSeries, reformNmtrSeries);
     updateNMTRInsight(nmtrSeries);
   } else {
     if (section) section.style.display = 'none';

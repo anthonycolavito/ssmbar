@@ -97,6 +97,10 @@ class DataLoader {
     return this._fetch(`reform/individual/${type}.json`);
   }
 
+  async getReformNMTRData(type) {
+    return this._fetch(`reform/individual/${type}_nmtr.json`);
+  }
+
   // =========================================================================
   // Reform data extraction helpers
   // =========================================================================
@@ -124,6 +128,10 @@ class DataLoader {
 
   getReformCohortSeries(reformCohortData, comboKey) {
     return reformCohortData?.data?.[comboKey] || null;
+  }
+
+  getReformNMTRSeries(reformNmtrData, comboKey, birthYear) {
+    return reformNmtrData?.data?.[comboKey]?.[String(birthYear)] || null;
   }
 
   // =========================================================================

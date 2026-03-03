@@ -467,7 +467,7 @@ compute_pv_to_year <- function(worker, assumptions, discount_to_year,
 #'
 #' @importFrom dplyr %>% filter group_by group_modify mutate arrange first ungroup left_join select summarise
 #' @export
-marginal_benefit_analysis <- function(worker, assumptions) {
+marginal_benefit_analysis <- function(worker, assumptions, use_reform_pipeline = FALSE) {
 
   # Validate required columns
   required_cols <- c("id", "year", "age", "earnings", "claim_age", "death_age")
@@ -570,17 +570,16 @@ marginal_benefit_analysis <- function(worker, assumptions) {
           worker_t$earnings[worker_t$age > cutoff_age] <- 0
         }
 
-        # Run through actual benefit pipeline
-        # aime() handles: qc_comp, comp_period, indexing, AIME calculation
-        worker_t <- aime(worker_t, assumptions, debugg = TRUE)
-
-        # pia() handles: PIA calculation with bend points
-        worker_t <- pia(worker_t, assumptions, debugg = TRUE)
-
-        # cola() handles: COLA adjustments
-        worker_t <- cola(worker_t, assumptions, debugg = TRUE)
-
-        # worker_benefit() handles: actuarial adjustments
+        # Run through benefit pipeline
+        if (use_reform_pipeline) {
+          worker_t <- aime_reform(worker_t, assumptions, debugg = TRUE)
+          worker_t <- pia_reform(worker_t, assumptions, debugg = TRUE)
+          worker_t <- cola_reform(worker_t, assumptions, debugg = TRUE)
+        } else {
+          worker_t <- aime(worker_t, assumptions, debugg = TRUE)
+          worker_t <- pia(worker_t, assumptions, debugg = TRUE)
+          worker_t <- cola(worker_t, assumptions, debugg = TRUE)
+        }
         worker_t <- worker_benefit(worker_t, assumptions, debugg = TRUE)
 
         # Get AIME and PIA at claim year
@@ -719,11 +718,13 @@ marginal_benefit_analysis <- function(worker, assumptions) {
 #' }
 #'
 #' @export
-net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE) {
+net_marginal_tax_rate <- function(worker, assumptions, include_employer = FALSE,
+                                   use_reform_pipeline = FALSE) {
 
   # Get marginal benefit analysis (using cumulative stopping-point method)
   # Benefits are discounted to each working year in nominal dollars
-  marginal <- marginal_benefit_analysis(worker, assumptions)
+  marginal <- marginal_benefit_analysis(worker, assumptions,
+                                         use_reform_pipeline = use_reform_pipeline)
 
   # Calculate taxes
   worker_with_taxes <- calculate_taxes(worker, assumptions)
