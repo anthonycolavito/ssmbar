@@ -28,6 +28,16 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 2, 2026 (Session 23) — Label Renaming, Cohort Chart Fix, Reform NMTR
+
+**Rename reform labels to match CRFB reformer tool**
+- Updated category, button, and manifest labels to match https://www.crfb.org/socialsecurityreformer/
+- NRA: "Raise NRA to 68" → "Raise Age from 67 to 68", "Index NRA to Longevity" → "Index Age to Life Expectancy", etc.
+- COLA category: "Modify COLAs" → "Modify Cost of Living Adjustments (COLAs)"
+- PIA buttons: "Reduce Top Factor to 5%" → "Slow Benefit Growth for Top 20% of Earners", etc.
+- COLA buttons: "Chained CPI" → "Index COLAs to Chained CPI", etc.
+- Also reorganized CLAUDE.md / skill.md / CLAUDE_GUIDELINES.md / MEMORY.md to eliminate redundancy
+
 ### March 2, 2026 (Session 22) — Reform Implementation: PIA, NRA, COLA Categories
 
 **Commit 3: COLA Reforms**

@@ -39,15 +39,15 @@
         <div class="category-body" id="pia-body">
           <button class="reform-option" data-category="pia" data-reform="reduce_fact3"
                   onclick="selectReform('pia', 'reduce_fact3', this)">
-            Reduce Top Factor to 5%
+            Slow Benefit Growth for Top 20% of Earners
           </button>
           <button class="reform-option" data-category="pia" data-reform="flat_benefit"
                   onclick="selectReform('pia', 'flat_benefit', this)">
-            Transition to Flat Benefit
+            Transition to a Flat Benefit
           </button>
           <button class="reform-option" data-category="pia" data-reform="simpson_bowles_pia"
                   onclick="selectReform('pia', 'simpson_bowles_pia', this)">
-            Simpson-Bowles PIA
+            Slow Benefit Growth for Top Half of Earners
           </button>
         </div>
       </div>
@@ -62,15 +62,15 @@
         <div class="category-body" id="nra-body">
           <button class="reform-option" data-category="nra" data-reform="nra_to_68"
                   onclick="selectReform('nra', 'nra_to_68', this)">
-            Raise NRA to 68
+            Raise Age from 67 to 68
           </button>
           <button class="reform-option" data-category="nra" data-reform="index_nra"
                   onclick="selectReform('nra', 'index_nra', this)">
-            Index NRA to Longevity
+            Index Age to Life Expectancy
           </button>
           <button class="reform-option" data-category="nra" data-reform="nra_to_69_index"
                   onclick="selectReform('nra', 'nra_to_69_index', this)">
-            NRA to 69, Then Index
+            Raise Age to 69, then Index to Life Expectancy
           </button>
         </div>
       </div>
@@ -79,21 +79,21 @@
       <div class="reform-category" data-category="cola">
         <div class="category-header" onclick="toggleReformCategory('cola')">
           <i class="bi bi-graph-up category-icon"></i>
-          <span class="category-label">Modify COLAs</span>
+          <span class="category-label">Modify Cost of Living Adjustments (COLAs)</span>
           <i class="bi bi-chevron-down category-chevron" id="cola-chevron"></i>
         </div>
         <div class="category-body" id="cola-body">
           <button class="reform-option" data-category="cola" data-reform="chained_cpi"
                   onclick="selectReform('cola', 'chained_cpi', this)">
-            Chained CPI
+            Index COLAs to Chained CPI
           </button>
           <button class="reform-option" data-category="cola" data-reform="cola_cap"
                   onclick="selectReform('cola', 'cola_cap', this)">
-            Cap COLAs
+            Cap COLAs for Top Half of Beneficiaries
           </button>
           <button class="reform-option" data-category="cola" data-reform="cpi_e"
                   onclick="selectReform('cola', 'cpi_e', this)">
-            CPI-E (Elderly)
+            Index COLAs to CPI-E
           </button>
         </div>
       </div>

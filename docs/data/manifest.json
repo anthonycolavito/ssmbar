@@ -29,9 +29,9 @@
     "reduce_fact3": "Slow Benefit Growth for Top 20% of Earners",
     "flat_benefit": "Transition to a Flat Benefit",
     "simpson_bowles_pia": "Slow Benefit Growth for Top Half of Earners",
-    "nra_to_68": "Raise NRA to 68",
-    "index_nra": "Index NRA to Longevity",
-    "nra_to_69_index": "NRA to 69, then Index",
+    "nra_to_68": "Raise Age from 67 to 68",
+    "index_nra": "Index Age to Life Expectancy",
+    "nra_to_69_index": "Raise Age to 69 and then Index to Life Expectancy",
     "chained_cpi": "Index COLAs to Chained CPI",
     "cola_cap": "Cap COLAs for Top Half of Beneficiaries",
     "cpi_e": "Index COLAs to CPI-E",
@@ -55,7 +55,7 @@
       "exclusive": true
     },
     "cola": {
-      "label": "Modify COLAs",
+      "label": "Modify Cost of Living Adjustments (COLAs)",
       "icon": "bi-graph-up",
       "reforms": ["chained_cpi", "cola_cap", "cpi_e"],
       "exclusive": true
