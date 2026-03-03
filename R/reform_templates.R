@@ -749,16 +749,20 @@ reform_child_care_credit <- function(effective_year = 2026, max_years = 5) {
 #' the federal poverty level, phased in over 25 years. The PIA formula is
 #' also modified: fact2 phases from 32% to 4%, fact3 phases from 15% to 0%.
 #'
-#' @param flat_amount Annual flat benefit in 2025 dollars. Default is $19,300
-#'   (125% of poverty line).
+#' @param flat_amount Monthly flat benefit in 2025 dollars. Default is $19,300/12
+#'   (125% of poverty line, monthly).
 #' @param effective_year Year when the reform takes effect. Default is 2026.
 #' @param phase_in_years Number of years to phase in. Default is 25.
+#' @param assumptions Assumptions data frame (must contain \code{year} and \code{awi}
+#'   columns). When provided, the flat benefit is AWI-indexed with a two-year lag
+#'   (same as bend points). When NULL, a constant flat_amount is used.
 #'
 #' @return A Reform object
 #'
 #' @details
 #' Worker's PIA = max(formula_pia, flat_benefit) if they have 40 QCs.
-#' The flat benefit is AWI-indexed after the base year.
+#' The flat benefit is AWI-indexed with a two-year lag: for eligibility year Y,
+#' flat_benefit(Y) = flat_amount * AWI(Y-2) / AWI(2023).
 #'
 #' @examples
 #' \dontrun{
@@ -767,15 +771,27 @@ reform_child_care_credit <- function(effective_year = 2026, max_years = 5) {
 #'
 #' @export
 reform_flat_benefit <- function(flat_amount = 19300 / 12, effective_year = 2026,
-                                 phase_in_years = 25) {
-  # flat_amount is monthly, divide annual by 12
+                                 phase_in_years = 25, assumptions = NULL) {
+  # flat_amount is monthly in 2025$; AWI-index with two-year lag (same as bend points)
+  if (!is.null(assumptions)) {
+    awi_schedule <- setNames(assumptions$awi, assumptions$year)
+    awi_base <- awi_schedule[["2023"]]  # AWI(2023) = base year for 2025$ amounts
+    flat_fn <- function(year) {
+      awi_ref <- awi_schedule[as.character(year - 2)]
+      if (length(awi_ref) == 0 || is.na(awi_ref)) return(flat_amount)
+      unname(flat_amount * awi_ref / awi_base)
+    }
+  } else {
+    # Fallback: constant (for backward compatibility when assumptions not available)
+    flat_fn <- flat_amount
+  }
 
   create_reform(
     name = "Flat Benefit Floor",
     description = sprintf("Establish flat benefit floor of $%.0f/month (2025$), phase in formula changes over %d years",
                           flat_amount, phase_in_years),
     parameters = list(
-      list(param = "flat_benefit", value = flat_amount, type = "replace"),
+      list(param = "flat_benefit", value = flat_fn, type = "replace"),
       # Phase fact2 from 32% to 4%
       list(param = "fact2", value = 0.04, type = "replace"),
       # Phase fact3 from 15% to 0%

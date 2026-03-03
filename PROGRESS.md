@@ -28,6 +28,30 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 25) — AWI-Index Flat Benefit, Reform Documentation
+
+**Fix flat_benefit AWI indexing**
+- `reform_flat_benefit()` in `R/reform_templates.R` now uses an AWI-indexed closure instead of a constant scalar ($1,608.33/month)
+- Formula: `flat_benefit(year) = $1,608.33 × AWI(year-2) / AWI(2023)` — same two-year lag as bend points
+- Generation script passes `assumptions = tr2025` to the factory so the AWI schedule is available
+- Without AWI indexing, the flat benefit eroded in real terms and never became binding for medium+ earners
+- With fix: very_low/low/medium earners converge to flat benefit for later cohorts (e.g., all get $8,137/mo for 2010 birth)
+
+**Fix nested mclapply in generation script**
+- Changed outer worker-type loop from `mclapply(mc.cores=6)` to `lapply` (sequential)
+- Nested parallelism (6 workers × 6 NMTR cores = 36 R processes on 8 CPU cores) caused 3+ GB swap, no completion after 4 hours
+- Sequential outer / parallel inner: ~24 min per worker, ~142 min total for all 6
+
+**Create reform documentation**
+- 9 new files in `docs/reforms/`: flat_benefit, reduce_fact3, simpson_bowles_pia, nra_to_68, index_nra, nra_to_69_index, chained_cpi, cola_cap, cpi_e
+- Each documents parameters, effective year, phase-in, indexing, formula, and expected behavior
+- Verified by agent against actual code in reform_templates.R and reform_functions.R
+
+**Regenerate all reform data** (all 63 combos × 6 worker types)
+- All 18 files regenerated: cohort (6), individual (6), NMTR (6)
+- Spot-checked: flat_benefit values increase across birth years (AWI-indexed)
+- Test suite: 653 pass, 0 fail
+
 ### March 3, 2026 (Session 24) — Reform NMTR, Button Reorder, Investigations
 
 **Reorder PIA reform buttons to match CRFB reformer tool**

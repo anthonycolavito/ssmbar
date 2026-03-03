@@ -267,6 +267,44 @@ test_that("reform_flat_benefit() creates valid Reform", {
   expect_true("fact3" %in% param_names)
 })
 
+test_that("reform_flat_benefit() without assumptions uses constant value", {
+  reform <- reform_flat_benefit(effective_year = 2030)
+  fb_param <- reform$parameters[[which(sapply(reform$parameters, function(p) p$param == "flat_benefit"))]]
+  # Without assumptions, value should be the constant flat_amount
+  expect_equal(fb_param$value, 19300 / 12)
+})
+
+test_that("reform_flat_benefit() AWI-indexes flat benefit when assumptions provided", {
+  # Create minimal assumptions with AWI values
+  assumptions <- data.frame(
+    year = 2020:2070,
+    awi = seq(55000, 150000, length.out = 51)
+  )
+  # Set AWI(2023) as the base
+  awi_2023 <- assumptions$awi[assumptions$year == 2023]
+
+  reform <- reform_flat_benefit(effective_year = 2030, assumptions = assumptions)
+
+  fb_param <- reform$parameters[[which(sapply(reform$parameters, function(p) p$param == "flat_benefit"))]]
+  expect_true(is.function(fb_param$value))
+
+  flat_amount <- 19300 / 12
+
+  # Value at 2025 should use AWI(2023) — i.e., exactly flat_amount
+  val_2025 <- fb_param$value(2025)
+  expect_equal(val_2025, flat_amount)
+
+  # Value should scale with AWI (two-year lag)
+  val_2040 <- fb_param$value(2040)  # Uses AWI(2038)
+  val_2050 <- fb_param$value(2050)  # Uses AWI(2048)
+  expect_true(val_2050 > val_2040)  # Grows with wages
+
+  # Check exact computation: flat_amount * AWI(year-2) / AWI(2023)
+  awi_2038 <- assumptions$awi[assumptions$year == 2038]
+  expected_2040 <- flat_amount * awi_2038 / awi_2023
+  expect_equal(val_2040, expected_2040)
+})
+
 test_that("reform_simpson_bowles() creates valid Reform", {
   reform <- reform_simpson_bowles(effective_year = 2030)
 
@@ -446,9 +484,8 @@ test_that("apply_reforms() can bypass exclusivity check", {
   reform2 <- reform_index_nra(effective_year = 2030)
 
   # Should not error when check_exclusivity = FALSE
-  expect_no_error(
-    apply_reforms(tr2025, list(reform1, reform2), check_exclusivity = FALSE)
-  )
+  result <- apply_reforms(tr2025, list(reform1, reform2), check_exclusivity = FALSE)
+  expect_true(is.data.frame(result))
 })
 
 test_that("apply_reforms() works with valid combinations", {

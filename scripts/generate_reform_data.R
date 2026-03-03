@@ -78,7 +78,7 @@ reform_defs <- list(
     phase_type = "cohort",
     reforms = list(
       reduce_fact3      = function() reform_reduce_fact3(0.05, 2030),
-      flat_benefit      = function() reform_flat_benefit(effective_year = 2030),
+      flat_benefit      = function() reform_flat_benefit(effective_year = 2030, assumptions = tr2025),
       simpson_bowles_pia = function() reform_simpson_bowles(effective_year = 2030)
     )
   ),
@@ -511,11 +511,11 @@ cat(sprintf("Combo keys: %d\n", length(combo_keys)))
 cat(sprintf("Worker types: %d\n", length(worker_configs)))
 cat(sprintf("Cores: %d\n\n", n_cores))
 
-if (length(worker_configs) == 1 || n_cores == 1) {
-  results <- lapply(worker_configs, process_worker_type)
-} else {
-  results <- parallel::mclapply(worker_configs, process_worker_type, mc.cores = n_cores)
-}
+# Process worker types sequentially to avoid nested mclapply
+# (each worker's NMTR phase uses mc.cores internally, so running
+# workers in parallel too would create n_cores^2 processes and
+# cause severe memory pressure / swap thrashing)
+results <- lapply(worker_configs, process_worker_type)
 
 cat("\n=== SUMMARY ===\n")
 for (r in results) cat(" ", r, "\n")
