@@ -28,6 +28,35 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 26) — Tax Max Reforms: Code, Tests, Documentation
+
+**Fix `calculate_taxes()` to use `taxmax_tax`**
+- When `taxmax_tax` column is present in assumptions (Reform #14), `calculate_taxes()` now uses it for payroll tax capping instead of `taxmax`
+- Falls back to `taxmax` when `taxmax_tax` is not present (current law behavior unchanged)
+
+**Improve `reform_taxmax_90_pct()` with closure over assumptions**
+- Accepts optional `assumptions` parameter; when provided, bp3 and new taxmax are derived from `assumptions$taxmax` schedule via closures (values through 2100)
+- New taxmax = old taxmax × 1.7913 (ratio of $330,500 / $184,500)
+- Without assumptions: keeps hardcoded fallback (2024-2040) with 3.8%/year extrapolation for unit tests
+
+**Improve `reform_eliminate_taxmax()` with explicit bp3 closure**
+- Accepts optional `assumptions` parameter; when provided, bp3 = `assumptions$taxmax / 12`
+- Without assumptions: returns `NA_real_` (pia_reform fallback still works)
+
+**No changes to `reform_eliminate_taxmax_no_credit()`** — already architecturally correct
+
+**Create tax max reform documentation**
+- 3 new files in `docs/reforms/`: `taxmax_90_pct.md`, `eliminate_taxmax.md`, `eliminate_taxmax_no_credit.md`
+- Each documents parameters, indexing, formula, and expected behavior
+
+**Write comprehensive tests**
+- `reform_taxmax_90_pct()`: with and without assumptions, bp3 function values, new taxmax > old taxmax, ratio check
+- `reform_eliminate_taxmax()`: with and without assumptions, bp3 function values, fact4=0.15, taxmax=10M
+- `reform_eliminate_taxmax_no_credit()`: taxmax_tax=10M scalar, taxmax_benefit returns NA
+- `calculate_taxes()`: verifies taxmax_tax is used when present, earnings above taxmax correctly taxed
+
+**Note**: No data generation — all current worker types earn below taxmax, so reforms produce identical results to current law. Deferred until a high-earner custom worker type is added.
+
 ### March 3, 2026 (Session 25) — AWI-Index Flat Benefit, Reform Documentation
 
 **Fix flat_benefit AWI indexing**

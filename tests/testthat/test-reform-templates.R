@@ -189,23 +189,98 @@ test_that("reform_cola_cap() creates valid Reform", {
   expect_equal(reform$name, "Cap COLAs at Median PIA")
 })
 
-test_that("reform_taxmax_90_pct() creates valid Reform", {
+test_that("reform_taxmax_90_pct() creates valid Reform without assumptions", {
   reform <- reform_taxmax_90_pct(effective_year = 2030)
 
   expect_s3_class(reform, "Reform")
   expect_match(reform$name, "90% Coverage")
-  expect_true(any(sapply(reform$parameters, function(p) p$param == "fact4")))
+
+  # Check expected parameters
+  param_names <- sapply(reform$parameters, function(p) p$param)
+  expect_true("bp3" %in% param_names)
+  expect_true("fact4" %in% param_names)
+  expect_true("taxmax" %in% param_names)
+  expect_true("taxmax_benefit" %in% param_names)
+
+  # fact4 = 5%
+  fact4_param <- reform$parameters[[which(param_names == "fact4")]]
+  expect_equal(fact4_param$value, 0.05)
+
+  # bp3 function returns hardcoded taxmax / 12
+  bp3_fn <- reform$parameters[[which(param_names == "bp3")]]$value
+  expect_true(is.function(bp3_fn))
+  expect_equal(bp3_fn(2026), 184500 / 12)
+  expect_equal(bp3_fn(2030), 215400 / 12)
+
+  # taxmax function returns new higher taxmax
+  taxmax_fn <- reform$parameters[[which(param_names == "taxmax")]]$value
+  expect_true(is.function(taxmax_fn))
+  expect_true(taxmax_fn(2030) > 215400)  # New taxmax > old taxmax
 })
 
-test_that("reform_eliminate_taxmax() creates valid Reform", {
+test_that("reform_taxmax_90_pct() uses closure over assumptions", {
+  # Create minimal assumptions with taxmax values
+  assumptions <- data.frame(
+    year = 2020:2060,
+    taxmax = seq(150000, 400000, length.out = 41)
+  )
+  taxmax_2030 <- assumptions$taxmax[assumptions$year == 2030]
+
+  reform <- reform_taxmax_90_pct(effective_year = 2026, assumptions = assumptions)
+
+  param_names <- sapply(reform$parameters, function(p) p$param)
+
+  # bp3 should use actual taxmax schedule
+  bp3_fn <- reform$parameters[[which(param_names == "bp3")]]$value
+  expect_equal(bp3_fn(2030), taxmax_2030 / 12)
+
+  # New taxmax should be ratio × old taxmax
+  taxmax_fn <- reform$parameters[[which(param_names == "taxmax")]]$value
+  expected_ratio <- 330500 / 184500
+  expect_equal(taxmax_fn(2030), taxmax_2030 * expected_ratio)
+
+  # Before effective year should return NA
+  expect_true(is.na(taxmax_fn(2025)))
+})
+
+test_that("reform_eliminate_taxmax() creates valid Reform without assumptions", {
   reform <- reform_eliminate_taxmax(effective_year = 2030)
 
   expect_s3_class(reform, "Reform")
   expect_match(reform$name, "Eliminate Taxmax with 15% Credit")
 
-  # Should have fact4 = 0.15
-  fact4_param <- reform$parameters[[which(sapply(reform$parameters, function(p) p$param == "fact4"))]]
+  param_names <- sapply(reform$parameters, function(p) p$param)
+
+  # fact4 = 15%
+  fact4_param <- reform$parameters[[which(param_names == "fact4")]]
   expect_equal(fact4_param$value, 0.15)
+
+  # taxmax = 10M
+  taxmax_param <- reform$parameters[[which(param_names == "taxmax")]]
+  expect_equal(taxmax_param$value, 10000000)
+
+  # bp3 returns NA without assumptions (relies on pia_reform fallback)
+  bp3_fn <- reform$parameters[[which(param_names == "bp3")]]$value
+  expect_true(is.function(bp3_fn))
+  expect_true(is.na(bp3_fn(2030)))
+})
+
+test_that("reform_eliminate_taxmax() uses closure over assumptions for bp3", {
+  assumptions <- data.frame(
+    year = 2020:2060,
+    taxmax = seq(150000, 400000, length.out = 41)
+  )
+  taxmax_2030 <- assumptions$taxmax[assumptions$year == 2030]
+
+  reform <- reform_eliminate_taxmax(effective_year = 2026, assumptions = assumptions)
+
+  param_names <- sapply(reform$parameters, function(p) p$param)
+  bp3_fn <- reform$parameters[[which(param_names == "bp3")]]$value
+
+  # bp3 should return actual taxmax / 12 when assumptions provided
+  expect_equal(bp3_fn(2030), taxmax_2030 / 12)
+  # Still NA for years outside the schedule
+  expect_true(is.na(bp3_fn(1990)))
 })
 
 test_that("reform_eliminate_taxmax_no_credit() creates valid Reform", {
@@ -213,7 +288,18 @@ test_that("reform_eliminate_taxmax_no_credit() creates valid Reform", {
 
   expect_s3_class(reform, "Reform")
   expect_match(reform$name, "without Credit")
-  expect_true(any(sapply(reform$parameters, function(p) p$param == "taxmax_tax")))
+
+  param_names <- sapply(reform$parameters, function(p) p$param)
+
+  # taxmax_tax = 10M (scalar, not a function)
+  taxmax_tax_param <- reform$parameters[[which(param_names == "taxmax_tax")]]
+  expect_equal(taxmax_tax_param$value, 10000000)
+  expect_false(is.function(taxmax_tax_param$value))
+
+  # taxmax_benefit = function returning NA (keeps current law)
+  taxmax_benefit_param <- reform$parameters[[which(param_names == "taxmax_benefit")]]
+  expect_true(is.function(taxmax_benefit_param$value))
+  expect_true(is.na(taxmax_benefit_param$value(2030)))
 })
 
 test_that("reform_basic_minimum() creates valid Reform", {
@@ -504,4 +590,43 @@ test_that("apply_reforms() works with valid combinations", {
 
   # Verify each reform took effect
   expect_equal(reformed[reformed$year == 2035, "pia_multiplier"], 0.95)
+})
+
+
+# -----------------------------------------------------------------------------
+# Test calculate_taxes() with taxmax_tax
+# -----------------------------------------------------------------------------
+
+test_that("calculate_taxes() uses taxmax_tax when present in assumptions", {
+  # Create worker with earnings above taxmax but below taxmax_tax
+  worker <- data.frame(
+    id = rep("test-worker", 3),
+    year = 2025:2027,
+    age = 40:42,
+    earnings = c(200000, 200000, 200000)
+  )
+
+  # Assumptions without taxmax_tax (current law)
+  assumptions_base <- data.frame(
+    year = 2025:2027,
+    oasi_tr = c(5.3, 5.3, 5.3),
+    di_tr = c(0.9, 0.9, 0.9),
+    taxmax = c(176100, 184500, 190800)
+  )
+
+  result_base <- calculate_taxes(worker, assumptions_base)
+  # Taxable earnings should be capped at taxmax
+
+  expect_equal(result_base$ss_taxable_earn[1], 176100)
+
+  # Assumptions with taxmax_tax (reform #14 — unlimited taxes)
+  assumptions_reform <- assumptions_base
+  assumptions_reform$taxmax_tax <- c(10000000, 10000000, 10000000)
+
+  result_reform <- calculate_taxes(worker, assumptions_reform)
+  # Taxable earnings should use taxmax_tax (effectively uncapped)
+  expect_equal(result_reform$ss_taxable_earn[1], 200000)
+
+  # Tax should be higher under reform
+  expect_true(result_reform$ss_tax[1] > result_base$ss_tax[1])
 })

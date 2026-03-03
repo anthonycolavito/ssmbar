@@ -69,7 +69,11 @@ calculate_taxes <- function(worker, assumptions) {
   }
 
   # Join tax parameters from assumptions if not already present
+  # Reform #14 uses taxmax_tax to set a separate cap for payroll taxes
   cols_needed <- c("oasi_tr", "di_tr", "taxmax")
+  if ("taxmax_tax" %in% names(assumptions)) {
+    cols_needed <- c(cols_needed, "taxmax_tax")
+  }
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -82,13 +86,16 @@ calculate_taxes <- function(worker, assumptions) {
 
   # Calculate taxes
   # Rates are percentages (e.g., 5.3 means 5.3%), so divide by 100
+  # Use taxmax_tax when present (Reform #14), otherwise fall back to taxmax
   dataset <- dataset %>%
     mutate(
-      ss_taxable_earn = pmin(earnings, taxmax, na.rm = TRUE),  # Cap earnings at taxmax
+      tax_cap = if ("taxmax_tax" %in% names(.)) taxmax_tax else taxmax,
+      ss_taxable_earn = pmin(earnings, tax_cap, na.rm = TRUE), # Cap earnings at tax cap
       oasi_tax = ss_taxable_earn * oasi_tr / 100,              # OASI tax (employee share)
       di_tax = ss_taxable_earn * di_tr / 100,                  # DI tax (employee share)
       ss_tax = oasi_tax + di_tax                               # Total SS tax (employee share)
-    )
+    ) %>%
+    select(-tax_cap)
 
   # Remove joined columns that were only needed for calculation
   if (length(cols_missing) > 0) {

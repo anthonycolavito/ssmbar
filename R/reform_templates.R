@@ -496,20 +496,25 @@ reform_cola_cap <- function(effective_year = 2026) {
 #' earnings above the old taxmax.
 #'
 #' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param assumptions Optional assumptions data frame (e.g., tr2025). When provided,
+#'   bp3 and the new taxmax are derived from the actual taxmax schedule via closures.
+#'   When NULL, uses hardcoded fallback values.
 #'
 #' @return A Reform object
 #'
 #' @details
 #' The 90% coverage taxmax is $330,500 in 2026 and is AWI-indexed thereafter.
-#' Creates a 4-bracket PIA formula: 90/32/15/5.
+#' The ratio 330500/184500 = 1.7913 is applied to each year's current-law taxmax
+#' to produce the new higher cap. Creates a 4-bracket PIA formula: 90/32/15/5.
 #'
 #' @examples
 #' \dontrun{
 #' reform <- reform_taxmax_90_pct(effective_year = 2030)
+#' reform <- reform_taxmax_90_pct(effective_year = 2030, assumptions = tr2025)
 #' }
 #'
 #' @export
-reform_taxmax_90_pct <- function(effective_year = 2026) {
+reform_taxmax_90_pct <- function(effective_year = 2026, assumptions = NULL) {
   # Reform #12: Raise taxmax to cover 90% of earnings
   # - taxmax increases to $330,500 in 2026 (AWI-indexed)
   # - 4th PIA bracket: 5% replacement rate for AIME above old taxmax
@@ -517,44 +522,76 @@ reform_taxmax_90_pct <- function(effective_year = 2026) {
   # - fact4 = 5%
   # - taxmax_benefit = NA (use taxmax for AIME capping, which is now higher)
 
-  # Old taxmax trajectory (2024-2100, from TR2025)
-  # These are the current-law taxmax values used for bp3
-  old_taxmax <- c(
-    "2024" = 168600, "2025" = 176100, "2026" = 184500, "2027" = 190800,
-    "2028" = 198900, "2029" = 207000, "2030" = 215400, "2031" = 223800,
-    "2032" = 232500, "2033" = 241800, "2034" = 251100, "2035" = 261300,
-    "2036" = 271200, "2037" = 281400, "2038" = 291600, "2039" = 302400,
-    "2040" = 313500
-  )
+  # Ratio of 90%-coverage taxmax to current-law taxmax in 2026
+  taxmax_ratio <- 330500 / 184500  # ~1.7913
+
+  if (!is.null(assumptions)) {
+    # Closure over actual taxmax schedule from TR2025 (has values through 2100)
+    taxmax_schedule <- setNames(assumptions$taxmax, assumptions$year)
+
+    bp3_fn <- function(year) {
+      val <- taxmax_schedule[as.character(year)]
+      if (length(val) == 0 || is.na(val)) return(NA_real_)
+      unname(val / 12)  # Old taxmax in monthly terms
+    }
+
+    new_taxmax_fn <- function(year) {
+      if (year < effective_year) return(NA)  # Keep existing before effective year
+      val <- taxmax_schedule[as.character(year)]
+      if (length(val) == 0 || is.na(val)) return(NA)
+      unname(val * taxmax_ratio)
+    }
+
+    new_taxmax_benefit_fn <- function(year) {
+      if (year < effective_year) return(NA)  # Keep existing before effective year
+      val <- taxmax_schedule[as.character(year)]
+      if (length(val) == 0 || is.na(val)) return(NA)
+      unname(val * taxmax_ratio)  # Same as new taxmax
+    }
+  } else {
+    # Fallback: hardcoded values for unit tests without assumptions
+    old_taxmax <- c(
+      "2024" = 168600, "2025" = 176100, "2026" = 184500, "2027" = 190800,
+      "2028" = 198900, "2029" = 207000, "2030" = 215400, "2031" = 223800,
+      "2032" = 232500, "2033" = 241800, "2034" = 251100, "2035" = 261300,
+      "2036" = 271200, "2037" = 281400, "2038" = 291600, "2039" = 302400,
+      "2040" = 313500
+    )
+
+    bp3_fn <- function(year) {
+      year_str <- as.character(year)
+      if (year_str %in% names(old_taxmax)) {
+        old_taxmax[[year_str]] / 12
+      } else if (year >= 2040) {
+        old_taxmax[["2040"]] * (1.038^(year - 2040)) / 12
+      } else {
+        NA_real_
+      }
+    }
+
+    new_taxmax_fn <- function(year) {
+      if (year < effective_year) return(NA)
+      330500 * (1.038^(year - 2026))
+    }
+
+    new_taxmax_benefit_fn <- function(year) {
+      if (year < effective_year) return(NA)
+      330500 * (1.038^(year - 2026))
+    }
+  }
 
   create_reform(
     name = "Raise Taxmax to 90% Coverage with 5% Credit",
     description = "Raise taxable maximum to cover 90% of earnings; 5% replacement rate for new bracket",
     parameters = list(
       # bp3 = old taxmax in monthly terms (for 4th bracket calculation)
-      list(param = "bp3", value = function(year) {
-        year_str <- as.character(year)
-        if (year_str %in% names(old_taxmax)) {
-          old_taxmax[[year_str]] / 12  # Convert to monthly
-        } else if (year >= 2040) {
-          # Approximate AWI growth after 2040: ~3.8% per year
-          old_taxmax[["2040"]] * (1.038^(year - 2040)) / 12
-        } else {
-          NA_real_
-        }
-      }, type = "replace"),
+      list(param = "bp3", value = bp3_fn, type = "replace"),
       list(param = "fact4", value = 0.05, type = "replace"),
-      # New taxmax at 90% coverage ($330,500 in 2026, AWI-indexed ~3.8%/year)
-      list(param = "taxmax", value = function(year) {
-        if (year < effective_year) return(NA)  # Keep existing before effective year
-        330500 * (1.038^(year - 2026))  # AWI-indexed from 2026 base
-      }, type = "replace"),
-      # Set taxmax_benefit = taxmax so AIME uses the higher cap
-      # (aime() uses benefit_cap = taxmax_benefit if not NA, otherwise taxmax)
-      list(param = "taxmax_benefit", value = function(year) {
-        if (year < effective_year) return(NA)  # Keep existing before effective year
-        330500 * (1.038^(year - 2026))  # Same as new taxmax
-      }, type = "replace")
+      # New taxmax at 90% coverage
+      list(param = "taxmax", value = new_taxmax_fn, type = "replace"),
+      # Set taxmax_benefit = new taxmax so AIME uses the higher cap
+      # (aime_reform() uses benefit_cap = taxmax_benefit if not NA, otherwise taxmax)
+      list(param = "taxmax_benefit", value = new_taxmax_benefit_fn, type = "replace")
     ),
     effective_year = effective_year,
     phase_in_years = 0
@@ -573,23 +610,40 @@ reform_taxmax_90_pct <- function(effective_year = 2026) {
 #' the old taxmax.
 #'
 #' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param assumptions Optional assumptions data frame (e.g., tr2025). When provided,
+#'   bp3 is derived from the actual taxmax schedule (old cap / 12). When NULL,
+#'   returns NA_real_ and relies on pia_reform() fallback (taxmax_benefit / 12).
 #'
 #' @return A Reform object
 #'
 #' @examples
 #' \dontrun{
 #' reform <- reform_eliminate_taxmax(effective_year = 2030)
+#' reform <- reform_eliminate_taxmax(effective_year = 2030, assumptions = tr2025)
 #' }
 #'
 #' @export
-reform_eliminate_taxmax <- function(effective_year = 2026) {
+reform_eliminate_taxmax <- function(effective_year = 2026, assumptions = NULL) {
+
+  if (!is.null(assumptions)) {
+    # Closure: bp3 = old (current-law) taxmax in monthly terms
+    taxmax_schedule <- setNames(assumptions$taxmax, assumptions$year)
+    bp3_fn <- function(year) {
+      val <- taxmax_schedule[as.character(year)]
+      if (length(val) == 0 || is.na(val)) return(NA_real_)
+      unname(val / 12)
+    }
+  } else {
+    # Fallback: NA triggers pia_reform() fallback (taxmax_benefit / 12)
+    bp3_fn <- function(year) NA_real_
+  }
+
   create_reform(
     name = "Eliminate Taxmax with 15% Credit",
     description = "Remove taxable maximum; 15% replacement rate for earnings above old cap",
     parameters = list(
-      list(param = "bp3", value = function(year) {
-        NA_real_  # Implementation in pia()
-      }, type = "replace"),
+      # bp3 = old taxmax in monthly terms (4th bracket starts here)
+      list(param = "bp3", value = bp3_fn, type = "replace"),
       list(param = "fact4", value = 0.15, type = "replace"),
       # Very high taxmax effectively eliminates cap
       list(param = "taxmax", value = 10000000, type = "replace")
