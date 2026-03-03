@@ -63,14 +63,14 @@ COHORT_METRICS <- c(
   "repl_rate" = "Replacement Rate (Wage H35)"
 )
 
-# CRFB Color Palette
-CRFB_DARK_BLUE <- "#003477"
-CRFB_LIGHT_BLUE <- "#9ACDFF"
-CRFB_ORANGE <- "#F36107"
-CRFB_RED <- "#EE3224"
-CRFB_PURPLE <- "#2A368A"
-CRFB_TEAL <- "#0A81A8"
-CRFB_GRAY <- "#666666"
+# App Color Palette
+APP_DARK_BLUE <- "#003477"
+APP_LIGHT_BLUE <- "#9ACDFF"
+APP_ORANGE <- "#F36107"
+APP_RED <- "#EE3224"
+APP_PURPLE <- "#2A368A"
+APP_TEAL <- "#0A81A8"
+APP_GRAY <- "#666666"
 
 # Dark mode colors
 DARK_BG <- "#1a1a2e"
@@ -78,16 +78,16 @@ DARK_CARD <- "#16213e"
 DARK_TEXT <- "#e8e8e8"
 DARK_MUTED <- "#a0a0a0"
 
-# Theme configuration - Dark mode with CRFB accents
+# Theme configuration - Dark mode with app accents
 app_theme <- bs_theme(
   bg = DARK_BG,
   fg = DARK_TEXT,
-  primary = CRFB_LIGHT_BLUE,
-  secondary = CRFB_GRAY,
-  success = CRFB_TEAL,
-  info = CRFB_LIGHT_BLUE,
-  warning = CRFB_ORANGE,
-  danger = CRFB_RED,
+  primary = APP_LIGHT_BLUE,
+  secondary = APP_GRAY,
+  success = APP_TEAL,
+  info = APP_LIGHT_BLUE,
+  warning = APP_ORANGE,
+  danger = APP_RED,
   base_font = font_google("Open Sans"),
   font_scale = 0.95,
   `enable-rounded` = TRUE
@@ -114,12 +114,12 @@ chart_theme <- theme_minimal(base_size = 16) +
   theme(
     plot.background = element_rect(fill = DARK_CARD, color = NA),
     panel.background = element_rect(fill = DARK_CARD, color = NA),
-    plot.title = element_text(face = "bold", size = 18, color = CRFB_LIGHT_BLUE),
+    plot.title = element_text(face = "bold", size = 18, color = APP_LIGHT_BLUE),
     plot.subtitle = element_text(color = DARK_MUTED, size = 13),
     legend.position = "right",
     legend.background = element_rect(fill = DARK_CARD, color = NA),
     legend.text = element_text(color = DARK_TEXT, size = 12),
-    legend.title = element_text(color = CRFB_LIGHT_BLUE, size = 13),
+    legend.title = element_text(color = APP_LIGHT_BLUE, size = 13),
     legend.key = element_rect(fill = DARK_CARD, color = NA),
     panel.grid.major = element_line(color = "#2a3f5f", linewidth = 0.3),
     panel.grid.minor = element_blank(),
@@ -129,10 +129,10 @@ chart_theme <- theme_minimal(base_size = 16) +
 
 # Color palette for charts (bright colors for dark background)
 CHART_COLORS <- c(
-  CRFB_LIGHT_BLUE, # Primary - Light Blue (visible on dark)
-  CRFB_ORANGE,     # Secondary - Contrast Orange
-  CRFB_TEAL,       # Third - Website Teal
-  CRFB_RED,        # Fourth - FTD Red
+  APP_LIGHT_BLUE, # Primary - Light Blue (visible on dark)
+  APP_ORANGE,     # Secondary - Contrast Orange
+  APP_TEAL,       # Third - Website Teal
+  APP_RED,        # Fourth - FTD Red
   "#9b7ed9",       # Fifth - Lighter purple (more visible)
   "#50c878"        # Sixth - Emerald green
 )

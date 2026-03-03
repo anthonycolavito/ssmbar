@@ -468,8 +468,8 @@ cohort_tab_server <- function(id, reform_state) {
         geom_point(size = 3, alpha = 0.8) +
         scale_y_continuous(labels = function(x) paste0(x, "%")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
-        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        scale_color_manual(values = c("Baseline" = APP_LIGHT_BLUE,
+                                       setNames(APP_ORANGE, chart_info$reform_label))) +
         labs(x = "Birth Year", y = "Replacement Rate (%)", color = NULL) +
         chart_theme +
         theme(legend.position = if (show_legend) "top" else "none")
@@ -497,8 +497,8 @@ cohort_tab_server <- function(id, reform_state) {
         geom_point(size = 3, alpha = 0.8) +
         scale_y_continuous(labels = dollar_format(suffix = "K")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
-        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        scale_color_manual(values = c("Baseline" = APP_LIGHT_BLUE,
+                                       setNames(APP_ORANGE, chart_info$reform_label))) +
         labs(x = "Birth Year", y = "PV Lifetime Benefits ($K)", color = NULL) +
         chart_theme +
         theme(legend.position = if (show_legend) "top" else "none")
@@ -527,8 +527,8 @@ cohort_tab_server <- function(id, reform_state) {
         geom_hline(yintercept = 1.0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
         scale_y_continuous(labels = function(x) sprintf("%.2f", x)) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
-        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        scale_color_manual(values = c("Baseline" = APP_LIGHT_BLUE,
+                                       setNames(APP_ORANGE, chart_info$reform_label))) +
         labs(x = "Birth Year", y = "Benefit-Tax Ratio", color = NULL) +
         annotate("text", x = 2007, y = 1.02, label = "Break-even",
                  color = DARK_MUTED, size = 3, hjust = 1) +
@@ -559,8 +559,8 @@ cohort_tab_server <- function(id, reform_state) {
         geom_hline(yintercept = 0, color = DARK_MUTED, linetype = "dashed", linewidth = 0.5) +
         scale_y_continuous(labels = function(x) paste0(x, "%")) +
         scale_x_continuous(breaks = seq(1960, 2010, by = 5)) +
-        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                       setNames(CRFB_ORANGE, chart_info$reform_label))) +
+        scale_color_manual(values = c("Baseline" = APP_LIGHT_BLUE,
+                                       setNames(APP_ORANGE, chart_info$reform_label))) +
         labs(x = "Birth Year", y = "Internal Rate of Return (%)", color = NULL) +
         chart_theme +
         theme(legend.position = if (show_legend) "top" else "none")

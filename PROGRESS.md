@@ -28,7 +28,14 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
-### March 3, 2026 (Session 27) — Comprehensive Repo Cleanup
+### March 3, 2026 (Session 27) — Repo Cleanup and De-brand App
+
+**Remove CRFB branding from Benefit Explorer**
+- Renamed CSS variables `--crfb-*` → `--brand-*` in `docs/css/style.css`
+- Renamed R color constants `CRFB_*` → `APP_*` in `global.R`, `mod_cohort_tab.R`, `mod_individual_tab.R`
+- Removed "| CRFB" from page title in `docs/index.html`
+
+### March 3, 2026 (Session 27a) — Comprehensive Repo Cleanup
 
 **Deleted ~72 files of accumulated development artifacts**
 - Removed 48 one-off scripts from `scripts/` (debug, trace, investigate, check, test, misc)

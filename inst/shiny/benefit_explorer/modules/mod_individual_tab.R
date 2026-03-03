@@ -519,8 +519,8 @@ individual_tab_server <- function(id, reform_state) {
         geom_point(size = 2.5, alpha = 0.8) +
         scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0.02, 0.1))) +
         scale_x_continuous(breaks = seq(60, 100, by = 5)) +
-        scale_color_manual(values = c("Baseline" = CRFB_LIGHT_BLUE,
-                                       setNames(CRFB_ORANGE, setdiff(unique_scenarios, "Baseline")))) +
+        scale_color_manual(values = c("Baseline" = APP_LIGHT_BLUE,
+                                       setNames(APP_ORANGE, setdiff(unique_scenarios, "Baseline")))) +
         labs(x = "Age", y = y_label, color = NULL) +
         chart_theme +
         theme(
@@ -660,15 +660,15 @@ individual_tab_server <- function(id, reform_state) {
           geom_col(data = combined %>% filter(scenario != "Baseline"),
                    width = 0.5, alpha = 0.85) +
           geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
-          geom_hline(yintercept = 12.4, color = CRFB_RED, linewidth = 0.8, linetype = "dashed") +
+          geom_hline(yintercept = 12.4, color = APP_RED, linewidth = 0.8, linetype = "dashed") +
           scale_y_continuous(labels = function(x) paste0(x, "%"),
                              limits = c(-50, 20), oob = scales::squish) +
           scale_x_continuous(breaks = seq(25, 65, by = 5)) +
-          scale_fill_manual(values = c("Baseline" = CRFB_TEAL,
-                                        setNames(CRFB_ORANGE, mdata$reform_scenario))) +
+          scale_fill_manual(values = c("Baseline" = APP_TEAL,
+                                        setNames(APP_ORANGE, mdata$reform_scenario))) +
           labs(x = "Age", y = "Net Marginal Tax Rate", fill = NULL) +
           annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
-                   color = CRFB_RED, size = 3, hjust = 1) +
+                   color = APP_RED, size = 3, hjust = 1) +
           chart_theme +
           theme(legend.position = "top")
 
@@ -684,15 +684,15 @@ individual_tab_server <- function(id, reform_state) {
         if (nrow(nmtr_data) == 0) return(NULL)
 
         p <- ggplot(nmtr_data, aes(x = age, y = nmtr_pct_display)) +
-          geom_col(width = 0.8, alpha = 0.85, fill = CRFB_TEAL) +
+          geom_col(width = 0.8, alpha = 0.85, fill = APP_TEAL) +
           geom_hline(yintercept = 0, color = DARK_MUTED, linewidth = 0.5) +
-          geom_hline(yintercept = 12.4, color = CRFB_RED, linewidth = 0.8, linetype = "dashed") +
+          geom_hline(yintercept = 12.4, color = APP_RED, linewidth = 0.8, linetype = "dashed") +
           scale_y_continuous(labels = function(x) paste0(x, "%"),
                              limits = c(-50, 20), oob = scales::squish) +
           scale_x_continuous(breaks = seq(25, 65, by = 5)) +
           labs(x = "Age", y = "Net Marginal Tax Rate") +
           annotate("text", x = 63, y = 13.5, label = "12.4% (no accrual)",
-                   color = CRFB_RED, size = 3, hjust = 1) +
+                   color = APP_RED, size = 3, hjust = 1) +
           chart_theme
       }
 

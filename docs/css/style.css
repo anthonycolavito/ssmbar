@@ -5,9 +5,9 @@
 /* --- CSS Variables --- */
 :root {
   /* Brand */
-  --crfb-navy:       #0f1741;
-  --crfb-blue:       #003477;
-  --crfb-orange:     #F36107;
+  --brand-navy:       #0f1741;
+  --brand-blue:       #003477;
+  --brand-orange:     #F36107;
 
   /* Page */
   --bg-page:         #FAFBFC;
@@ -64,12 +64,12 @@ body {
 }
 
 a { color: var(--accent-blue); }
-a:hover { color: var(--crfb-blue); }
+a:hover { color: var(--brand-blue); }
 
 /* --- Navbar (dark) --- */
 .navbar {
   background-color: var(--bg-dark) !important;
-  border-bottom: 2px solid var(--crfb-blue);
+  border-bottom: 2px solid var(--brand-blue);
   padding: 0.5rem 1rem;
 }
 
