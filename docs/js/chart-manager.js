@@ -353,10 +353,12 @@ class ChartManager {
 
     // Add reform overlay if present
     if (reformSeries && reformSeries[metric]) {
-      // Align reform data to baseline birth years (reform may have fewer years)
-      const alignedData = series.birth_years.map(by => {
+      // Align reform data to baseline birth years; for birth years where
+      // the reform was not yet in effect, use the baseline value so the
+      // line spans the full chart (reform == baseline for those cohorts)
+      const alignedData = series.birth_years.map((by, i) => {
         const idx = reformSeries.birth_years.indexOf(by);
-        return idx >= 0 ? reformSeries[metric][idx] : null;
+        return idx >= 0 ? reformSeries[metric][idx] : series[metric][i];
       });
 
       datasets.push({

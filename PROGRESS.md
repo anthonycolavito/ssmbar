@@ -38,6 +38,10 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 - COLA buttons: "Chained CPI" → "Index COLAs to Chained CPI", etc.
 - Also reorganized CLAUDE.md / skill.md / CLAUDE_GUIDELINES.md / MEMORY.md to eliminate redundancy
 
+**Fill baseline values for skipped birth years in cohort chart**
+- When reform data is missing for early birth years (e.g., 1940/1950/1960 for PIA reforms), the cohort chart now uses baseline values instead of leaving gaps
+- This makes the reform line span the full chart — reform equals baseline for unaffected cohorts
+
 ### March 2, 2026 (Session 22) — Reform Implementation: PIA, NRA, COLA Categories
 
 **Commit 3: COLA Reforms**
