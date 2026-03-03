@@ -45,7 +45,7 @@
     "pia_formula": {
       "label": "Slow Initial Benefit Growth",
       "icon": "bi-calculator",
-      "reforms": ["reduce_fact3", "flat_benefit", "simpson_bowles_pia"],
+      "reforms": ["flat_benefit", "simpson_bowles_pia", "reduce_fact3"],
       "exclusive": true
     },
     "nra": {

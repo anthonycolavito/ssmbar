@@ -28,6 +28,12 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 24) — Reform NMTR, Button Reorder, Investigations
+
+**Reorder PIA reform buttons to match CRFB reformer tool**
+- PIA buttons now in CRFB order: Flat Benefit, Simpson-Bowles (Top Half), Reduce Factor 3 (Top 20%)
+- NRA and COLA already matched
+
 ### March 2, 2026 (Session 23) — Label Renaming, Cohort Chart Fix, Reform NMTR
 
 **Rename reform labels to match CRFB reformer tool**
