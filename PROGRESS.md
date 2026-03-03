@@ -16,7 +16,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: March 2, 2026
+**Last Updated**: March 3, 2026
 
 **Active Work**: Benefit Explorer — Reform Implementation (PIA, NRA, COLA categories)
 
@@ -27,6 +27,21 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 3, 2026 (Session 27) — Comprehensive Repo Cleanup
+
+**Deleted ~72 files of accumulated development artifacts**
+- Removed 48 one-off scripts from `scripts/` (debug, trace, investigate, check, test, misc)
+- Removed 4 superseded generation scripts (`generate_data.R`, `generate_data_parallel.R`, `precompute_static_data.R`, `precompute_fast.R`)
+- Removed 7 archived Shiny modules from `inst/shiny/benefit_explorer/modules/archive/`
+- Removed 11 files in `inst/benchmarks/` (benchmark scripts + saved results)
+- Removed empty `docs/lib/` directory and `R/.Rhistory`
+- 15 scripts retained: 5 active generation + 10 validation/check scripts
+
+**Updated `.Rbuildignore`**
+- Added entries for `CLAUDE_GUIDELINES.md`, `APP_REFORM_DESIGN.md`, `STATUTORY_AUDIT.md`, `PROGRESS.md`, `docs`
+
+**All 676 tests pass (0 failures)**
 
 ### March 3, 2026 (Session 26) — Tax Max Reforms: Code, Tests, Documentation, UI Unlock
 

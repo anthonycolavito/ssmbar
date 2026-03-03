@@ -11,3 +11,8 @@
 ^legacy$
 ^\.claude$
 ^scripts$
+^CLAUDE_GUIDELINES\.md$
+^APP_REFORM_DESIGN\.md$
+^STATUTORY_AUDIT\.md$
+^PROGRESS\.md$
+^docs$
