@@ -54,7 +54,7 @@ if (is.null(categories_arg)) {
 }
 
 active_categories <- trimws(strsplit(categories_arg, ",")[[1]])
-valid_cats <- c("pia", "nra", "cola")
+valid_cats <- c("pia", "nra", "cola", "taxmax")
 bad <- setdiff(active_categories, valid_cats)
 if (length(bad) > 0) stop("Unknown categories: ", paste(bad, collapse = ", "))
 
@@ -98,6 +98,15 @@ reform_defs <- list(
       chained_cpi = function() reform_chained_cpi(2026),
       cola_cap    = function() reform_cola_cap(2026),
       cpi_e       = function() reform_cpi_e(2026)
+    )
+  ),
+  taxmax = list(
+    effective_year = 2026L,
+    phase_type = "cohort",
+    reforms = list(
+      taxmax_90_pct              = function() reform_taxmax_90_pct(2026, assumptions = tr2025),
+      eliminate_taxmax            = function() reform_eliminate_taxmax(2026, assumptions = tr2025),
+      eliminate_taxmax_no_credit  = function() reform_eliminate_taxmax_no_credit(2026)
     )
   )
 )

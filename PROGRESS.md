@@ -28,7 +28,16 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
-### March 3, 2026 (Session 26) — Tax Max Reforms: Code, Tests, Documentation
+### March 3, 2026 (Session 26) — Tax Max Reforms: Code, Tests, Documentation, UI Unlock
+
+**Unlock taxmax reform category in Benefit Explorer**
+- Removed `locked` class from taxmax category in `docs/index.html`, added reform buttons
+- Added "taxmax" to `active_reform_categories` in `docs/data/manifest.json`
+- Cloned reform data for 192 new taxmax combos (255 total) via `scripts/clone_taxmax_data.py`
+  - Standalone taxmax combos: copied from baseline `male_single` data (identical to current law)
+  - Cross-category combos: copied from non-taxmax equivalent (taxmax has no effect)
+- Added taxmax category to `scripts/generate_reform_data.R` (valid_cats + reform_defs)
+- Note: all workers earn below taxmax, so reform overlays show identical values to baseline
 
 **Fix `calculate_taxes()` to use `taxmax_tax`**
 - When `taxmax_tax` column is present in assumptions (Reform #14), `calculate_taxes()` now uses it for payroll tax capping instead of `taxmax`

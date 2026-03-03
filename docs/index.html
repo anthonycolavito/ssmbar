@@ -99,11 +99,25 @@
       </div>
 
       <!-- Tax Max Category -->
-      <div class="reform-category locked" data-category="taxmax">
-        <div class="category-header">
+      <div class="reform-category" data-category="taxmax">
+        <div class="category-header" onclick="toggleReformCategory('taxmax')">
           <i class="bi bi-cash-stack category-icon"></i>
           <span class="category-label">Increase Taxable Maximum</span>
-          <i class="bi bi-lock category-lock"></i>
+          <i class="bi bi-chevron-down category-chevron" id="taxmax-chevron"></i>
+        </div>
+        <div class="category-body" id="taxmax-body">
+          <button class="reform-option" data-category="taxmax" data-reform="taxmax_90_pct"
+                  onclick="selectReform('taxmax', 'taxmax_90_pct', this)">
+            Raise Tax Max to Cover 90% of Wages
+          </button>
+          <button class="reform-option" data-category="taxmax" data-reform="eliminate_taxmax"
+                  onclick="selectReform('taxmax', 'eliminate_taxmax', this)">
+            Eliminate Tax Max with Benefit Credit
+          </button>
+          <button class="reform-option" data-category="taxmax" data-reform="eliminate_taxmax_no_credit"
+                  onclick="selectReform('taxmax', 'eliminate_taxmax_no_credit', this)">
+            Eliminate Tax Max without Benefit Credit
+          </button>
         </div>
       </div>
 

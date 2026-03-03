@@ -3,7 +3,7 @@
   "package_version": "0.0.0.9001",
   "data_source": "2025 Trustees Report",
   "data_mode": "current_law_with_reforms",
-  "active_reform_categories": ["pia", "nra", "cola"],
+  "active_reform_categories": ["pia", "nra", "cola", "taxmax"],
   "dimensions": {
     "worker_types": [
       { "key": "very_low", "label": "Very Low Earner" },
