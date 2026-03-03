@@ -28,7 +28,17 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
-### March 2, 2026 (Session 22) — Reform Implementation: PIA Category
+### March 2, 2026 (Session 22) — Reform Implementation: PIA, NRA, COLA Categories
+
+**Commit 2: NRA Reforms**
+- Regenerated data with `--categories pia,nra` → 15 combo keys × 6 types × 5 BYs = 450 configs in 0.9 min
+- Unlocked NRA category in sidebar with 3 options: Raise NRA to 68, Index NRA to Longevity, NRA to 69 Then Index
+- NRA reforms (effective_year=2026) skip 1940/1950/1960 (turn 62 before 2026)
+- Combo keys include cross-category combos (e.g., reduce_fact3+nra_to_68)
+
+**Commit 1: PIA Reforms** (see below)
+
+### March 2, 2026 (Session 22, Commit 1) — Reform Implementation: PIA Category
 
 **Task**: Unlock first 3 reform categories (PIA, NRA, COLA) in the Benefit Explorer with interactive sidebar, data generation, and chart overlays. This commit covers PIA reforms only.
 

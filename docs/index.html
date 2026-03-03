@@ -53,11 +53,25 @@
       </div>
 
       <!-- NRA Category -->
-      <div class="reform-category locked" data-category="nra">
-        <div class="category-header">
+      <div class="reform-category" data-category="nra">
+        <div class="category-header" onclick="toggleReformCategory('nra')">
           <i class="bi bi-clock category-icon"></i>
           <span class="category-label">Increase Retirement Age</span>
-          <i class="bi bi-lock category-lock"></i>
+          <i class="bi bi-chevron-down category-chevron" id="nra-chevron"></i>
+        </div>
+        <div class="category-body" id="nra-body">
+          <button class="reform-option" data-category="nra" data-reform="nra_to_68"
+                  onclick="selectReform('nra', 'nra_to_68', this)">
+            Raise NRA to 68
+          </button>
+          <button class="reform-option" data-category="nra" data-reform="index_nra"
+                  onclick="selectReform('nra', 'index_nra', this)">
+            Index NRA to Longevity
+          </button>
+          <button class="reform-option" data-category="nra" data-reform="nra_to_69_index"
+                  onclick="selectReform('nra', 'nra_to_69_index', this)">
+            NRA to 69, Then Index
+          </button>
         </div>
       </div>
 
