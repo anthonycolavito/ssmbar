@@ -83,8 +83,6 @@ reform_reduce_benefits <- function(multiplier, effective_year, phase_in_years = 
 #' Creates a reform that reduces the third PIA replacement factor (fact3) from
 #' 15% to a target value. This reduces benefits for high earners.
 #'
-#' Wrapper around reform_benefit_formula() for convenience.
-#'
 #' @param target_fact3 Target value for fact3. Default is 0.05 (5%).
 #' @param effective_year Year when the reform takes effect (by eligibility cohort).
 #'   Only workers whose eligibility year >= this value are affected; existing
@@ -101,8 +99,12 @@ reform_reduce_benefits <- function(multiplier, effective_year, phase_in_years = 
 #'
 #' @export
 reform_reduce_fact3 <- function(target_fact3 = 0.05, effective_year, phase_in_years = 10) {
-  reform_benefit_formula(
-    fact3 = target_fact3,
+  create_reform(
+    name = "Reduce Third Factor",
+    description = sprintf("Reduce fact3 from 15%% to %.0f%%", target_fact3 * 100),
+    parameters = list(
+      list(param = "fact3", value = target_fact3, type = "replace")
+    ),
     effective_year = effective_year,
     phase_in_years = phase_in_years
   )
@@ -855,15 +857,21 @@ reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
 #' had a child under age 6. Credited earnings equal max(actual earnings, 0.5 * AWI)
 #' for up to 5 years, chosen to maximize the AIME increase.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected. Default is 2026.
 #' @param max_years Maximum years of credit. Default is 5.
 #'
 #' @return A Reform object
 #'
 #' @details
-#' This reform requires modification to the earnings generation or AIME
-#' calculation to identify years with children under 6 and apply the
-#' earnings floor.
+#' This is a **cohort-based reform**: it modifies AIME, which is determined at
+#' the worker's eligibility age. Only workers becoming eligible in or after
+#' the effective year are affected.
+#'
+#' The credit replaces actual earnings with 0.5 * AWI in years where that
+#' floor exceeds actual earnings, for up to \code{max_years} years with a
+#' child under 6. The years are selected to maximize the AIME increase.
+#' Higher earners see no benefit because their earnings already exceed the floor.
 #'
 #' @examples
 #' \dontrun{
@@ -906,8 +914,9 @@ reform_child_care_credit <- function(effective_year = 2026, max_years = 5) {
 #'
 #' @param flat_amount Monthly flat benefit in 2025 dollars. Default is $19,300/12
 #'   (125% of poverty line, monthly).
-#' @param effective_year Year when the reform takes effect. Default is 2026.
-#' @param phase_in_years Number of years to phase in. Default is 25.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected. Default is 2026.
+#' @param phase_in_years Number of years to phase in across cohorts. Default is 25.
 #' @param assumptions Assumptions data frame (must contain \code{year} and \code{awi}
 #'   columns). When provided, the flat benefit is AWI-indexed with a two-year lag
 #'   (same as bend points). When NULL, a constant flat_amount is used.
@@ -915,6 +924,11 @@ reform_child_care_credit <- function(effective_year = 2026, max_years = 5) {
 #' @return A Reform object
 #'
 #' @details
+#' This is a **cohort-based reform**: the flat benefit floor and modified PIA
+#' factors (fact2, fact3) are all looked up at the worker's eligibility age.
+#' Only workers becoming eligible in or after the effective year are affected;
+#' existing beneficiaries keep their current-law PIA.
+#'
 #' Worker's PIA = max(formula_pia, flat_benefit) if they have 40 QCs.
 #' The flat benefit is AWI-indexed with a two-year lag: for eligibility year Y,
 #' flat_benefit(Y) = flat_amount * AWI(Y-2) / AWI(2023).
@@ -968,10 +982,17 @@ reform_flat_benefit <- function(flat_amount = 19300 / 12, effective_year = 2026,
 #' replacement factors: fact2: 32%->30%, fact3: 15%->10%, fact4: 15%->5%.
 #' Phased in over 10 eligibility cohorts.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
-#' @param phase_in_years Number of years to phase in. Default is 10.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected. Default is 2026.
+#' @param phase_in_years Number of years to phase in across cohorts. Default is 10.
 #'
 #' @return A Reform object
+#'
+#' @details
+#' This is a **cohort-based reform**: all PIA parameters (bp3, fact2, fact3, fact4)
+#' are looked up at the worker's eligibility age. Only workers becoming eligible
+#' in or after the effective year are affected; existing beneficiaries keep their
+#' current-law PIA.
 #'
 #' @examples
 #' \dontrun{
@@ -1011,12 +1032,17 @@ reform_simpson_bowles <- function(effective_year = 2026, phase_in_years = 10) {
 #' Current law: PIA = formula(average(top 35 indexed earnings) / 12)
 #' Mini-PIA: PIA = average(formula(each year's indexed earnings / 12))
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
-#' @param phase_in_years Number of years to phase in. Default is 10.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected. Default is 2026.
+#' @param phase_in_years Number of years to phase in across cohorts. Default is 10.
 #'
 #' @return A Reform object
 #'
 #' @details
+#' This is a **cohort-based reform**: the mini-PIA blend factor is looked up at
+#' the worker's eligibility age. Only workers becoming eligible in or after the
+#' effective year are affected; existing beneficiaries keep their current-law PIA.
+#'
 #' During phase-in: PIA = (1 - blend) * current_pia + blend * mini_pia
 #'
 #' @examples
@@ -1050,11 +1076,17 @@ reform_mini_pia <- function(effective_year = 2026, phase_in_years = 10) {
 #' at the medium worker's PIA. Widow receives the higher of current law or
 #' this alternative.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Calendar year when the reform takes effect. All
+#'   surviving spouses receive the enhanced benefit starting in this year,
+#'   including existing beneficiaries. Default is 2026.
 #'
 #' @return A Reform object
 #'
 #' @details
+#' This is a **calendar-year reform**: all surviving spouses receiving widow
+#' benefits in or after the effective year get the enhanced calculation,
+#' including existing beneficiaries.
+#'
 #' Alternative = min(75% * (survivor_wrk_ben + deceased_wrk_ben), medium_worker_pia)
 #' Final = max(current_law_widow_ben, alternative)
 #'

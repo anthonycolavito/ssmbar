@@ -1071,7 +1071,7 @@ widow_benefit_reform <- function(worker, assumptions, debugg = FALSE) {
       # Alternative = min(75% * (survivor_wrk_ben + deceased_wrk_ben), medium_worker_pia_cap)
       # For simplicity, use the survivor's cola_basic_pia * 1.5 as the medium worker cap proxy
       # (A full implementation would pre-calculate medium worker PIAs)
-      widow_75_active = !is.na(widow_75_pct_active[1]) & widow_75_pct_active[1] == TRUE,
+      widow_75_active = !is.na(widow_75_pct_active) & widow_75_pct_active == TRUE,
 
       # Need wrk_ben from the calculation. If not available, use cola_basic_pia * w_act_factor
       own_wrk_ben = if ("wrk_ben" %in% names(.)) wrk_ben else floor(cola_basic_pia * w_act_factor),

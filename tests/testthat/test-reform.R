@@ -333,50 +333,6 @@ test_that("reform_impact_summary() calculates statistics correctly", {
 # Test reform template functions
 # -----------------------------------------------------------------------------
 
-test_that("reform_raise_nra() creates valid reform", {
-  reform <- reform_raise_nra(target_nra = 69, effective_year = 2030, phase_in_years = 10)
-
-  expect_s3_class(reform, "Reform")
-  expect_equal(reform$parameters[[1]]$param, "nra")
-  expect_equal(reform$parameters[[1]]$value, 69)
-  expect_equal(reform$effective_year, 2030)
-  expect_equal(reform$phase_in_years, 10)
-})
-
-test_that("reform_benefit_formula() creates valid reform", {
-  reform <- reform_benefit_formula(fact3 = 0.10, effective_year = 2027)
-
-  expect_s3_class(reform, "Reform")
-  expect_equal(length(reform$parameters), 1)
-  expect_equal(reform$parameters[[1]]$param, "fact3")
-  expect_equal(reform$parameters[[1]]$value, 0.10)
-})
-
-test_that("reform_benefit_formula() requires at least one factor", {
-  expect_error(
-    reform_benefit_formula(effective_year = 2027),
-    "At least one of fact1, fact2, or fact3 must be specified"
-  )
-})
-
-test_that("reform_benefit_cut() creates valid reform", {
-  reform <- reform_benefit_cut(cut_pct = 0.20, effective_year = 2033)
-
-  expect_s3_class(reform, "Reform")
-  expect_equal(length(reform$parameters), 3)  # all three factors
-
-  # Check that multiplier is 0.8 (1 - 0.20)
-  expect_equal(reform$parameters[[1]]$value, 0.8)
-  expect_equal(reform$parameters[[1]]$type, "multiply")
-})
-
-test_that("reform_benefit_cut() validates cut_pct range", {
-  expect_error(reform_benefit_cut(cut_pct = 0, effective_year = 2033))
-  expect_error(reform_benefit_cut(cut_pct = 1, effective_year = 2033))
-  expect_error(reform_benefit_cut(cut_pct = 1.5, effective_year = 2033))
-})
-
-
 # -----------------------------------------------------------------------------
 # Test integration with calculate_benefits_reform()
 # -----------------------------------------------------------------------------
@@ -408,7 +364,7 @@ test_that("Reform affects benefit calculations", {
   )
 
   # Create reform that cuts benefits by 20%
-  reform <- reform_benefit_cut(cut_pct = 0.20, effective_year = 2025)
+  reform <- reform_reduce_benefits(multiplier = 0.80, effective_year = 2025)
 
   # Calculate with reform using calculate_benefits_reform()
   reformed <- calculate_benefits_reform(

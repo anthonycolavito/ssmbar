@@ -551,123 +551,8 @@ print.ReformImpact <- function(x, ...) {
 # 6. Pre-built Reform Templates
 # -----------------------------------------------------------------------------
 
-#' Create Common Reform: Raise Normal Retirement Age
-#'
-#' Creates a reform that raises the Normal Retirement Age.
-#'
-#' @param target_nra Target NRA (e.g., 69)
-#' @param effective_year Year reform begins
-#' @param phase_in_years Years to phase in (default 10)
-#'
-#' @return A Reform object
-#'
-#' @examples
-#' \dontrun{
-#' reform <- reform_raise_nra(target_nra = 69, effective_year = 2030)
-#' }
-#'
-#' @export
-reform_raise_nra <- function(target_nra, effective_year, phase_in_years = 10) {
-  create_reform(
-    name = sprintf("Raise NRA to %.0f", target_nra),
-    description = sprintf("Gradually raise Normal Retirement Age to %.0f over %d years",
-                          target_nra, phase_in_years),
-    parameters = list(
-      list(param = "nra", value = target_nra, type = "replace")
-    ),
-    effective_year = effective_year,
-    phase_in_years = phase_in_years
-  )
-}
-
-
-#' Create Common Reform: Modify Benefit Formula
-#'
-#' Creates a reform that modifies the PIA benefit formula factors.
-#'
-#' @param fact1 First bend point factor (default 0.90)
-#' @param fact2 Second bend point factor (default 0.32)
-#' @param fact3 Third bend point factor (default 0.15)
-#' @param effective_year Year reform begins
-#' @param phase_in_years Years to phase in (default 0)
-#'
-#' @return A Reform object
-#'
-#' @examples
-#' \dontrun{
-#' # Reduce top replacement rate
-#' reform <- reform_benefit_formula(fact3 = 0.10, effective_year = 2027)
-#' }
-#'
-#' @export
-reform_benefit_formula <- function(fact1 = NULL, fact2 = NULL, fact3 = NULL,
-                                   effective_year, phase_in_years = 0) {
-  params <- list()
-
-  if (!is.null(fact1)) {
-    params <- c(params, list(list(param = "fact1", value = fact1, type = "replace")))
-  }
-  if (!is.null(fact2)) {
-    params <- c(params, list(list(param = "fact2", value = fact2, type = "replace")))
-  }
-  if (!is.null(fact3)) {
-    params <- c(params, list(list(param = "fact3", value = fact3, type = "replace")))
-  }
-
-  if (length(params) == 0) {
-    stop("At least one of fact1, fact2, or fact3 must be specified")
-  }
-
-  create_reform(
-    name = "Modify Benefit Formula",
-    description = "Change PIA benefit formula replacement factors",
-    parameters = params,
-    effective_year = effective_year,
-    phase_in_years = phase_in_years
-  )
-}
-
-
-#' Create Common Reform: Across-the-Board Benefit Cut
-#'
-#' Creates a reform that reduces all benefits by a percentage.
-#'
-#' @param cut_pct Percentage to cut benefits (e.g., 0.20 for 20% cut)
-#' @param effective_year Year reform begins
-#' @param phase_in_years Years to phase in (default 0)
-#'
-#' @return A Reform object
-#'
-#' @examples
-#' \dontrun{
-#' reform <- reform_benefit_cut(cut_pct = 0.20, effective_year = 2033)
-#' }
-#'
-#' @export
-reform_benefit_cut <- function(cut_pct, effective_year, phase_in_years = 0) {
-  if (cut_pct <= 0 || cut_pct >= 1) {
-    stop("'cut_pct' must be between 0 and 1 (e.g., 0.20 for 20% cut)")
-  }
-
-  # Reduce all three factors by the same percentage
-  multiplier <- 1 - cut_pct
-
-  create_reform(
-    name = sprintf("%.0f%% Benefit Cut", cut_pct * 100),
-    description = sprintf("Reduce all benefits by %.0f%%", cut_pct * 100),
-    parameters = list(
-      list(param = "fact1", value = multiplier, type = "multiply"),
-      list(param = "fact2", value = multiplier, type = "multiply"),
-      list(param = "fact3", value = multiplier, type = "multiply")
-    ),
-    effective_year = effective_year,
-    phase_in_years = phase_in_years
-  )
-}
-
-
 # -----------------------------------------------------------------------------
-# 8. Mutual Exclusivity
+# 6. Mutual Exclusivity
 # -----------------------------------------------------------------------------
 
 #' Mutual Exclusivity Groups for Reforms
@@ -692,8 +577,7 @@ reform_benefit_cut <- function(cut_pct, effective_year, phase_in_years = 0) {
 REFORM_EXCLUSIVITY_GROUPS <- list(
   pia_formula = c(
     "Flat Benefit",         # matches "Flat Benefit Floor"
-    "Simpson-Bowles",       # matches "Simpson-Bowles 4-Bracket PIA"
-    "Modify Benefit Formula" # reform_reduce_fact3 uses reform_benefit_formula
+    "Simpson-Bowles"        # matches "Simpson-Bowles 4-Bracket PIA"
   ),
   nra = c(
     "Raise NRA to 68",

@@ -176,7 +176,7 @@ test_that("Reforms produce different results than baseline", {
   )
 
   # Calculate with 20% benefit cut
-  reform <- reform_benefit_cut(cut_pct = 0.20, effective_year = 2025)
+  reform <- reform_reduce_benefits(multiplier = 0.80, effective_year = 2025)
   reformed <- calculate_benefits_reform(
     birth_yr = 1970, sex = "male", type = "medium", age_claim = 67,
     factors = sef2025, assumptions = tr2025, reform = reform

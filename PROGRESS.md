@@ -28,6 +28,16 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 28) — Reform Doc Review Complete, Bug Fixes, Cleanup
+
+**Completed reform documentation review (reforms #17–#24)**
+- #17 child care credit: updated docs (cohort-based), removed stale "requires modification" note. App TODO: assume lower-earning spouse gets max credits.
+- #18 flat benefit: added cohort-based clarification, verified `flat_benefit_elig` lookup at eligibility age
+- #19 Simpson-Bowles: added cohort-based clarification, verified `bp3_elig`/`fact4_elig` lookup
+- #20 mini-PIA: added cohort-based clarification, verified `mini_pia_blend_elig` lookup
+- #21 widow 75%: **fixed calendar-year bug** — `widow_75_pct_active[1]` always read earliest year (pre-reform = FALSE). Changed to per-year check, same pattern as RET fix. Added calendar-year documentation.
+- #22–24: removed 3 unused generic wrappers (`reform_raise_nra`, `reform_benefit_formula`, `reform_benefit_cut`). Inlined `reform_reduce_fact3` to use `create_reform()` directly. Cleaned up stale mutual exclusivity entry. Updated tests to use `reform_reduce_benefits()`.
+
 ### March 3, 2026 (Session 28) — BMB COLA Indexing Fix
 
 **Fixed BMB to be AWI-indexed at eligibility, then COLA'd forward**
