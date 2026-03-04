@@ -860,6 +860,10 @@ reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
 #' @param effective_year Year when the reform takes effect (by eligibility cohort).
 #'   Only workers whose eligibility year >= this value are affected. Default is 2026.
 #' @param max_years Maximum years of credit. Default is 5.
+#' @param assume_max_credits If TRUE, assume the worker qualifies for the maximum
+#'   number of credits regardless of child specifications. This selects the best
+#'   \code{max_years} working years for the credit. Used for pre-generated app data
+#'   where child specs are not available. Default is FALSE.
 #'
 #' @return A Reform object
 #'
@@ -873,25 +877,47 @@ reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
 #' child under 6. The years are selected to maximize the AIME increase.
 #' Higher earners see no benefit because their earnings already exceed the floor.
 #'
+#' When \code{assume_max_credits = FALSE} (default), actual child specifications
+#' must be provided via the \code{child1_spec}, \code{child2_spec}, \code{child3_spec}
+#' parameters in \code{\link{calculate_benefits_reform}}. If no children are
+#' specified, the credit has no effect.
+#'
+#' When \code{assume_max_credits = TRUE}, the credit is applied to the
+#' \code{max_years} working years that maximize the AIME gain, regardless of
+#' whether children are specified.
+#'
 #' @examples
 #' \dontrun{
+#' # For direct use with child specifications:
 #' reform <- reform_child_care_credit(effective_year = 2030)
+#'
+#' # For pre-generated app data (assumes max credits):
+#' reform <- reform_child_care_credit(effective_year = 2030, assume_max_credits = TRUE)
 #' }
 #'
 #' @export
-reform_child_care_credit <- function(effective_year = 2026, max_years = 5) {
+reform_child_care_credit <- function(effective_year = 2026, max_years = 5,
+                                     assume_max_credits = FALSE) {
   # Reform #29: Child Care Credit
   # Credits earnings up to 0.5*AWI for years when worker had child under age 6
   # Up to max_years years, selecting years that maximize AIME gain
+
+  params <- list(
+    list(param = "child_care_credit_active", value = TRUE, type = "replace"),
+    list(param = "max_child_care_years", value = max_years, type = "replace")
+  )
+
+  if (assume_max_credits) {
+    params <- c(params, list(
+      list(param = "child_care_assume_max", value = TRUE, type = "replace")
+    ))
+  }
 
   create_reform(
     name = "Child Care Credit",
     description = sprintf("Credit earnings up to 0.5*AWI for years with child under 6 (max %d years)",
                           max_years),
-    parameters = list(
-      list(param = "child_care_credit_active", value = TRUE, type = "replace"),
-      list(param = "max_child_care_years", value = max_years, type = "replace")
-    ),
+    parameters = params,
     effective_year = effective_year,
     phase_in_years = 0
   )

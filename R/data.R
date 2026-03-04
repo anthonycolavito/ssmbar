@@ -149,6 +149,7 @@
 #'   \item{child_care_credit_active}{Whether child care credits apply (default FALSE). Reform #29}
 #'   \item{max_child_care_years}{Max years of child care credit (default 5). Reform #29}
 #'   \item{child_care_earnings_rate}{Fraction of AWI credited (default 0.5). Reform #29}
+#'   \item{child_care_assume_max}{Whether to assume max credits without child specs (default FALSE). Reform #29}
 #'   \item{widow_75_pct_active}{Whether 75\% combined widow benefit applies (default FALSE). Reform #28}
 #' }
 #'

@@ -63,7 +63,7 @@ aime_reform <- function(worker, assumptions, debugg = FALSE){ #Function for calc
   cols_needed <- c("taxmax", "qc_rec", "qc_required", "max_qc_per_year",
                    "max_dropout_years", "min_comp_period", "index_age_offset", "awi",
                    "taxmax_benefit", "child_care_credit_active", "max_child_care_years",
-                   "child_care_earnings_rate")
+                   "child_care_earnings_rate", "child_care_assume_max")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -101,43 +101,61 @@ aime_reform <- function(worker, assumptions, debugg = FALSE){ #Function for calc
       benefit_cap = if_else(is.na(taxmax_benefit), taxmax, taxmax_benefit),
 
       # Reform #29: Child Care Credit
-      # If enabled, credit earnings up to child_care_earnings_rate * AWI for years with child under 6
-      child_care_floor = if_else(
-        !is.na(child_care_credit_active) & child_care_credit_active == TRUE,
-        child_care_earnings_rate * awi,
-        0
-      )
+      # Compute potential floor for ALL years; the group_modify below checks
+      # eligibility at the worker's eligibility age (cohort-based gate)
+      child_care_floor = child_care_earnings_rate * awi
     ) %>%
-    # Apply child care credit if active and worker has children
+    # Apply child care credit if active
     group_modify(~ {
       n <- nrow(.x)
-      cc_active <- .x$child_care_credit_active[1]
-      cc_active <- !is.na(cc_active) && cc_active == TRUE
+      # Check if credit is active at eligibility age (cohort-based reform)
+      elig_idx <- which(.x$age == .x$elig_age[1])[1]
+      cc_val <- if (!is.null(elig_idx) && !is.na(elig_idx)) .x$child_care_credit_active[elig_idx] else NA
+      cc_active <- !is.na(cc_val) && cc_val == TRUE
 
-      # Parse child birth years from child_spec columns
-      child1_by <- if ("child1_spec" %in% names(.x)) parse_child_birth_year(.x$child1_spec[1]) else NA_integer_
-      child2_by <- if ("child2_spec" %in% names(.x)) parse_child_birth_year(.x$child2_spec[1]) else NA_integer_
-      child3_by <- if ("child3_spec" %in% names(.x)) parse_child_birth_year(.x$child3_spec[1]) else NA_integer_
-
-      has_children <- !is.na(child1_by) | !is.na(child2_by) | !is.na(child3_by)
-
-      if (cc_active && has_children) {
-        max_cc_years <- .x$max_child_care_years[1]
+      if (cc_active) {
+        # Look up cohort-based parameters at eligibility age (not [1] which is earliest year)
+        max_cc_years <- if (!is.na(elig_idx)) .x$max_child_care_years[elig_idx] else 5
         max_cc_years <- if (is.na(max_cc_years)) 5 else max_cc_years
 
-        # Determine which years had a child under 6
-        years_with_child_under_6 <- logical(n)
-        for (i in seq_len(n)) {
-          yr <- .x$year[i]
-          has_young_child <- FALSE
-          if (!is.na(child1_by) && (yr - child1_by) >= 0 && (yr - child1_by) < 6) has_young_child <- TRUE
-          if (!is.na(child2_by) && (yr - child2_by) >= 0 && (yr - child2_by) < 6) has_young_child <- TRUE
-          if (!is.na(child3_by) && (yr - child3_by) >= 0 && (yr - child3_by) < 6) has_young_child <- TRUE
-          years_with_child_under_6[i] <- has_young_child
+        # Parse child birth years from child_spec columns
+        child1_by <- if ("child1_spec" %in% names(.x)) parse_child_birth_year(.x$child1_spec[1]) else NA_integer_
+        child2_by <- if ("child2_spec" %in% names(.x)) parse_child_birth_year(.x$child2_spec[1]) else NA_integer_
+        child3_by <- if ("child3_spec" %in% names(.x)) parse_child_birth_year(.x$child3_spec[1]) else NA_integer_
+
+        has_children <- !is.na(child1_by) | !is.na(child2_by) | !is.na(child3_by)
+
+        # Check for assume_max_credits flag at eligibility age (cohort-based)
+        assume_max <- if ("child_care_assume_max" %in% names(.x) && !is.na(elig_idx))
+          !is.na(.x$child_care_assume_max[elig_idx]) && .x$child_care_assume_max[elig_idx] == TRUE
+        else FALSE
+
+        # Determine which years are eligible for the credit
+        if (has_children) {
+          # Use actual child specs to determine eligible years
+          years_eligible <- logical(n)
+          for (i in seq_len(n)) {
+            yr <- .x$year[i]
+            has_young_child <- FALSE
+            if (!is.na(child1_by) && (yr - child1_by) >= 0 && (yr - child1_by) < 6) has_young_child <- TRUE
+            if (!is.na(child2_by) && (yr - child2_by) >= 0 && (yr - child2_by) < 6) has_young_child <- TRUE
+            if (!is.na(child3_by) && (yr - child3_by) >= 0 && (yr - child3_by) < 6) has_young_child <- TRUE
+            years_eligible[i] <- has_young_child
+          }
+        } else if (assume_max) {
+          # assume_max_credits mode: working years before eligibility age are
+          # eligible candidates; the selection logic below picks the best
+          # max_cc_years years. Restrict to pre-eligibility to match the
+          # policy intent (caring for young children during working career).
+          years_eligible <- .x$age < .x$elig_age[1]
+        } else {
+          # No children and no assume_max: credit has no effect
+          .x$earnings_with_cc <- .x$earnings
+          return(.x)
         }
 
-        # Calculate potential credit gain for each year
-        potential_gain <- pmax(.x$child_care_floor - .x$earnings, 0) * years_with_child_under_6
+        # Calculate potential credit gain for each eligible year
+        potential_gain <- pmax(.x$child_care_floor - .x$earnings, 0) * years_eligible
 
         # Select best max_cc_years years (highest gain)
         if (sum(potential_gain > 0) > 0) {

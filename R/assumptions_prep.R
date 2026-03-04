@@ -479,6 +479,7 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   assume$child_care_credit_active <- FALSE
   assume$max_child_care_years <- 5
   assume$child_care_earnings_rate <- 0.5  # Fraction of AWI credited
+  assume$child_care_assume_max <- FALSE   # When TRUE, assume max credits without child specs
 
   # 75% Widow Benefit (Reform #28)
   # When enabled, provides alternative widow benefit calculation:

@@ -30,7 +30,7 @@ utils::globalVariables(c(
   "benefit_cap", "nra_bmb", "at_or_past_nra", "has_spouse", "bmb_supplement",
   "child_care_credit_active", "years_with_child_under_6",
   "max_child_care_years", "child_care_earnings_rate", "child_care_floor",
-  "earnings_with_cc", "mini_pia_blend_elig",
+  "child_care_assume_max", "earnings_with_cc", "mini_pia_blend_elig",
   "widow_75_pct_active", "survivor_ben_current_law", "survivor_ben_alternative",
   "own_wrk_ben", "widow_75_active",
 

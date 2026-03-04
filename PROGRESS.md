@@ -18,7 +18,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Last Updated**: March 3, 2026
 
-**Active Work**: Benefit Explorer — Reform Implementation (PIA, NRA, COLA categories)
+**Active Work**: Benefit Explorer — Reform Implementation (child care credit app integration, data generation wiring)
 
 **Blocked On**: Nothing
 
@@ -27,6 +27,17 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 3, 2026 (Session 29) — Child Care Credit App Implementation
+
+**Implemented `assume_max_credits` mode for child care credit reform**
+- Added `assume_max_credits` parameter to `reform_child_care_credit()` — when TRUE, assumes max credits without child specs (for pre-generated app data). Default FALSE preserves correct behavior for direct API use.
+- Fixed cohort floor bug: `child_care_floor` was only computed for years where reform was active (post-effective-year), but the credit applies to pre-eligibility working years. Now computes floor for all years; eligibility check at `group_modify` gates the reform.
+- Fixed two `[1]` bugs: `child_care_assume_max[1]` and `max_child_care_years[1]` read earliest year (pre-reform). Changed to eligibility-age lookups (`[elig_idx]`).
+- Restricted `assume_max` eligible years to pre-eligibility working ages (`age < elig_age`), preventing selection of post-retirement years.
+- Added `child_care_assume_max` column to `assumptions_prep.R`, `data.R`, `ssmbar-package.R`, and regenerated `tr2025.rda`.
+- Results: very_low +$99/mo (+5.7%), low +$40/mo (+1.8%), medium/high/max $0.
+- All 659 tests pass.
 
 ### March 3, 2026 (Session 28) — Reform Doc Review Complete, Bug Fixes, Cleanup
 
