@@ -24,7 +24,7 @@ utils::globalVariables(c(
   "bmb_individual", "bmb_couple", "mini_pia_blend", "flat_benefit",
   "taxmax_tax", "taxmax_benefit",
   "bp3_elig", "fact4_elig", "cola_cap_year", "cola_cap_active_vals", "cap_is_active",
-  "bmb_rate", "bmb_rate_elig",
+  "bmb_rate",
   "flat_benefit_elig", "mini_pia_val", "regular_pia", "blended_pia",
   "pia_mult_elig", "regular_pia_mult", "regular_pia_final",
   "benefit_cap", "nra_bmb", "at_or_past_nra", "has_spouse", "bmb_supplement",

@@ -35,6 +35,8 @@
 #'
 #' @param multiplier Numeric multiplier for benefits. 0.95 = 5% cut, 1.10 = 10% increase.
 #' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep their unmodified PIA.
 #' @param phase_in_years Number of years to phase in the reform (0 = immediate).
 #'   Default is 0.
 #'
@@ -84,7 +86,9 @@ reform_reduce_benefits <- function(multiplier, effective_year, phase_in_years = 
 #' Wrapper around reform_benefit_formula() for convenience.
 #'
 #' @param target_fact3 Target value for fact3. Default is 0.05 (5%).
-#' @param effective_year Year when the reform takes effect.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep their unmodified PIA.
 #' @param phase_in_years Number of years to phase in. Default is 10.
 #'
 #' @return A Reform object
@@ -114,7 +118,9 @@ reform_reduce_fact3 <- function(target_fact3 = 0.05, effective_year, phase_in_ye
 #' Creates a reform that raises the Normal Retirement Age from 67 to 68.
 #' Phase-in: +1 month per 2 eligibility cohorts, capped at 68.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep their current-law NRA.
 #'
 #' @return A Reform object
 #'
@@ -153,7 +159,9 @@ reform_nra_to_68 <- function(effective_year = 2026) {
 #' Creates a reform that indexes the Normal Retirement Age to life expectancy
 #' improvements. Phase-in: +1 month per 2 eligibility cohorts, no cap.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep their current-law NRA.
 #'
 #' @return A Reform object
 #'
@@ -192,7 +200,9 @@ reform_index_nra <- function(effective_year = 2026) {
 #' then indexes to longevity. Phase 1: +2 months per year until 69. Phase 2:
 #' +1 month per 2 years after 69.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep their current-law NRA.
 #'
 #' @return A Reform object
 #'
@@ -236,7 +246,12 @@ reform_nra_to_69_index <- function(effective_year = 2026) {
 #' Creates a reform that indexes COLAs to the Chained CPI-U (C-CPI-U) instead
 #' of CPI-W. C-CPI-U grows about 0.3 percentage points slower than CPI-W.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' This is a calendar-year change: the reduced COLA applies to all
+#' beneficiaries (current and future) starting in the effective year.
+#'
+#' @param effective_year Calendar year when the reduced COLA first applies.
+#'   All beneficiaries receiving benefits in this year and beyond are affected.
+#'   Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -269,7 +284,12 @@ reform_chained_cpi <- function(effective_year = 2026) {
 #' CPI-E grows about 0.2 percentage points faster than CPI-W due to higher
 #' health care spending by seniors.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' This is a calendar-year change: the increased COLA applies to all
+#' beneficiaries (current and future) starting in the effective year.
+#'
+#' @param effective_year Calendar year when the increased COLA first applies.
+#'   All beneficiaries receiving benefits in this year and beyond are affected.
+#'   Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -301,8 +321,12 @@ reform_cpi_e <- function(effective_year = 2026) {
 #' Creates a reform that changes the OASI payroll tax rate by a specified
 #' amount in percentage points.
 #'
+#' This is a calendar-year change: the new tax rate applies to all workers
+#' earning in the effective year and beyond.
+#'
 #' @param rate_change Change in tax rate in percentage points. E.g., 1.0 for +1%.
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Calendar year when the new tax rate first applies.
+#'   All workers earning in this year and beyond are affected. Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -340,7 +364,9 @@ reform_change_tax_rate <- function(rate_change, effective_year = 2026) {
 #'
 #' Phase-in: Reduce dropout years by 1 per year (5->4->3->2->1->0).
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value are affected; existing
+#'   beneficiaries keep the standard 5 dropout years.
 #'
 #' @return A Reform object
 #'
@@ -378,7 +404,12 @@ reform_40_year_averaging <- function(effective_year = 2026) {
 #' Creates a reform that repeals the Retirement Earnings Test (RET), allowing
 #' beneficiaries to receive full benefits regardless of earnings.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' This is a calendar-year change: the RET is repealed for all beneficiaries
+#' starting in the effective year, regardless of when they first claimed.
+#'
+#' @param effective_year Calendar year when the RET is repealed. All
+#'   beneficiaries with earnings in this year and beyond are unaffected by the
+#'   RET. Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -408,9 +439,13 @@ reform_repeal_ret <- function(effective_year = 2026) {
 #' Create Reform: Phase Out Spousal Benefits
 #'
 #' Creates a reform that phases out spousal benefits by reducing the spousal
-#' PIA share from 50% to 0%.
+#' PIA share from 50% to 0%. The spousal PIA share is determined at the
+#' worker's eligibility age, so this is an eligibility-cohort reform: only
+#' workers reaching eligibility in or after the effective year are affected.
+#' Existing beneficiaries keep their current-law 50% share.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Year when the reform takes effect (by eligibility cohort).
+#'   Only workers whose eligibility year >= this value see a reduced spousal share.
 #' @param phase_in_years Number of years to phase out. Default is 10.
 #'
 #' @return A Reform object
@@ -449,9 +484,15 @@ reform_phase_out_spousal <- function(effective_year = 2026, phase_in_years = 10)
 #' median. Beneficiaries above the threshold receive the same dollar COLA
 #' increase as the median beneficiary, rather than a percentage increase.
 #'
+#' This is a calendar-year change: the cap applies to all beneficiaries
+#' (current and future) whose PIA exceeds the median threshold in the
+#' effective year and beyond.
+#'
 #' Requires cola_cap_median.csv data to be loaded in assumptions.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Calendar year when the COLA cap first applies.
+#'   All beneficiaries above the median PIA threshold are affected from this
+#'   year forward. Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -494,6 +535,12 @@ reform_cola_cap <- function(effective_year = 2026) {
 #' Creates a reform that raises the taxable maximum to cover 90% of earnings
 #' and adds a fourth PIA bend point/bracket with 5% replacement rate for
 #' earnings above the old taxmax.
+#'
+#' The higher taxable maximum applies by calendar year: all workers earning
+#' above the old cap pay additional payroll taxes starting in the effective
+#' year. The benefit credit (5% 4th bracket) effectively phases in for new
+#' cohorts, since only workers who paid taxes on the higher earnings have
+#' AIME above the old cap to receive credit for.
 #'
 #' @param effective_year Year when the reform takes effect. Default is 2026.
 #' @param assumptions Optional assumptions data frame (e.g., tr2025). When provided,
@@ -609,6 +656,12 @@ reform_taxmax_90_pct <- function(effective_year = 2026, assumptions = NULL) {
 #' a fourth PIA bracket with 15% replacement rate for all earnings above
 #' the old taxmax.
 #'
+#' The unlimited taxable maximum applies by calendar year: all workers pay
+#' payroll taxes on their full earnings starting in the effective year. The
+#' benefit credit (15% 4th bracket) effectively phases in for new cohorts,
+#' since only workers who paid taxes on earnings above the old cap have
+#' AIME above the old cap to receive credit for.
+#'
 #' @param effective_year Year when the reform takes effect. Default is 2026.
 #' @param assumptions Optional assumptions data frame (e.g., tr2025). When provided,
 #'   bp3 is derived from the actual taxmax schedule (old cap / 12). When NULL,
@@ -665,7 +718,14 @@ reform_eliminate_taxmax <- function(effective_year = 2026, assumptions = NULL) {
 #' workers pay taxes on all earnings but benefits are still calculated
 #' using earnings capped at the old taxmax.
 #'
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' This is a calendar-year tax reform: all workers pay payroll taxes on
+#' their full earnings starting in the effective year. Benefits are
+#' completely unaffected — AIME is still computed using earnings capped
+#' at the current-law taxable maximum.
+#'
+#' @param effective_year Calendar year when the unlimited tax cap first
+#'   applies. All workers earning above the old taxmax pay additional
+#'   taxes from this year forward. Default is 2026.
 #'
 #' @return A Reform object
 #'
@@ -708,8 +768,13 @@ reform_eliminate_taxmax_no_credit <- function(effective_year = 2026) {
 #'   Default is $900.
 #' @param couple_amount Monthly BMB amount for couples in 2026 dollars.
 #'   Default is $1,342.
-#' @param effective_year Year when the reform takes effect. Default is 2026.
+#' @param effective_year Calendar year when the BMB first applies. All
+#'   beneficiaries at or past NRA in this year and beyond receive the
+#'   supplement, including existing beneficiaries. Default is 2026.
 #' @param phase_in_years Number of years to phase in. Default is 0 (immediate).
+#' @param assumptions Optional assumptions data frame (e.g., tr2025). When provided,
+#'   BMB amounts are AWI-indexed with a two-year lag (same convention as bend
+#'   points). When NULL, uses constant nominal amounts.
 #'
 #' @return A Reform object
 #'
@@ -717,26 +782,49 @@ reform_eliminate_taxmax_no_credit <- function(effective_year = 2026) {
 #' The BMB kicks in at NRA and is calculated AFTER actuarial adjustments:
 #' BMB_supplement = max(BMB_rate - 0.70 * actuarially_adjusted_benefit, 0)
 #'
-#' BMB amounts are AWI-indexed after 2026.
+#' When assumptions are provided, BMB amounts are AWI-indexed: for eligibility
+#' year Y, BMB(Y) = base_amount * AWI(Y-2) / AWI(2024).
 #'
 #' @examples
 #' \dontrun{
 #' reform <- reform_basic_minimum(effective_year = 2030)
+#' reform <- reform_basic_minimum(effective_year = 2030, assumptions = tr2025)
 #' }
 #'
 #' @export
 reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
-                                  effective_year = 2026, phase_in_years = 0) {
-  # Note: AWI indexing of BMB amounts needs implementation
-  # These are 2026 base values
+                                  effective_year = 2026, phase_in_years = 0,
+                                  assumptions = NULL) {
+  if (!is.null(assumptions)) {
+    # AWI-index with two-year lag (same convention as bend points)
+    # Base amounts are in 2026$, so AWI base year is 2024
+    awi_schedule <- setNames(assumptions$awi, assumptions$year)
+    awi_base <- awi_schedule[["2024"]]
+
+    indiv_fn <- function(year) {
+      awi_ref <- awi_schedule[as.character(year - 2)]
+      if (length(awi_ref) == 0 || is.na(awi_ref)) return(individual_amount)
+      unname(individual_amount * awi_ref / awi_base)
+    }
+
+    couple_fn <- function(year) {
+      awi_ref <- awi_schedule[as.character(year - 2)]
+      if (length(awi_ref) == 0 || is.na(awi_ref)) return(couple_amount)
+      unname(couple_amount * awi_ref / awi_base)
+    }
+  } else {
+    # Fallback: constant nominal amounts (for unit tests without assumptions)
+    indiv_fn <- individual_amount
+    couple_fn <- couple_amount
+  }
 
   create_reform(
     name = "Basic Minimum Benefit",
-    description = sprintf("Establish BMB: $%.0f/month individual, $%.0f/month couple (2026$)",
+    description = sprintf("Establish BMB: $%.0f/month individual, $%.0f/month couple (2026$, AWI-indexed)",
                           individual_amount, couple_amount),
     parameters = list(
-      list(param = "bmb_individual", value = individual_amount, type = "replace"),
-      list(param = "bmb_couple", value = couple_amount, type = "replace")
+      list(param = "bmb_individual", value = indiv_fn, type = "replace"),
+      list(param = "bmb_couple", value = couple_fn, type = "replace")
     ),
     effective_year = effective_year,
     phase_in_years = phase_in_years

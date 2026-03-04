@@ -324,7 +324,6 @@ calculate_benefits_reform <- function(birth_yr,
     pia_reform(assumptions, debugg) %>%
     cola_reform(assumptions, debugg) %>%
     worker_benefit(assumptions, debugg) %>%
-    basic_minimum_benefit(assumptions, debugg) %>%
     spousal_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
     child_pia(assumptions, debugg) %>%
@@ -333,6 +332,7 @@ calculate_benefits_reform <- function(birth_yr,
     widow_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     widow_benefit_reform(assumptions, debugg) %>%
     ret_reform(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
+    basic_minimum_benefit(assumptions, debugg) %>%
     final_benefit(debugg)
 
   # Calculate annual individual benefit

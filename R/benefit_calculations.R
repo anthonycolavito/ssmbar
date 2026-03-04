@@ -71,6 +71,11 @@ join_all_assumptions <- function(worker, assumptions) {
                    "s_pia_share", "s_rf1", "s_rf2", "child_pia_share",
                    "fm_bp1", "fm_bp2", "fm_bp3", "ret1", "ret_phaseout_rate")
 
+  # Include reform columns when present in assumptions
+  if ("ret_enabled" %in% names(assumptions)) {
+    cols_needed <- c(cols_needed, "ret_enabled")
+  }
+
   # Only join columns that aren't already present
   cols_present <- names(worker)
   cols_to_join <- cols_needed[!cols_needed %in% cols_present | cols_needed == "year"]

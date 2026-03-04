@@ -645,17 +645,16 @@ basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
 
       # Determine BMB rate based on household type
       # Use couple rate if spouse_spec is not NA, otherwise individual rate
+      # BMB is a calendar-year parameter: all beneficiaries at/past NRA receive
+      # the supplement in the effective year and beyond, not just new cohorts
       has_spouse = !is.na(spouse_spec),
       bmb_rate = if_else(has_spouse, bmb_couple, bmb_individual),
-
-      # Get BMB rate at eligibility year (AWI-indexed)
-      bmb_rate_elig = bmb_rate[which(age == first(elig_age))][1],
 
       # Calculate BMB supplement: max(BMB - 0.70 * wrk_ben, 0)
       # Only applies at/after NRA
       bmb_supplement = if_else(
-        at_or_past_nra & !is.na(bmb_rate_elig),
-        pmax(bmb_rate_elig - 0.70 * wrk_ben, 0),
+        at_or_past_nra & !is.na(bmb_rate),
+        pmax(bmb_rate - 0.70 * wrk_ben, 0),
         0
       ),
 
@@ -666,7 +665,7 @@ basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
 
   # Return result
   if (debugg) {
-    cols_to_add <- c("bmb_rate_elig", "bmb_supplement")
+    cols_to_add <- c("bmb_rate", "bmb_supplement")
     cols_new <- cols_to_add[!cols_to_add %in% names(worker)]
 
     # Update wrk_ben in worker
@@ -730,10 +729,10 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
   # https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-toc18.html
 
   # Reform #23: Check if RET is enabled
-  # If ret_enabled is FALSE in assumptions, skip all RET calculations and return unchanged
-  ret_enabled_val <- assumptions$ret_enabled[1]
-  if (!is.na(ret_enabled_val) && ret_enabled_val == FALSE) {
-    # RET is repealed - return worker data unchanged
+  # If ret_enabled is FALSE for all years in the worker data, skip RET entirely.
+  # ret_enabled is joined per-year by join_all_assumptions(), so we check the
+  # worker's column (not assumptions[1]) to respect the effective_year.
+  if ("ret_enabled" %in% names(worker) && all(worker$ret_enabled == FALSE, na.rm = TRUE)) {
     return(worker)
   }
 
@@ -846,6 +845,11 @@ ret_reform <- function(worker, assumptions, spouse_data = NULL, factors = NULL, 
 
       # Step 1: Calculate worker's excess earnings
       wd$excess_earnings <- calculate_excess_earnings(wd$earnings, wd$ret1, wd$age, claim_age_val, nra_ind)
+
+      # Reform #23: Zero out excess earnings for years where RET is repealed
+      if ("ret_enabled" %in% names(wd)) {
+        wd$excess_earnings <- if_else(wd$ret_enabled == FALSE, 0, wd$excess_earnings)
+      }
 
       # Step 2: Calculate reduction (capped at annual benefits)
       wrk_total_ben <- wd$wrk_ben + wd$spouse_ben

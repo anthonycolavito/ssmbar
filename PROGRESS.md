@@ -28,6 +28,16 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 27) — Repo Cleanup, De-brand, Reform Doc Review & Fixes
+
+**Reform documentation review and bug fixes (reforms #1–#16)**
+- Added `effective_year` documentation clarifying cohort vs calendar-year behavior for each reform
+- **Fixed `ret_reform()` bug**: was reading `assumptions$ret_enabled[1]` (always year 1951 = TRUE), never actually repealing RET. Now checks per-year `ret_enabled` from worker data joined by `join_all_assumptions()`
+- **Fixed `reform_basic_minimum()` AWI indexing**: BMB amounts now AWI-indexed with two-year lag when `assumptions` parameter provided (was fixed in nominal terms)
+- **Fixed `basic_minimum_benefit()` calendar-year behavior**: BMB supplement now applies to all beneficiaries at/past NRA by calendar year, not just new eligibility cohorts
+- **Fixed BMB pipeline ordering**: moved `basic_minimum_benefit()` after `ret_reform()` in pipeline so RET doesn't overwrite the BMB supplement
+- Reforms still needing doc review: #17 child care credit, #18 flat benefit, #19 Simpson-Bowles, #20 mini-PIA, #21 widow 75%, #22-24 generic templates (reform.R)
+
 ### March 3, 2026 (Session 27) — Repo Cleanup and De-brand App
 
 **Remove CRFB branding from Benefit Explorer**
