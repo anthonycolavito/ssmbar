@@ -28,6 +28,18 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 3, 2026 (Session 28) — BMB COLA Indexing Fix
+
+**Fixed BMB to be AWI-indexed at eligibility, then COLA'd forward**
+- BMB base rate is now locked in at each worker's eligibility age (AWI-indexed, cohort-specific)
+- After eligibility, the base grows with COLA (same factor as regular benefits), not continuing AWI growth
+- Added `bmb_start_year` column to assumptions for calendar-year onset control (reform template generates AWI-indexed values for ALL years; `basic_minimum_benefit()` checks `bmb_start_year` to determine when supplement actually applies)
+- Renamed `cola_factor` to `bmb_cola_factor` in BMB function to avoid conflict with `cola()` function
+- Updated `reform_basic_minimum()` template, `basic_minimum_benefit()` function, `assumptions_prep.R`, `data.R`, and `ssmbar-package.R` globalVariables
+- Regenerated `tr2025.rda` to include new `bmb_start_year` column
+- All 676 tests pass
+- Reforms still needing doc review: #17 child care credit, #18 flat benefit, #19 Simpson-Bowles, #20 mini-PIA, #21 widow 75%, #22-24 generic templates (reform.R)
+
 ### March 3, 2026 (Session 27) — Repo Cleanup, De-brand, Reform Doc Review & Fixes
 
 **Reform documentation review and bug fixes (reforms #1–#16)**

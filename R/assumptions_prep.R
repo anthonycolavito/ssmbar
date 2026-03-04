@@ -456,6 +456,7 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   # Values are in 2026 dollars and should be AWI-indexed for future years.
   assume$bmb_individual <- NA_real_
   assume$bmb_couple <- NA_real_
+  assume$bmb_start_year <- NA_real_
 
   # Mini-PIA Blend Factor (Reform #22)
   # 0 = current law, 1 = full mini-PIA. Phases in over time.

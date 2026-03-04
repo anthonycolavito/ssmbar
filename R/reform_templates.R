@@ -782,8 +782,14 @@ reform_eliminate_taxmax_no_credit <- function(effective_year = 2026) {
 #' The BMB kicks in at NRA and is calculated AFTER actuarial adjustments:
 #' BMB_supplement = max(BMB_rate - 0.70 * actuarially_adjusted_benefit, 0)
 #'
-#' When assumptions are provided, BMB amounts are AWI-indexed: for eligibility
-#' year Y, BMB(Y) = base_amount * AWI(Y-2) / AWI(2024).
+#' **Indexing**: When assumptions are provided, BMB amounts grow with AWI
+#' year-over-year (two-year lag, same convention as bend points). At each
+#' worker's eligibility age, the AWI-indexed BMB rate is locked in as their
+#' cohort-specific base amount. After eligibility, that base is COLA'd forward
+#' (same cumulative COLA as regular benefits), not further AWI-indexed.
+#'
+#' **Calendar-year application**: All beneficiaries at or past NRA receive the
+#' supplement starting in the effective year, including existing beneficiaries.
 #'
 #' @examples
 #' \dontrun{
@@ -812,10 +818,16 @@ reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
       if (length(awi_ref) == 0 || is.na(awi_ref)) return(couple_amount)
       unname(couple_amount * awi_ref / awi_base)
     }
+
+    # Set effective_year to earliest year so AWI-indexed values exist for ALL
+    # years.  The actual start year is stored in bmb_start_year, which
+    # basic_minimum_benefit() checks to determine when the supplement applies.
+    min_year <- min(assumptions$year)
   } else {
     # Fallback: constant nominal amounts (for unit tests without assumptions)
     indiv_fn <- individual_amount
     couple_fn <- couple_amount
+    min_year <- effective_year
   }
 
   create_reform(
@@ -824,10 +836,11 @@ reform_basic_minimum <- function(individual_amount = 900, couple_amount = 1342,
                           individual_amount, couple_amount),
     parameters = list(
       list(param = "bmb_individual", value = indiv_fn, type = "replace"),
-      list(param = "bmb_couple", value = couple_fn, type = "replace")
+      list(param = "bmb_couple", value = couple_fn, type = "replace"),
+      list(param = "bmb_start_year", value = effective_year, type = "replace")
     ),
-    effective_year = effective_year,
-    phase_in_years = phase_in_years
+    effective_year = min_year,
+    phase_in_years = 0
   )
 }
 

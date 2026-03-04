@@ -615,14 +615,13 @@ basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
   # BMB kicks in at NRA, computed AFTER actuarial adjustments
   # BMB_supplement = max(BMB_rate - 0.70 * wrk_ben, 0)
 
-  # Check if BMB reform is active (bmb_individual is not all NA)
-  if (all(is.na(assumptions$bmb_individual))) {
-    # BMB reform not active, return unchanged
+  # Check if BMB reform is active (bmb_start_year is present and not all NA)
+  if (!"bmb_start_year" %in% names(assumptions) || all(is.na(assumptions$bmb_start_year))) {
     return(worker)
   }
 
   # Join BMB rates from assumptions
-  cols_needed <- c("bmb_individual", "bmb_couple", "nra")
+  cols_needed <- c("bmb_individual", "bmb_couple", "bmb_start_year", "nra")
   cols_missing <- cols_needed[!cols_needed %in% names(worker)]
 
   if (length(cols_missing) > 0) {
@@ -634,6 +633,10 @@ basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
   }
 
   # Calculate BMB supplement
+  # The BMB base rate is AWI-indexed at eligibility (different cohorts get
+  # different base amounts), then COLA'd forward after eligibility — same
+  # pattern as regular PIA/COLA. All beneficiaries at/past NRA receive the
+  # supplement starting in bmb_start_year.
   dataset <- dataset %>%
     group_by(id) %>%
     arrange(id, age) %>%
@@ -644,16 +647,25 @@ basic_minimum_benefit <- function(worker, assumptions, debugg = FALSE) {
       at_or_past_nra = age >= nra_bmb,
 
       # Determine BMB rate based on household type
-      # Use couple rate if spouse_spec is not NA, otherwise individual rate
-      # BMB is a calendar-year parameter: all beneficiaries at/past NRA receive
-      # the supplement in the effective year and beyond, not just new cohorts
       has_spouse = !is.na(spouse_spec),
-      bmb_rate = if_else(has_spouse, bmb_couple, bmb_individual),
+      bmb_rate_year = if_else(has_spouse, bmb_couple, bmb_individual),
+
+      # Lock in the AWI-indexed rate at the worker's eligibility age
+      bmb_rate_elig = bmb_rate_year[which(age == first(elig_age))][1],
+
+      # COLA the base rate forward from eligibility, using the same cumulative
+      # COLA factor as regular benefits (cola_basic_pia / basic_pia)
+      bmb_cola_factor = if_else(
+        basic_pia > 0,
+        cola_basic_pia / basic_pia,
+        1
+      ),
+      bmb_rate = bmb_rate_elig * bmb_cola_factor,
 
       # Calculate BMB supplement: max(BMB - 0.70 * wrk_ben, 0)
-      # Only applies at/after NRA
+      # Only applies at/after NRA AND on/after the start year (calendar-year onset)
       bmb_supplement = if_else(
-        at_or_past_nra & !is.na(bmb_rate),
+        at_or_past_nra & year >= first(bmb_start_year) & !is.na(bmb_rate),
         pmax(bmb_rate - 0.70 * wrk_ben, 0),
         0
       ),

@@ -141,6 +141,7 @@
 #'   \item{cola_cap_active}{Whether COLA cap applies (default FALSE). Reform #9}
 #'   \item{bmb_individual}{Monthly Basic Minimum Benefit, individual (default NA). Reform #27}
 #'   \item{bmb_couple}{Monthly Basic Minimum Benefit, couple (default NA). Reform #27}
+#'   \item{bmb_start_year}{Calendar year when BMB supplement begins (default NA). Reform #27}
 #'   \item{mini_pia_blend}{Mini-PIA blend factor, 0--1 (default 0). Reform #22}
 #'   \item{flat_benefit}{Monthly flat benefit floor (default NA). Reform #2}
 #'   \item{taxmax_tax}{Taxable max for payroll tax (default = taxmax). Reform #14}
