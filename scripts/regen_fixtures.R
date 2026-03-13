@@ -1,5 +1,5 @@
 # Regenerate ALL regression test fixtures — exact params from test-regression.R
-setwd("C:/Users/AnthonyColavito/ssmbar")
+# Run from repo root: Rscript scripts/regen_fixtures.R
 devtools::load_all(".")
 
 fixture_dir <- "tests/testthat/fixtures"

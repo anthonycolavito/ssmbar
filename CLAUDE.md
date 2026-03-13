@@ -33,14 +33,10 @@ Failure to follow this sequence (e.g., committing without PROGRESS.md, relying o
 
 ## Development Environment
 
-**Mac:**
 - R 4.0.3 at `/usr/local/bin/Rscript`
 - ssmbar is NOT installed — use `devtools::load_all(".", quiet = TRUE)`
 - 8 CPU cores available; use 6 for parallel work (`mclapply`)
 - Kill zombie R processes before data generation: `ps aux | grep "R --no-echo" | grep -v grep`
-
-**Windows (CRFB):**
-- R 4.5.0 at `C:\Users\AnthonyColavito\AppData\Local\Programs\R\R-4.5.0\bin\Rscript.exe`
 
 To run tests:
 ```bash

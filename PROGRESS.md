@@ -16,7 +16,7 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 ## Current Status
 
-**Last Updated**: March 3, 2026
+**Last Updated**: March 13, 2026
 
 **Active Work**: Benefit Explorer — Reform Implementation (child care credit app integration, data generation wiring)
 
@@ -27,6 +27,19 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 ## Session Log
 
 *Most recent entries at top.*
+
+### March 13, 2026 (Session 30) — Cleanup: Remove stale scripts and Windows references
+
+**Removed 9 stale development scripts from `scripts/`**
+- Deleted 6 superseded validation scripts: `validate_2025.R`, `validate_all_workers.R`, `validate_all_workers_deflated.R`, `validate_extended.R`, `validate_v_c7.R`, `validate_vc7_proper.R`
+- Deleted 3 one-off check scripts: `check_actuarial_factor.R`, `check_cola_timing.R`, `check_earnings_years.R`
+- Kept `validate_vc7_2025.R` as the final working V.C7 validation script
+
+**Removed Windows work computer references**
+- CLAUDE.md: Removed Windows (CRFB) dev environment section
+- `regen_fixtures.R`: Replaced hardcoded Windows `setwd()` with comment to run from repo root
+- `validate_vc7_2025.R`: Replaced hardcoded Windows paths with relative path
+- All 659 tests pass.
 
 ### March 3, 2026 (Session 29) — Child Care Credit App Implementation
 

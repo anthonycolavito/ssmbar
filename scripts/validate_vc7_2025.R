@@ -8,12 +8,12 @@
 library(readxl)
 library(dplyr)
 
-# Set working directory and load package
-setwd("C:/Users/AnthonyColavito/ssmbar")
+# Load package — run from repo root: Rscript scripts/validate_vc7_2025.R
 devtools::load_all(".")
 
 # Read V.C7 data - use raw read with no assumed column names
-vc7_path <- "C:/Users/AnthonyColavito/instructions/VC7.xlsx"
+# Set this path to your local copy of the V.C7 Excel file
+vc7_path <- "inst/extdata/VC7.xlsx"
 raw_data <- read_excel(vc7_path, col_names = FALSE)
 
 # Show structure
