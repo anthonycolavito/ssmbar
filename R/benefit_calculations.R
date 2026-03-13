@@ -315,7 +315,7 @@ aime <- function(worker, assumptions, debugg = FALSE) {
 #' PIA Calculation (Baseline - Current Law)
 #'
 #' Function that computes a worker's Primary Insurance Amount by age using
-#' the standard 90/32/15 bend point formula per current statutory rules.
+#' the standard 90/32/15 bend point formula per 42 USC 415(a)
 #' Compares the regular PIA with the special minimum PIA per 42 USC 415(a)(1)(C)
 #' and returns the higher of the two.
 #'
@@ -377,11 +377,11 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       # Regular PIA per 42 USC 415(a)(1)(A): 90/32/15 bend point formula
       # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       regular_pia = case_when(
-        age >= elig_age ~ floor_dime(case_when(
-                          aime > bp2_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (bp2_elig - bp1_elig)) + (fact3_elig * (aime - bp2_elig)),
-                          aime > bp1_elig ~ (fact1_elig * bp1_elig) + (fact2_elig * (aime - bp1_elig)),
-                          TRUE ~ fact1_elig * aime
-                        )),
+        age >= elig_age ~ floor_dime(
+                          pmin(aime, bp1_elig)*fact1_elig + #90% Replacement of AIME below first bend point
+                          pmax(pmin(aime, bp2_elig) - bp1_elig, 0)*fact2_elig + #32% Replacement of AIME between second and third bend point
+                          pmax(aime - bp2_elig,0)*fact3_elig #15% Replacement of AIME above third bend point
+                          ),
         TRUE ~ 0),
 
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
@@ -571,7 +571,7 @@ cola <- function (worker, assumptions, debugg = FALSE) {
 #'
 #' @export
 worker_benefit <- function(worker, assumptions, debugg = FALSE) {
-  #Benefit reduction factors are descrinbed in Sections 723 and 724 of the Social Security Handbook
+  #Benefit reduction factors are described in Sections 723 and 724 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0723.html
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0724.html
   #Delayed retirement credits are described in Section 720
