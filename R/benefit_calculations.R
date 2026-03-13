@@ -379,8 +379,8 @@ pia <- function(worker, assumptions, debugg = FALSE) {
       regular_pia = case_when(
         age >= elig_age ~ floor_dime(
                           pmin(aime, bp1_elig)*fact1_elig + #90% Replacement of AIME below first bend point
-                          pmax(pmin(aime, bp2_elig) - bp1_elig, 0)*fact2_elig + #32% Replacement of AIME between second and third bend point
-                          pmax(aime - bp2_elig,0)*fact3_elig #15% Replacement of AIME above third bend point
+                          pmax(0, pmin(aime, bp2_elig) - bp1_elig)*fact2_elig + #32% Replacement of AIME between second and third bend point
+                          pmax(0, aime - bp2_elig)*fact3_elig #15% Replacement of AIME above third bend point
                           ),
         TRUE ~ 0),
 
