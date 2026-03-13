@@ -163,7 +163,7 @@ calculate_benefits <- function(birth_yr,
     spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
     child_pia(assumptions, debugg) %>%
     child_benefit(assumptions, debugg) %>%
-    family_maximum(assumptions, debugg) %>%
+    family_maximum(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
     widow_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     widow_benefit(assumptions, debugg) %>%
     ret(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
@@ -328,7 +328,7 @@ calculate_benefits_reform <- function(birth_yr,
     spouse_benefit(spouse_data = spouse_data, assumptions, debugg) %>%
     child_pia(assumptions, debugg) %>%
     child_benefit(assumptions, debugg) %>%
-    family_maximum(assumptions, debugg) %>%
+    family_maximum(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%
     widow_pia(spouse_data = spouse_data, assumptions, factors = factors, debugg = debugg) %>%
     widow_benefit_reform(assumptions, debugg) %>%
     ret_reform(assumptions, spouse_data = spouse_data, factors = factors, debugg = debugg) %>%

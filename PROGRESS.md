@@ -46,6 +46,20 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 *Most recent entries at top.*
 
+### March 13, 2026 (Session 31) — Fix: Include dependent spouse benefit in family maximum
+
+**Bug:** `family_maximum()` only reduced child benefits when the family max was exceeded. The dependent spouse's benefit (`spouse_dep_ben` — the benefit the spouse receives from the worker's record) was computed in `ret()` and never subjected to the family max. Per 42 USC 403(a)(1), ALL auxiliary benefits on a worker's record must be included.
+
+**Fix:**
+- Extended `family_maximum()` signature to accept `spouse_data` and `factors`
+- Compute `spouse_dep_ben` inside `family_maximum()` using existing `calculate_spouse_dep_benefit()` helper
+- Include `spouse_dep_ben` in `total_aux_ben` for proportional reduction, producing `spouse_dep_ben_fm`
+- Updated `ret()` and `ret_reform()` to use pre-computed `spouse_dep_ben_fm` instead of recomputing
+- Updated both baseline and reform pipeline calls in `calculate_benefits.R`
+- Added 4 new tests (667 total, 0 failures)
+
+**Files modified:** `R/benefit_calculations.R`, `R/calculate_benefits.R`, `R/ret.R`, `R/reform_functions.R`, `tests/testthat/test-family_maximum.R`
+
 ### March 13, 2026 (Session 30) — Cleanup: Remove stale scripts and Windows references
 
 **Removed 9 stale development scripts from `scripts/`**

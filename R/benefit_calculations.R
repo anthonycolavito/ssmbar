@@ -663,7 +663,7 @@ worker_benefit <- function(worker, assumptions, debugg = FALSE) {
 #'   containing family-maximum-adjusted auxiliary benefits
 #'
 #' @export
-family_maximum <- function(worker, assumptions, debugg = FALSE) {
+family_maximum <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg = FALSE) {
   # Family maximum is described in 42 USC 403(a)
   # https://www.ssa.gov/OP_Home/ssact/title02/0203.htm
   #
@@ -765,19 +765,36 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
     }) %>%
     ungroup()
 
+  # Compute dependent spouse benefit (benefit the SPOUSE receives from THIS worker's record)
+  # Per 42 USC 403(a), this is an auxiliary on this worker's record and subject to family max
+  if (!"spouse_spec" %in% names(dataset)) {
+    dataset$spouse_dep_ben <- 0
+  } else {
+    dataset <- dataset %>%
+      group_by(id) %>%
+      group_modify(~ {
+        spec <- .x$spouse_spec[1]
+        if (!is.na(spec) && !is.null(spouse_data) && !is.null(spouse_data[[spec]])) {
+          .x$spouse_dep_ben <- calculate_spouse_dep_benefit(.x, spouse_data[[spec]], assumptions)
+        } else {
+          .x$spouse_dep_ben <- 0
+        }
+        .x
+      }) %>%
+      ungroup()
+  }
+
   # Apply family maximum reduction to auxiliary benefits
   dataset <- dataset %>%
     mutate(
-      # Total auxiliary benefits (before family max reduction)
-      # In ssmbar's data model, `spouse_ben` in the worker's dataframe is the
-      # benefit the worker receives FROM the spouse's record (as a dependent of
-      # the spouse). This is subject to the SPOUSE's family max, not this
-      # worker's family max. Only benefits paid FROM this worker's record
-      # (i.e., child benefits) are subject to this worker's family max.
-      # Per 42 USC 403(a), the family max applies to all auxiliaries on ONE
-      # worker's record — but the spouse_ben here is an auxiliary on the
-      # spouse's record, not this worker's.
-      total_aux_ben = pmax(child1_ben, 0, na.rm = TRUE) +
+      # Total auxiliary benefits on THIS worker's record (before family max reduction)
+      # Per 42 USC 403(a), the family max applies to all auxiliaries on ONE worker's record:
+      #   - spouse_dep_ben: benefit the SPOUSE receives from this worker's record (section 402(b)/(c))
+      #   - child benefits: benefits children receive from this worker's record (section 402(d))
+      # Does NOT include spouse_ben — that is the benefit THIS worker receives from the
+      # SPOUSE's record, which is subject to the SPOUSE's family max, not this worker's.
+      total_aux_ben = pmax(spouse_dep_ben, 0, na.rm = TRUE) +
+                      pmax(child1_ben, 0, na.rm = TRUE) +
                       pmax(child2_ben, 0, na.rm = TRUE) +
                       pmax(child3_ben, 0, na.rm = TRUE),
 
@@ -793,9 +810,10 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
         1.0  # No reduction needed
       ),
 
-      # Apply proportional reduction to each auxiliary benefit on this worker's record.
+      # Apply proportional reduction to ALL auxiliaries on this worker's record.
       # spouse_ben is passed through unchanged (it's from the spouse's record).
       spouse_ben_fm = pmax(spouse_ben, 0, na.rm = TRUE),
+      spouse_dep_ben_fm = floor(pmax(spouse_dep_ben, 0, na.rm = TRUE) * fm_reduction_factor),
       child1_ben_fm = floor(pmax(child1_ben, 0, na.rm = TRUE) * fm_reduction_factor),
       child2_ben_fm = floor(pmax(child2_ben, 0, na.rm = TRUE) * fm_reduction_factor),
       child3_ben_fm = floor(pmax(child3_ben, 0, na.rm = TRUE) * fm_reduction_factor)
@@ -805,9 +823,11 @@ family_maximum <- function(worker, assumptions, debugg = FALSE) {
   if (debugg) {
     cols_to_add <- c("family_max", "regular_fm", "disability_fm", "fm_at_elig",
                      "total_aux_ben", "aux_available", "fm_reduction_factor",
-                     "spouse_ben_fm", "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
+                     "spouse_ben_fm", "spouse_dep_ben", "spouse_dep_ben_fm",
+                     "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
   } else {
-    cols_to_add <- c("family_max", "spouse_ben_fm", "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
+    cols_to_add <- c("family_max", "spouse_ben_fm", "spouse_dep_ben_fm",
+                     "child1_ben_fm", "child2_ben_fm", "child3_ben_fm")
   }
 
   cols_new <- cols_to_add[!cols_to_add %in% names(worker)]

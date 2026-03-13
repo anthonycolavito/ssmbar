@@ -309,3 +309,112 @@ test_that("Total benefit includes family-max-adjusted auxiliary benefits", {
   # For this test, we just verify child benefits are included
   expect_gte(at_claim$ben, at_claim$wrk_ben + at_claim$child1_ben_fm)
 })
+
+# =============================================================================
+# Tests for Dependent Spouse Benefit in Family Maximum
+# =============================================================================
+
+test_that("Dependent spouse benefit is subject to worker's family maximum", {
+  # High earner with low-earning spouse = large dependent spouse benefit
+  # Plus children to push total auxiliaries over family max
+  worker <- calculate_benefits(
+    birth_yr = 1960,
+    sex = "male",
+    type = "max",
+    age_claim = 62,
+    factors = sef2025,
+    assumptions = tr2025,
+    spouse_type = "very_low",
+    spouse_sex = "female",
+    spouse_birth_yr = 1962,
+    spouse_age_claim = 62,
+    child1_spec = "2010-TRUE",
+    child2_spec = "2012-TRUE",
+    debugg = TRUE
+  )
+
+  # At an age where both worker and spouse are claiming and children are eligible
+  at_claim <- worker[worker$age == 62, ]
+
+  # spouse_dep_ben_fm should exist and be >= 0
+  expect_true("spouse_dep_ben_fm" %in% names(worker))
+
+  # If family max is binding, total auxiliaries (including spouse_dep_ben_fm)
+  # should not exceed family_max - wrk_ben
+  total_aux <- at_claim$spouse_dep_ben_fm + at_claim$child1_ben_fm +
+               at_claim$child2_ben_fm + at_claim$child3_ben_fm
+  available <- at_claim$family_max - at_claim$wrk_ben
+
+  expect_lte(total_aux, available + 1)  # +1 for rounding tolerance
+})
+
+test_that("Dependent spouse benefit gets same proportional reduction as children", {
+  # Use same birth year so both claim simultaneously at age 62
+  worker <- calculate_benefits(
+    birth_yr = 1960,
+    sex = "male",
+    type = "max",
+    age_claim = 62,
+    factors = sef2025,
+    assumptions = tr2025,
+    spouse_type = "very_low",
+    spouse_sex = "female",
+    spouse_birth_yr = 1960,
+    spouse_age_claim = 62,
+    child1_spec = "2010-TRUE",
+    child2_spec = "2012-TRUE",
+    debugg = TRUE
+  )
+
+  # At age 62, both worker and spouse are claiming
+  at_claim <- worker[worker$age == 62, ]
+
+  # Verify the test scenario actually has a binding family max and positive spouse_dep_ben
+  expect_lt(at_claim$fm_reduction_factor, 1)
+  expect_gt(at_claim$spouse_dep_ben, 0)
+
+  # The reduction factor should be applied to spouse_dep_ben too
+  expected_spouse_dep_fm <- floor(at_claim$spouse_dep_ben * at_claim$fm_reduction_factor)
+  expect_equal(at_claim$spouse_dep_ben_fm, expected_spouse_dep_fm, tolerance = 1)
+})
+
+test_that("No dependent spouse produces spouse_dep_ben_fm of zero", {
+  worker <- calculate_benefits(
+    birth_yr = 1970,
+    sex = "male",
+    type = "medium",
+    age_claim = 67,
+    factors = sef2025,
+    assumptions = tr2025,
+    child1_spec = "2025-FALSE",
+    debugg = TRUE
+  )
+
+  at_claim <- worker[worker$age == 67, ]
+  expect_true("spouse_dep_ben_fm" %in% names(worker))
+  expect_equal(at_claim$spouse_dep_ben_fm, 0)
+})
+
+test_that("Worker's own spousal benefit (from spouse's record) is unaffected by worker's family max", {
+  # This test ensures the fix doesn't accidentally start reducing spouse_ben
+  # spouse_ben is from the SPOUSE's record, not the worker's
+  worker <- calculate_benefits(
+    birth_yr = 1960,
+    sex = "male",
+    type = "max",
+    age_claim = 62,
+    factors = sef2025,
+    assumptions = tr2025,
+    spouse_type = "very_low",
+    spouse_sex = "female",
+    spouse_birth_yr = 1962,
+    spouse_age_claim = 62,
+    child1_spec = "2010-TRUE",
+    debugg = TRUE
+  )
+
+  at_claim <- worker[worker$age == 62, ]
+
+  # spouse_ben_fm should equal spouse_ben (unchanged by worker's family max)
+  expect_equal(at_claim$spouse_ben_fm, pmax(at_claim$spouse_ben, 0))
+})

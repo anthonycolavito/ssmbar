@@ -439,10 +439,15 @@ ret <- function(worker, assumptions, spouse_data = NULL, factors = NULL, debugg 
       # =====================================================
       # Now uses the already-reduced spouse_ben from Step 0
 
-      # Calculate spouse's dependent benefit (based on worker's record)
-      wd$spouse_dep_ben <- if (!is.na(spec) && !is.null(spouse_data[[spec]])) {
-        calculate_spouse_dep_benefit(wd, spouse_data[[spec]], assumptions)
-      } else { 0 }
+      # Use family-max-adjusted spouse_dep_ben if available (computed by family_maximum())
+      # Fall back to computing it here for backwards compatibility (e.g., if ret() called without family_maximum())
+      if ("spouse_dep_ben_fm" %in% names(wd)) {
+        wd$spouse_dep_ben <- wd$spouse_dep_ben_fm
+      } else {
+        wd$spouse_dep_ben <- if (!is.na(spec) && !is.null(spouse_data[[spec]])) {
+          calculate_spouse_dep_benefit(wd, spouse_data[[spec]], assumptions)
+        } else { 0 }
+      }
 
       # Step 1: Calculate worker's excess earnings
       wd$excess_earnings <- calculate_excess_earnings(wd$earnings, wd$ret1, wd$age, claim_age_val, nra_ind)
