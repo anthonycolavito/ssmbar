@@ -22,6 +22,24 @@ This document tracks Claude's work on the ssmbar package. Claude updates this fi
 
 **Blocked On**: Nothing
 
+### Known Issues
+
+**COLA double-count in `compute_pv_to_year()` (analytic_functions.R:311-396)**
+- `cola_basic_pia` at claim year already includes cumulative COLAs from eligibility to claim
+- Line 379 multiplies by `cola_cum_factor` (also cumulative from eligibility), applying those COLAs twice
+- Overstates `delta_pv_benefits` by `cola_cum_factor_at_claim` (~12% for 1960 cohort claiming at 67)
+- Affects: `marginal_benefit_analysis()`, `net_marginal_tax_rate()`, `marginal_irr()`
+- Does NOT affect site data (uses `pv_lifetime_benefits()` from pv_functions.R instead)
+- Fix approach: use `cola_basic_pia` at each benefit year directly (already has proper rounding), avoid `cola_cum_factor` entirely. Spousal PIA offset should also update per-year.
+
+**Unused `pv_cache` in `marginal_benefit_analysis()` (analytic_functions.R:565)**
+- Cache is allocated but never read/written; loop recomputes t-1 fresh each iteration
+- Results in 88 pipeline runs per worker instead of 45
+
+**Hardcoded 5% discount factor extrapolation (analytic_functions.R:388)**
+- `df_benefit <- last_df * (1.05 ^ years_beyond)` for years past Trustees Report horizon
+- Arbitrary assumption affecting later birth cohorts
+
 ---
 
 ## Session Log
