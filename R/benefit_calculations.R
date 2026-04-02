@@ -151,13 +151,15 @@ rf_and_drc <- function(claim_age, nra, rf1, rf2, drc, max_drc_age = 70) {
   drc_max_months <- (max_drc_age - nra) * 12 # Maximum months of DRC per 42 USC 402(w)
 
   # Calculate reduction factors
-  rf_amt <- if_else(dist_from_nra >= 0, 0, # If claiming at or above NRA, no RFs
-                   if_else(dist_from_nra <= -36, (-36*rf1) + (pmax(-24,(dist_from_nra + 36))*rf2), # If claiming more than three years before NRA
-                          dist_from_nra * rf1)) # If claiming less than three years before NRA
+  rf_amt <- pmin(0, # If claiming at or above NRA, no RFs
+                 pmax(-36, dist_from_nra)*rf1 + # If claiming less than three years before NRA
+                 pmin(0, pmin(-36, dist_from_nra) + 36)*rf2 # If claiming more than three years before NRA
+                 )
 
   # Calculate DRCs (capped at drc_max_months past NRA, i.e., max_drc_age)
-  drc_amt <- if_else(dist_from_nra <= 0, 0, # If claiming at or below NRA
-                    pmin(drc_max_months * drc, dist_from_nra * drc)) # If claiming above NRA. DRCs capped at max_drc_age
+  drc_amt <- pmax(0, # If claiming at or below NRA, no DRCs
+                  pmin(drc_max_months, dist_from_nra) * drc # If claiming above NRA. DRCs capped at max_drc_age
+                  )
 
   act_factor <- 1 + rf_amt + drc_amt # Final actuarial factor for adjusting benefits
 
