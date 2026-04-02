@@ -238,7 +238,7 @@ aime <- function(worker, assumptions, debugg = FALSE) {
   # AIME Calculation
   # SSA Handbook Section 701: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
   #
-  # AIME equals the average monthly earnings of the highest earning years
+  # AIME equals the average indexed monthly earnings of the highest earning years
   # in the computation period (typically 35 years for retired workers).
   # For January 2 claims, AIME at age X uses earnings through age X-1.
   #
