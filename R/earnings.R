@@ -6,22 +6,17 @@ generate_single_worker <- function(sef, par,
   
   valid_types <- c("very_low", "low", "medium", "high", "max", "custom")
   
-  if (!is.null(type)) {
-    if (!type %in% valid_types){
-      stop("Type is not valid")
-    }
-    if (type == "custom" && is.null(custom_avg_earnings)) {
-      stop("custom_avg_earnings is required when type = 'custom'")
-    }
+  if (!type %in% valid_types){
+    stop("Type is not valid")
   }
-  else {
-    stop("Type is required")
+  if (type == "custom" && is.null(custom_avg_earnings)) {
+    stop("custom_avg_earnings is required when type = 'custom'")
   }
-  
+
   worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's ID
   
   # ID format: type-birthyr-career_length (e.g., "medium-1960-40")
-  id <- paste0(worker_type,"-", birth_yr, "-", career_length)
+  earn_id <- paste0(worker_type,"-", birth_yr, "-", career_length)
   
   
   earn <- left_join(
@@ -32,7 +27,7 @@ generate_single_worker <- function(sef, par,
     mutate(
       prelim_earnings = factor * awi, #Scaled earnings equals factor * awi
       career_length = career_length, #Length of workers career
-      id = id
+      earn_id = earn_id
     )
 
   if (type == "max"){ #If a max earner, the values of the taxmax are taken as the earnings amounts at each age. 
@@ -78,7 +73,7 @@ generate_single_worker <- function(sef, par,
     )
   
   if (!debugg) {
-    earn <- earn %>% select(id, year, age, earnings) #Selects only the needed variables.
+    earn <- earn %>% select(earn_id, year, age, earnings) #Selects only the needed variables.
   }
   
   return(earn)
