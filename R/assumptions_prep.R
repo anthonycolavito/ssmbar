@@ -146,55 +146,7 @@ prep_assumptions <- function(dataset) {
   # $1 withheld for every $2 of excess earnings = 0.5 rate
   assume$ret_phaseout_rate <- 0.5
 
-  # =============================================================================
-  # COLA (Cost-of-Living Adjustment)
-  # =============================================================================
-  # SSA Handbook Section 719: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0719.html
-  # COLA in year Y is applied to benefits in December of year Y (first full benefit in January Y+1).
-  # Historical COLAs are from SSA publications; projected COLAs are calculated from CPI-W ratios.
-  #
-  # For historical years (<=2025): Use actual COLA from cola.csv
-  # For projected years (>2025): Calculate from CPI-W ratio
-  #   cola_Y = (cpi_w_Y / cpi_w_(Y-1) - 1) * 100
-
-  assume$cola <- NA_real_
-
-  # Try to load historical COLA data
-  if (is.null(cola_file)) {
-    # Look for cola.csv in inst/extdata/
-    cola_file <- system.file("extdata", "cola.csv", package = "ssmbar")
-    if (cola_file == "") {
-      # Try relative path for development
-      if (file.exists("inst/extdata/cola.csv")) {
-        cola_file <- "inst/extdata/cola.csv"
-      }
-    }
-  }
-
-  if (!is.null(cola_file) && file.exists(cola_file)) {
-    cola_hist <- read.csv(cola_file)
-
-    # Merge historical COLAs by year
-    for (i in seq_len(nrow(assume))) {
-      yr <- assume$year[i]
-      hist_cola <- cola_hist$cola[cola_hist$year == yr]
-      if (length(hist_cola) == 1) {
-        assume$cola[i] <- hist_cola
-      }
-    }
-  }
-
-  # Calculate projected COLAs from CPI-W ratios for years without historical data
-  for (i in seq_len(nrow(assume))) {
-    if (is.na(assume$cola[i]) && i > 1) {
-      cpi_current <- assume$cpi_w[i]
-      cpi_prev <- assume$cpi_w[i - 1]
-      if (!is.na(cpi_current) && !is.na(cpi_prev) && cpi_prev > 0) {
-        # Negative COLAs are not payable under current law
-        assume$cola[i] <- pmax((cpi_current / cpi_prev - 1) * 100, 0)
-      }
-    }
-  }
+  
 
   # =============================================================================
   # Years of Coverage (YOC) for Special Minimum PIA
@@ -294,72 +246,6 @@ prep_assumptions <- function(dataset) {
 
   # Minimum years of coverage required for special minimum PIA
   assume$min_yoc_for_special_min <- 11
-
-  # =============================================================================
-  # Family Maximum Bend Points
-  # =============================================================================
-  # Per 42 USC 403(a)(1), the family maximum is calculated using a bend point
-  # formula similar to PIA calculation. The bend points are indexed to AWI
-  # from the 1979 base values ($230, $332, $433).
-  #
-  # Family maximum formula (42 USC 403(a)(1)):
-  # 150% of PIA up to fm_bp1 +
-  # 272% of PIA between fm_bp1 and fm_bp2 +
-  # 134% of PIA between fm_bp2 and fm_bp3 +
-  # 175% of PIA above fm_bp3
-
-  assume$fm_bp1 <- NA_real_
-  assume$fm_bp2 <- NA_real_
-  assume$fm_bp3 <- NA_real_
-
-  # Try to load historical family max bend point data
-  fm_bp_file <- system.file("extdata", "family_max_bp.csv", package = "ssmbar")
-  if (fm_bp_file == "") {
-    # Try relative path for development
-    if (file.exists("inst/extdata/family_max_bp.csv")) {
-      fm_bp_file <- "inst/extdata/family_max_bp.csv"
-    }
-  }
-
-  if (file.exists(fm_bp_file)) {
-    fm_bp_hist <- read.csv(fm_bp_file)
-
-    # Merge historical family max bend points by year
-    for (i in seq_len(nrow(assume))) {
-      yr <- assume$year[i]
-      hist_row <- fm_bp_hist[fm_bp_hist$year == yr, ]
-      if (nrow(hist_row) == 1) {
-        assume$fm_bp1[i] <- hist_row$fm_bp1
-        assume$fm_bp2[i] <- hist_row$fm_bp2
-        assume$fm_bp3[i] <- hist_row$fm_bp3
-      }
-    }
-  }
-
-  # Project family max bend points for future years
-  # Formula: fm_bp_base * AWI_2yrs_before / AWI_1977, rounded to nearest dollar
-  # Per SSA OACT: https://www.ssa.gov/oact/cola/familymax.html
-  fm_bp1_base <- 230  # 1979 base value
-  fm_bp2_base <- 332  # 1979 base value
-  fm_bp3_base <- 433  # 1979 base value
-
-  for (i in seq_len(nrow(assume))) {
-    yr <- assume$year[i]
-    if (yr >= 1979 && is.na(assume$fm_bp1[i])) {
-      awi_end <- assume$awi[assume$year == yr - 2]
-
-      if (length(awi_end) == 1 && !is.na(awi_end)) {
-        assume$fm_bp1[i] <- round(fm_bp1_base * awi_end / awi_1977)
-        assume$fm_bp2[i] <- round(fm_bp2_base * awi_end / awi_1977)
-        assume$fm_bp3[i] <- round(fm_bp3_base * awi_end / awi_1977)
-      }
-    }
-  }
-
-  # Child benefit share of worker's PIA
-  # Per 42 USC 402(d)(2): child benefit is 50% of worker's PIA
-  assume$child_pia_share <- 0.5
-
 
   return(assume)
 
