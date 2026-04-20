@@ -1,7 +1,6 @@
 
-prep_assumptions <- function(dataset, cola_file = NULL) {
+prep_assumptions <- function(dataset) {
 
-  # TODO: Document - add specific handbook section citations for each parameter projection formula
   #Rules for Updating Parameters: https://www.ssa.gov/OP_Home/comp2/G-APP-A.html
   # Tax max: Indexed forward from 1994 (1992 AWI) and rounded to the nearest $300
   # Bend points: Indexed forward from 1979 (1977 AWI) and rounded to the nearest dollar
@@ -12,10 +11,10 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   assume <- dataset
 
   #AWI bases
-  awi_1976 <- assume[assume$year == 1976, "awi"]
-  awi_1977 <- assume[assume$year == 1977, "awi"]
-  awi_1992 <- assume[assume$year == 1992, "awi"]
-  awi_2000 <- assume[assume$year == 2000, "awi"]
+  awi_1976 <- assume[assume$year == 1976, "awi"] #Used for QC req indexing
+  awi_1977 <- assume[assume$year == 1977, "awi"] #Used for BP indexing
+  awi_1992 <- assume[assume$year == 1992, "awi"] #Used for tax max and RET 1 indexing
+  awi_2000 <- assume[assume$year == 2000, "awi"] #Used for RET 2 indexing.
 
   #Parameter base amounts
   qc_base <- assume[assume$year == 1978, "qc_rec"]
@@ -108,7 +107,6 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
   # Program Rule Parameters
   # =============================================================================
   # These parameters represent Social Security program rules that are currently
-
   # constant but may change under policy reforms. Storing them in the assumptions
   # data frame allows for policy modeling by modifying these values.
 
@@ -118,7 +116,7 @@ prep_assumptions <- function(dataset, cola_file = NULL) {
 
   # Earliest age for retirement benefit eligibility
   # SSA Handbook Section 300: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0300.html
-  assume$elig_age_retired <- 62
+  assume$eea <- 62
 
   # Offset for wage indexing year (indexing year = elig_age - offset)
   # Earnings are indexed to AWI two years before eligibility age (age 60 for age-62 eligibility)
