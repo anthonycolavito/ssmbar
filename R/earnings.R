@@ -1,5 +1,6 @@
+
 generate_single_worker <- function(sef, par,
-                                   birth_yr, type, career_length,
+                                   birth_yr, type=NULL, career_length=44,
                                    custom_avg_earnings = NULL,
                                    debugg = FALSE) {
   
@@ -10,7 +11,7 @@ generate_single_worker <- function(sef, par,
       stop("Type is not valid")
     }
     if (type == "custom" && is.null(custom_avg_earnings)) {
-      stop("custom_avg_earnings is required when spouse_type = 'custom'")
+      stop("custom_avg_earnings is required when type = 'custom'")
     }
   }
   else {
@@ -29,17 +30,16 @@ generate_single_worker <- function(sef, par,
     by = "year" #by variable used for merging
   ) %>%
     mutate(
-      earnings = factor * awi, #Scaled earnings equals factor * awi
-      work_years = career_length, #Number of work years this worker has, used for AIME calc later
-      type = type, #Earnings level indicator, used for ID'ing
-      career_length = career_length #Length of workers career 
+      prelim_earnings = factor * awi, #Scaled earnings equals factor * awi
+      career_length = career_length, #Length of workers career
+      id = id
     )
 
   if (type == "max"){ #If a max earner, the values of the taxmax are taken as the earnings amounts at each age. 
-    earn <- earn %>% filter(worker == "raw") %>% select(year, age, type, birth_yr, career_length, earnings = taxmax)
+    earn <- earn %>% filter(worker == "raw") %>% mutate(earnings = taxmax)
   }
   else if (type != "custom") { #Otherwise, the earnings column calculated above is kept. 
-    earn <- earn %>% filter(worker == type) %>% select(year, age, type, birth_yr, career_length, earnings)
+    earn <- earn %>% filter(worker == type) %>% mutate(earnings = prelim_earnings)
   }
   else {
     #Earnings are generated using the raw scaled earnings factors provided by the trustee in five (5) steps
@@ -50,28 +50,37 @@ generate_single_worker <- function(sef, par,
     #5. The real earnings at each age are multiplied by this ratio and then converted back into nominal dollars.
     pi_curr <- par$gdp_pi[par$year == as.numeric(format(Sys.Date(), "%Y"))]
     
-    earn <- earn %>% filter(worker == "raw") %>% select(year, age, type, birth_yr, career_length, earnings) %>%
+    earn <- earn %>% filter(worker == "raw") %>%
       left_join(par %>% select(year, gdp_pi), by="year") %>%
       mutate(
         pi_curr = pi_curr, #Price index for the current year (looked up from assumptions)
         index = pi_curr / gdp_pi, #Indexing factors to convert nominal earnings into real earnings
-        nom_earn = factor * awi, #Nominal earnings used the raw scaled earnings factor and the yearly AWI
-        real_earn = nom_earn * index) #Real earnings
+        real_earn = prelim_earnings * index) #Real earnings
     
     real_earn <- earn$real_earn #Vector of the worker's real earnings
     avg_real_earn <- sum(sort(real_earn, decreasing = TRUE)[1:35]) / 35 #Average of the highest 35 real earnings
     scalar <- custom_avg_earnings / avg_real_earn #Ratio of the specified average to the average found
     
-    worker <- worker %>% mutate(
+    earn <- earn %>% mutate(
       adj_real_earn = real_earn * scalar, #Adjusted real earnings using the scalar previously calculated
-      earnings = pmax(adj_real_earn * gdp_pi / pi_curr * if_else(age < elig_age, 1, if_else(elig_age < elig_age_ret, 0, 1)), 0, na.rm = TRUE) #Final nominal earnings -- earnings past eligibility age set to 0 if disabled worker
+      earnings = adj_real_earn / index  #Final nominal earnings 
     )
   }
   
+  #Zeroing out earnings in years after career length
+  earn <- earn %>%
+    mutate(
+      work_year = age - 20,
+      earnings = case_when(
+        work_year <= career_length ~ earnings, 
+        TRUE ~ 0
+      )
+    )
+  
   if (!debugg) {
-    worker <- worker %>% select(id, sex, year, age, earnings) #Selects only the needed variables.
+    earn <- earn %>% select(id, year, age, earnings) #Selects only the needed variables.
   }
   
-  return(worker)
+  return(earn)
   
 }
