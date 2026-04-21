@@ -15,7 +15,7 @@ prep_assumptions <- function(dataset) {
   #AWI bases
   awi_1976 <- assume[assume$year == 1976, "awi"] #Used for QC req indexing
   awi_1977 <- assume[assume$year == 1977, "awi"] #Used for BP indexing
-  awi_1992 <- assume[assume$year == 1992, "awi"] #Used for tax max, RET 1, and old law contributio base indexing
+  awi_1992 <- assume[assume$year == 1992, "awi"] #Used for tax max, RET 1, and old law contribution base indexing
   awi_2000 <- assume[assume$year == 2000, "awi"] #Used for RET 2 indexing.
 
   #Parameter base amounts
@@ -37,12 +37,12 @@ prep_assumptions <- function(dataset) {
     ret1_i <- assume[assume$year == i, "ret1"]
     ret2_i <- assume[assume$year == i, "ret2"]
     old_law_base_i <- assume[assume$year == i, "old_law_base"]
-    spec_min_rate_i <- assume[assume$year == i, "special_min_rate"]
+    spec_min_base_i <- assume[assume$year == i, "special_min_base"]
 
     awi_end <- assume[assume$year == i - 2, "awi"]
 
     # Project out tax max
-    if (is.na(taxmax_i) == T){
+    if (is.na(taxmax_i)){
 
       taxmax_i <- round((taxmax_base * awi_end / awi_1992)/300)*300 
 
@@ -51,7 +51,7 @@ prep_assumptions <- function(dataset) {
     }
 
     #Project out bend points
-    if (is.na(bp1_i) == T) {
+    if (is.na(bp1_i)) {
 
       bp1_i <- round(bp1_base * awi_end / awi_1977)
       bp2_i <- round(bp2_base * awi_end / awi_1977)
@@ -61,7 +61,7 @@ prep_assumptions <- function(dataset) {
     }
 
     #Project out QC requirements
-    if (is.na(qc_rec_i) == T) {
+    if (is.na(qc_rec_i)) {
       prev_qc_rec <- assume[assume$year == i - 1, "qc_rec"]
 
       qc_rec_i <- max(round(qc_base * awi_end / awi_1976 / 10)*10,prev_qc_rec)
@@ -89,25 +89,25 @@ prep_assumptions <- function(dataset) {
     }
     
     #Project out old law contribution base
-    if (is.na(old_law_base)) {
+    if (is.na(old_law_base_i)) {
       
       old_law_base_i <- round((old_law_base_base * awi_end / awi_1992)/300)*300 #Tax max is not allowed to decline from the previous year
       
-      assume[assume$year == i, "taxmax"] <- taxmax_i
+      assume[assume$year == i, "old_law_base"] <- old_law_base_i
     }
     
-    #Project out special_min_pia rates
-    if (is.na(spec_min_rate_i)) {
+    #Project out special_min_pia bases
+    if (is.na(spec_min_base_i)) {
       # Per 42 USC 415(a)(1)(C)(i): $11.50 per year of coverage over 10, COLA-adjusted
       # The $11.50 was established in 1979 and is adjusted by each year's COLA (which comes from the previous year).
       # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
       
-      prev_smr <- assume$spec_min_rate[i-1]
-      cola_i <- assume$cola[i-1]
+      prev_smb <- assume$spec_min_base[assume$year == i-1]
+      cola_i <- assume$cola[assume$year == i-1]
       
-      cur_smr <- floor(prev_smr * (1+cola_i) * 10)/10
+      cur_smb <- floor(prev_smb * (1+cola_i) * 10)/10
       
-      assume$spec_min_rate[i] <- cur_smr
+      assume$spec_min_base[assume$year == i] <- cur_smb
       
     }
 
@@ -117,14 +117,9 @@ prep_assumptions <- function(dataset) {
   # - 1951-1978: 25% of contribution and benefit base
   # - 1979-1990: 25% of old-law contribution base
   # - 1991+: 15% of old-law contribution base
-  for(i in 1951:max(assume$year)){
-    if (i < 1991) {
-      assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.25
-    }
-    else {
-      assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.15
-    }
-  }
+  assume$yoc_threshold <- ifelse(assume$year < 1991,
+                                 assume$old_law_base * 0.25,
+                                 assume$old_law_base * 0.15)
   
   # Spousal PIA share
   # SSA Handbook Section 320: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
