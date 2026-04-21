@@ -7,13 +7,15 @@ prep_assumptions <- function(dataset) {
   # QCs: Indexed forward from 1978 (1976 AWI) and rounded to the nearest dollar
   # RET Exempt Amount 1: Indexed forward from 1994 (1992 AWI) and rounded to the lowest $10
   # Ret Exempt Amount 2: Indexed forward from 2002 (2000 AWI) and rounded to the lowest $10
+  # Old Law Base: Indexed from 1994 (1992 AWI) and rounded to the nearest $300
+  # Special Minimum PIA Base Rate: $11.50 in 1979, COLA'd out each year
 
   assume <- dataset
 
   #AWI bases
   awi_1976 <- assume[assume$year == 1976, "awi"] #Used for QC req indexing
   awi_1977 <- assume[assume$year == 1977, "awi"] #Used for BP indexing
-  awi_1992 <- assume[assume$year == 1992, "awi"] #Used for tax max and RET 1 indexing
+  awi_1992 <- assume[assume$year == 1992, "awi"] #Used for tax max, RET 1, and old law contributio base indexing
   awi_2000 <- assume[assume$year == 2000, "awi"] #Used for RET 2 indexing.
 
   #Parameter base amounts
@@ -23,8 +25,9 @@ prep_assumptions <- function(dataset) {
   taxmax_base <- assume[assume$year == 1994, "taxmax"]
   ret1_base <- assume[assume$year == 1994, "ret1"]
   ret2_base <- assume[assume$year == 2002, "ret2"]
+  old_law_base_base <- assume[assume$year == 1994, "old_law_base"]
 
-  for (i in 1978:max(assume$year)) {
+  for (i in 1979:max(assume$year)) {
 
     #Gather parameters
     taxmax_i <- assume[assume$year == i, "taxmax"]
@@ -33,16 +36,15 @@ prep_assumptions <- function(dataset) {
     qc_rec_i <- assume[assume$year == i, "qc_rec"]
     ret1_i <- assume[assume$year == i, "ret1"]
     ret2_i <- assume[assume$year == i, "ret2"]
+    old_law_base_i <- assume[assume$year == i, "old_law_base"]
+    spec_min_rate_i <- assume[assume$year == i, "special_min_rate"]
 
     awi_end <- assume[assume$year == i - 2, "awi"]
 
     # Project out tax max
     if (is.na(taxmax_i) == T){
 
-      prev_taxmax <- assume[assume$year == i - 1, "taxmax"]
-
-
-      taxmax_i <- max(round((taxmax_base * awi_end / awi_1992)/300)*300, prev_taxmax) #Tax max is not allowed to decline from the previous year
+      taxmax_i <- round((taxmax_base * awi_end / awi_1992)/300)*300 
 
       assume[assume$year == i, "taxmax"] <- taxmax_i
 
@@ -85,9 +87,45 @@ prep_assumptions <- function(dataset) {
       assume[assume$year == i, "ret2"] <- ret2_i
 
     }
+    
+    #Project out old law contribution base
+    if (is.na(old_law_base)) {
+      
+      old_law_base_i <- round((old_law_base_base * awi_end / awi_1992)/300)*300 #Tax max is not allowed to decline from the previous year
+      
+      assume[assume$year == i, "taxmax"] <- taxmax_i
+    }
+    
+    #Project out special_min_pia rates
+    if (is.na(spec_min_rate_i)) {
+      # Per 42 USC 415(a)(1)(C)(i): $11.50 per year of coverage over 10, COLA-adjusted
+      # The $11.50 was established in 1979 and is adjusted by each year's COLA (which comes from the previous year).
+      # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
+      
+      prev_smr <- assume$spec_min_rate[i-1]
+      cola_i <- assume$cola[i-1]
+      
+      cur_smr <- floor(prev_smr * (1+cola_i) * 10)/10
+      
+      assume$spec_min_rate[i] <- cur_smr
+      
+    }
 
   }
-
+  
+  # Years of coverage threshold (from SSA OACT):
+  # - 1951-1978: 25% of contribution and benefit base
+  # - 1979-1990: 25% of old-law contribution base
+  # - 1991+: 15% of old-law contribution base
+  for(i in 1951:max(assume$year)){
+    if (i < 1991) {
+      assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.25
+    }
+    else {
+      assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.15
+    }
+  }
+  
   # Spousal PIA share
   # SSA Handbook Section 320: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0320.html
   # Spousal benefit is 50% of worker's PIA (before any reductions for early claiming)
@@ -101,20 +139,11 @@ prep_assumptions <- function(dataset) {
   assume$s_rf1 <- 25 / 36 / 100
   assume$s_rf2 <- assume$rf2
 
-  #Retirement Earnings Test Exempt Amounts
-
-  # =============================================================================
-  # Program Rule Parameters
-  # =============================================================================
-  # These parameters represent Social Security program rules that are currently
-  # constant but may change under policy reforms. Storing them in the assumptions
-  # data frame allows for policy modeling by modifying these values.
-
   # Quarters of Coverage required for fully insured status
   # SSA Handbook Section 203: https://www.ssa.gov/OP_Home/handbook/handbook.02/handbook-0203.html
   assume$qc_required <- 40
 
-  # Earliest age for retirement benefit eligibility
+  # Earliest eligibility age for retirement benefits
   # SSA Handbook Section 300: https://www.ssa.gov/OP_Home/handbook/handbook.03/handbook-0300.html
   assume$eea <- 62
 
@@ -145,104 +174,6 @@ prep_assumptions <- function(dataset) {
   # SSA Handbook Section 1803: https://www.ssa.gov/OP_Home/handbook/handbook.18/handbook-1803.html
   # $1 withheld for every $2 of excess earnings = 0.5 rate
   assume$ret_phaseout_rate <- 0.5
-
-  
-
-  # =============================================================================
-  # Years of Coverage (YOC) for Special Minimum PIA
-  # =============================================================================
-  # Per 42 USC 415(a)(1)(C)(i), special minimum PIA = $11.50 × (years of coverage - 10)
-  # where $11.50 is COLA-adjusted from its 1979 base.
-  #
-  # Years of coverage threshold (from SSA OACT):
-  # - 1951-1978: 25% of contribution and benefit base
-  # - 1979-1990: 25% of old-law contribution base
-  # - 1991+: 15% of old-law contribution base
-  #
-  # Old-law contribution base projection (from SSA):
-  # max(45000 * AWI_2yrs_before / AWI_1992, current_old_law_base), rounded to $300
-
-  assume$yoc_threshold <- NA_real_
-  assume$old_law_base <- NA_real_
-  assume$special_min_rate <- NA_real_
-
-  # Try to load YOC data
-  yoc_file <- system.file("extdata", "yoc.csv", package = "ssmbar")
-  if (yoc_file == "") {
-    # Try relative path for development
-    if (file.exists("inst/extdata/yoc.csv")) {
-      yoc_file <- "inst/extdata/yoc.csv"
-    }
-  }
-
-  if (file.exists(yoc_file)) {
-    yoc_hist <- read.csv(yoc_file)
-    names(yoc_hist) <- c("year", "old_law_base", "yoc_threshold")
-
-    # Merge historical YOC data
-    for (i in seq_len(nrow(assume))) {
-      yr <- assume$year[i]
-      hist_row <- yoc_hist[yoc_hist$year == yr, ]
-      if (nrow(hist_row) == 1) {
-        assume$old_law_base[i] <- hist_row$old_law_base
-        assume$yoc_threshold[i] <- hist_row$yoc_threshold
-      }
-    }
-  }
-
-  # Project old-law base and YOC threshold for future years
-  # Old-law base: max(45000 * AWI_end / AWI_1992, prev_old_law_base), rounded to $300
-  old_law_base_1994 <- 45000
-  for (i in seq_len(nrow(assume))) {
-    yr <- assume$year[i]
-    if (yr >= 1994 && is.na(assume$old_law_base[i])) {
-      awi_end <- assume$awi[assume$year == yr - 2]
-      prev_old_law <- assume$old_law_base[assume$year == yr - 1]
-
-      if (length(awi_end) == 1 && !is.na(awi_end) && length(prev_old_law) == 1 && !is.na(prev_old_law)) {
-        # Project old-law base: max of formula result or previous year, rounded to $300
-        projected <- round(old_law_base_1994 * awi_end / awi_1992 / 300) * 300
-        assume$old_law_base[i] <- max(projected, prev_old_law)
-
-        # YOC threshold: 15% of old-law base (post-1990 rule)
-        assume$yoc_threshold[i] <- assume$old_law_base[i] * 0.15
-      }
-    }
-  }
-
-  # =============================================================================
-  # Special Minimum PIA Rate (COLA-adjusted)
-  # =============================================================================
-  # Per 42 USC 415(a)(1)(C)(i): $11.50 per year of coverage over 10, COLA-adjusted
-  # The $11.50 was established in 1979 and is adjusted by each year's COLA.
-  # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
-
-  special_min_base <- 11.50  # 1979 base amount per year of coverage over 10
-
-  # Calculate COLA-adjusted rate for each year
-  # The rate for year Y is the 1979 base adjusted by COLAs through year Y-1
-  for (i in seq_len(nrow(assume))) {
-    yr <- assume$year[i]
-    if (yr < 1979) {
-      # Before 1979, special minimum didn't exist in current form
-      assume$special_min_rate[i] <- NA_real_
-    } else if (yr == 1979) {
-      # 1979 is the base year
-      assume$special_min_rate[i] <- special_min_base
-    } else {
-      # Apply COLA from previous year and round to $0.10
-      prev_rate <- assume$special_min_rate[i - 1]
-      cola_pct <- assume$cola[i]  # COLA applied in December of year i, effective for year i+1
-
-      if (!is.na(prev_rate) && !is.na(cola_pct)) {
-        # Apply COLA and round to next lower $0.10
-        new_rate <- prev_rate * (1 + cola_pct / 100)
-        assume$special_min_rate[i] <- floor(new_rate * 10) / 10
-      } else {
-        assume$special_min_rate[i] <- prev_rate
-      }
-    }
-  }
 
   # Minimum years of coverage required for special minimum PIA
   assume$min_yoc_for_special_min <- 11
