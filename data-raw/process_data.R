@@ -2,12 +2,12 @@
 # This script reads raw data files, processes them, and saves them as package data.
 #
 # When new Trustees Report or scaled earnings factor data become available:
-# 1. Place the new raw CSV files in inst/extdata/
-# 2. Update the file paths and year suffix below
+# 1. Place the new raw CSV files in data-raw/
+# 2. Update the year suffix below
 # 3. Run this script to generate new .rda files
-# 4. The new data objects will be available to users after package rebuild
 
 library(dplyr)
+library(here)
 
 # Source the package functions needed for processing
 source("R/assumptions_prep.R")
@@ -20,8 +20,8 @@ source("R/assumptions_prep.R")
 DATA_YEAR <- 2025
 
 # Input file paths (raw data in inst/extdata/)
-TR_RAW_FILE <- "inst/extdata/2025TR_assumptions.csv"
-SEF_RAW_FILE <- "inst/extdata/scaled_earnings_factors.csv"
+TR_RAW_FILE <- here("data-raw", "2025TR_assumptions.csv")
+SEF_RAW_FILE <- here("data-raw", "scaled_earnings_factors.csv")
 
 # =============================================================================
 # Process Trustees Report Assumptions
@@ -66,7 +66,6 @@ if ("X" %in% names(sef_processed)) {
   sef_processed <- sef_processed %>% select(-X)
 }
 
-# Assign to named object with year suffix
 assign(paste0("sef", DATA_YEAR), sef_processed)
 
 cat(paste0("  Created: sef", DATA_YEAR, "\n"))
@@ -77,22 +76,18 @@ cat(paste0("  Created: sef", DATA_YEAR, "\n"))
 
 cat("Saving processed data to data/ directory...\n")
 
-# Save Trustees Report data
 save(
   list = paste0("tr", DATA_YEAR),
-  file = paste0("data/tr", DATA_YEAR, ".rda"),
+  file = here("data", paste0("tr", DATA_YEAR, ".rda")),
   compress = "xz"
 )
 cat(paste0("  Saved: data/tr", DATA_YEAR, ".rda\n"))
 
-# Save Scaled Earnings Factors data
 save(
   list = paste0("sef", DATA_YEAR),
-  file = paste0("data/sef", DATA_YEAR, ".rda"),
+  file = here("data", paste0("sef", DATA_YEAR, ".rda")),
   compress = "xz"
 )
 cat(paste0("  Saved: data/sef", DATA_YEAR, ".rda\n"))
 
 cat("\nData processing complete!\n")
-cat(paste0("Users can now access tr", DATA_YEAR, " and sef", DATA_YEAR,
-           " after loading the package.\n"))

@@ -102,12 +102,12 @@ prep_assumptions <- function(dataset) {
       # The $11.50 was established in 1979 and is adjusted by each year's COLA (which comes from the previous year).
       # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
       
-      prev_smb <- assume$spec_min_base[assume$year == i-1]
+      prev_smb <- assume$special_min_base[assume$year == i-1]
       cola_i <- assume$cola[assume$year == i-1]
       
       cur_smb <- floor(prev_smb * (1+cola_i) * 10)/10
       
-      assume$spec_min_base[assume$year == i] <- cur_smb
+      assume[assume$year == i, "special_min_base"] <- cur_smb
       
     }
 
