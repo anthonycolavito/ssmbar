@@ -1,4 +1,4 @@
-year,awi,cpi_w,gdp_pi,df,taxmax,oasi_tr,di_tr,bp1,bp2,qc_rec,fact1,fact2,fact3,rf1,rf2,drc,nra,ret1,ret2,real_df,le_m,le_f,cola,old_law_base,special_min_base
+year,awi,cpi_w,gdp_pi,df,taxmax,oasi_tr,di_tr,bp1,bp2,qc_rec,fact1,fact2,fact3,rf1,rf2,drc,nra,ret1,ret2,real_df,le_m,le_f,cola,old_law_base,special_min_rate
 1951,2799.16,,,,3600,1.5,0,,,50,,,,0.005555556,0.004166667,0.0025,65,,,,78.1,81.3,,3600,
 1952,2973.32,,,,3600,1.5,0,,,50,,,,0.005555556,0.004166667,0.0025,65,,,,78.1,81.4,,3600,
 1953,3139.44,,,,3600,1.5,0,,,50,,,,0.005555556,0.004166667,0.0025,65,,,,78.1,81.5,,3600,

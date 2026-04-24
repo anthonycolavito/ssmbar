@@ -25,15 +25,15 @@ comp_period <- function(worker, debugg=FALSE) {
   # - max_dropout_years: Maximum years that can be dropped (currently 5)
   # - min_comp_period: Minimum computation period (currently 2)
   
-  worker <- worker %>% filter(age == elig_age) %>%
-    group_by(id) %>%
+  worker <- worker %>%
+    group_by(id) %>% arrange(id, age) %>%
     mutate(
       elapsed_years = pmax(elig_age - 1 - 21, 0),
       # Dropout years differ by benefit type per 42 USC 415(b)(2)(A)
       # Retirement (elig_age >= 62): fixed 5 years per (b)(2)(A)(i)
       # Disability (elig_age < 62): floor(elapsed/5), max 5 per (b)(2)(A)(ii)
       dropout_years = if_else(
-        elig_age >= 62,
+        elig_age >= eea,
         max_dropout_years,
         pmin(max_dropout_years, floor(elapsed_years / 5))
       ),
@@ -48,6 +48,9 @@ comp_period <- function(worker, debugg=FALSE) {
 
 
 index_earnings <- function(worker, debugg = FALSE) {
+  
+  # Helper function inside aime()
+  
   # How earnings are indexed is described in Section 700.3 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
   
@@ -86,6 +89,9 @@ aime <- function(worker, debugg = FALSE) {
   # - max_dropout_years, min_comp_period: For computation period (Section 703)
   # - index_age_offset: Indexing year offset from eligibility age (Section 700.4)
   
+  worker <- comp_period(worker, debugg = debugg)
+  worker <- index_earnings(worker, debugg = debugg)
+  
   # AIME Calculation
   # SSA Handbook Section 701: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0701.html
   #
@@ -107,7 +113,7 @@ aime <- function(worker, debugg = FALSE) {
       elig <- .x$elig
       
       # Find first eligible index to skip early years
-      first_eligible <- which(is_eligible)[1]
+      first_eligible <- which(elig)[1]
       
       if (!is.na(first_eligible)) {
         # Only iterate from first eligible year onwards

@@ -37,7 +37,7 @@ prep_assumptions <- function(dataset) {
     ret1_i <- assume[assume$year == i, "ret1"]
     ret2_i <- assume[assume$year == i, "ret2"]
     old_law_base_i <- assume[assume$year == i, "old_law_base"]
-    spec_min_base_i <- assume[assume$year == i, "special_min_base"]
+    spec_min_rate_i <- assume[assume$year == i, "special_min_rate"]
 
     awi_end <- assume[assume$year == i - 2, "awi"]
 
@@ -97,17 +97,17 @@ prep_assumptions <- function(dataset) {
     }
     
     #Project out special_min_pia bases
-    if (is.na(spec_min_base_i)) {
+    if (is.na(spec_min_rate_i)) {
       # Per 42 USC 415(a)(1)(C)(i): $11.50 per year of coverage over 10, COLA-adjusted
       # The $11.50 was established in 1979 and is adjusted by each year's COLA (which comes from the previous year).
       # Rounding: Per 42 USC 415(a)(2)(C), round to next lower $0.10 after each COLA
       
-      prev_smb <- assume$special_min_base[assume$year == i-1]
+      prev_smb <- assume$special_min_rate[assume$year == i-1]
       cola_i <- assume$cola[assume$year == i-1]
       
       cur_smb <- floor(prev_smb * (1+cola_i) * 10)/10
       
-      assume[assume$year == i, "special_min_base"] <- cur_smb
+      assume[assume$year == i, "special_min_rate"] <- cur_smb
       
     }
 

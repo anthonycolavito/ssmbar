@@ -16,7 +16,7 @@ generate_single_worker <- function(sef, par,
   worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's ID
   
   # ID format: type-birthyr-career_length (e.g., "medium-1960-40")
-  earn_id <- paste0(worker_type,"-", birth_yr, "-", career_length)
+  id <- paste0(worker_type,"-", birth_yr, "-", career_length)
   
   
   earn <- left_join(
@@ -27,7 +27,7 @@ generate_single_worker <- function(sef, par,
     mutate(
       prelim_earnings = factor * awi, #Scaled earnings equals factor * awi
       career_length = career_length, #Length of workers career
-      earn_id = earn_id
+      id = id
     )
 
   if (type == "max"){ #If a max earner, the values of the taxmax are taken as the earnings amounts at each age. 
@@ -73,7 +73,7 @@ generate_single_worker <- function(sef, par,
     )
   
   if (!debugg) {
-    earn <- earn %>% select(earn_id, year, age, earnings) #Selects only the needed variables.
+    earn <- earn %>% select(id, year, age, earnings) #Selects only the needed variables.
   }
   
   return(earn)
