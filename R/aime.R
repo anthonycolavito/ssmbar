@@ -21,7 +21,7 @@ comp_period <- function(worker, debugg=FALSE) {
   #     DI beneficiaries can earn dropout years from childcare, but this function does
   #     not incorporate this aspect of the law. 
   #
-  # Program rules (from assumptions):
+  # Required parameters (from assumptions):
   # - max_dropout_years: Maximum years that can be dropped (currently 5)
   # - min_comp_period: Minimum computation period (currently 2)
   
@@ -54,7 +54,7 @@ index_earnings <- function(worker, debugg = FALSE) {
   # How earnings are indexed is described in Section 700.3 of the Social Security Handbook
   # https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0700.html
   
-  #Parameters needed for indexing earnings:
+  # Required Parameters needed for indexing earnings:
   # elig_age: Worker's age at which they become eligble for benefits. Computed in eligibility() 
   # awi: Average wage index for a given year
   # index_age_offset: The number of years prior to eligibility that earnings are indexed to

@@ -69,6 +69,13 @@ insured_status <- function(worker, debugg = FALSE) {
 
 eligibility <- function(worker, debugg=FALSE) {
   
+  #Determines whether an individual is eligible for benefits at any given age.
+  
+  #Uses two helper functions: qc_comp() and insured_status()
+  
+  #Required parameters:
+  # eea - earliest eligibility age from assumptions
+  
   worker <- qc_comp(worker, debugg=debugg)
   worker <- insured_status(worker, debugg=debugg)
   
