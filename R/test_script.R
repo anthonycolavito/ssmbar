@@ -10,6 +10,7 @@ source("./R/aime.R")
 source("./R/general_helpers.R")
 source("./R/pia.R")
 source("./R/special_min_pia.R")
+source("./R/monthly_ben.R")
 
 test <- generate_single_worker(sef2025, tr2025, birth_yr = 1960, type = "low") %>%
   mutate(dis_age = NA, yr_62 = year[which(age == 62)])
