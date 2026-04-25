@@ -44,9 +44,9 @@ cola <- function (worker, debugg = FALSE) {
   # SSA Handbook Section 719: https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0719.html
   #
   # How COLA works:
-  # - At eligibility age (62): cola_basic_pia = basic_pia (no COLA applied yet)
-  # - At age 63: cola_basic_pia = basic_pia x (1 + COLA from eligibility year)
-  # - At age 64: cola_basic_pia = cola_pia_63 x (1 + COLA from age 63 year)
+  # - At eligibility age (62): cola_pia = basic_pia (no COLA applied yet)
+  # - At age 63: cola_pia = basic_pia x (1 + COLA from eligibility year)
+  # - At age 64: cola_pia = cola_pia_63 x (1 + COLA from age 63 year)
   # - etc.
   #
   # The COLA announced in year Y (based on Q3 CPI-W change) is applied to
@@ -73,7 +73,7 @@ cola <- function (worker, debugg = FALSE) {
     # This matches how SSA actually calculates benefits
     group_modify(~ {
       n <- nrow(.x)
-      cola_basic_pia_vals <- numeric(n)
+      cola_pia_vals <- numeric(n)
       basic_pia <- .x$basic_pia
       cola_factor <- .x$cola_factor
       elig_age_val <- .x$elig_age[1]
@@ -84,14 +84,14 @@ cola <- function (worker, debugg = FALSE) {
       
       for (i in seq_len(n)) {
         if (ages[i] < elig_age_val) {
-          cola_basic_pia_vals[i] <- 0
+          cola_pia_vals[i] <- 0
         } else if (ages[i] == elig_age_val) {
           # At eligibility age: no COLA yet, use basic_pia
-          cola_basic_pia_vals[i] <- basic_pia[i]
+          cola_pia_vals[i] <- basic_pia[i]
         } else {
           # COLA the previous year's COLA'd PIA forward
           # Per 42 USC 415(i)(2)(A)(ii): round to next lower $0.10
-          cola_forward <- floor_dime(cola_basic_pia_vals[i-1] * cola_factor[i])
+          cola_forward <- floor_dime(cola_pia_vals[i-1] * cola_factor[i])
           
           # Automatic recomputation (SSA Handbook Section 715):
           # If AIME increased from continued earnings, basic_pia[i] may be
@@ -102,14 +102,14 @@ cola <- function (worker, debugg = FALSE) {
             for (j in (elig_idx + 1):i) {
               recomp_pia <- floor_dime(recomp_pia * cola_factor[j])
             }
-            cola_basic_pia_vals[i] <- max(cola_forward, recomp_pia)
+            cola_pia_vals[i] <- max(cola_forward, recomp_pia)
           } else {
-            cola_basic_pia_vals[i] <- cola_forward
+            cola_pia_vals[i] <- cola_forward
           }
         }
       }
       
-      .x$cola_basic_pia <- cola_basic_pia_vals
+      .x$cola_pia <- cola_pia_vals
       # Calculate cumulative factor for reference (informational only)
       .x$cola_cum_factor <- cumprod(.x$cola_factor)
       .x

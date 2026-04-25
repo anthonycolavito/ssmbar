@@ -1,9 +1,11 @@
 
 years_of_coverage <- function(worker, debugg=FALSE) {
   
+  # Helper function for special_min_pia()
+  
   # Count years where earnings >= yoc_threshold
   # Only count years from age 21 through eligibility age - 1 (working years)
-  dataset <- worker %>%
+  worker <- worker %>%
     group_by(id) %>%
     arrange(id, age) %>%
     mutate(
@@ -20,17 +22,51 @@ years_of_coverage <- function(worker, debugg=FALSE) {
     ) %>%
     ungroup()
   
-  if(debugg) {
-    worker <- worker %>% left_join(
-      dataset %>% select(id, age, years_of_coverage, is_coverage_year),
-      by = c("id", "age")
-    )
-  } else {
-    worker <- worker %>% left_join(
-      dataset %>% select(id, age, years_of_coverage),
-      by = c("id", "age")
-    )
-  }
+  if(!debugg) worker <- worker %>% select(-is_coverage_year) 
+  
+  return(worker)
+  
+}
+
+special_min_pia <- function(worker, debugg=FALSE) {
+  #Special Minimum PIA calculation in Section 717 of the Social Security Handbook
+  #https://www.ssa.gov/OP_Home/handbook/handbook.07/handbook-0717.html 
+  
+  #Required parameters:
+  # min_yoc_for_special_min: Minimum number of YOCs needed to be eligible for the Special Min PIA
+  # yoc_threshold: earnings threshold for receiving a YOC in a given year
+  # special_min_rate: Amount of Special Min PIA received for each YOC
+  
+  #Compute each worker's YOC amounts
+  worker <- years_of_coverage(worker, debugg = debugg)
+  
+  worker <- worker %>%
+    group_by(id) %>% arrange(id, age) %>%
+    mutate(
+      # Get special minimum rate at eligibility age (COLA-adjusted $11.50 base)
+      special_min_rate_elig = special_min_rate[which(age == first(elig_age))],
+      min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
+      
+      # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
+      # PIA = special_min_rate x (years_of_coverage - 10)
+      # Only applies if years_of_coverage >= min_yoc_for_special_min (11)
+      # Per 42 USC 415(a)(1)(A): round to next lower $0.10
+      special_min_pia = case_when(
+        age >= elig_age & years_of_coverage >= min_yoc_elig ~
+          floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
+        TRUE ~ 0),
+      
+      # Final PIA is the higher of regular or special minimum per 42 USC 415(a)(1)
+      final_pia = pmax(cola_pia, special_min_pia),
+      
+      #Marker for whether a worke received a special min PIA in a given year (informational only)
+      received_smp = case_when(
+        special_min_pia > cola_pia ~ TRUE,
+        TRUE ~ FALSE
+      )
+    ) %>% ungroup()
+  
+  if(!debugg) worker <- worker %>% select(-received_smp, -special_min_rate_elig, -min_yoc_elig, -special_min_Pia) 
   
   return(worker)
   
