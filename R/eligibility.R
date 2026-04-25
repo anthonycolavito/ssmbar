@@ -83,7 +83,7 @@ eligibility <- function(worker, debugg=FALSE) {
     group_by(id) %>% arrange(id, age) %>%
     mutate(
       #Find the worker's earliest eligibility age -- used for seeing when the worker first becomes eligible for benefits
-      eea_ind = eea[match(yr_62, year)],
+      eea_ind = eea[match(birth_yr + 62, year)],
       
       #Determine worker's eligiblity status for benefits at each age
       #If they are fully insured and at or above their eea, they are eligible for retirement benefits
@@ -92,6 +92,10 @@ eligibility <- function(worker, debugg=FALSE) {
         (full_ins & age >= eea_ind) | (dis_ins & age >= dis_age) | (spec_ins & age >= dis_age) ~ TRUE,
         TRUE ~ FALSE
       ),
+      
+      #Ensures that once a worker first becomes eligible for benefits, that they remain benefits. 
+      #Implicitly assumes that disabled workers remain disabled. 
+      elig = cumany(elig),
       
       elig_age = first(age[elig])
     ) %>% ungroup()
