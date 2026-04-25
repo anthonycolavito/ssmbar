@@ -96,7 +96,7 @@ eligibility <- function(worker, debugg=FALSE) {
       elig_age = first(age[elig])
     ) %>% ungroup()
   
-  if(!debugg) worker <- worker %>% select(-eea_ind, -elig) 
+  if(!debugg) worker <- worker %>% select(-eea_ind) 
 
   return(worker)
   

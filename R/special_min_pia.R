@@ -43,8 +43,7 @@ special_min_pia <- function(worker, debugg=FALSE) {
   worker <- worker %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
-      # Get special minimum rate at eligibility age (COLA-adjusted $11.50 base)
-      special_min_rate_elig = special_min_rate[which(age == first(elig_age))],
+      #Get minimum number of YOC needed for SMP at eligibility age
       min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
       
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
@@ -53,11 +52,11 @@ special_min_pia <- function(worker, debugg=FALSE) {
       # Per 42 USC 415(a)(1)(A): round to next lower $0.10
       special_min_pia = case_when(
         age >= elig_age & years_of_coverage >= min_yoc_elig ~
-          floor_dime(special_min_rate_elig * (years_of_coverage - 10)),
+          floor_dime(special_min_rate * (years_of_coverage - 10)),
         TRUE ~ 0),
       
-      # Final PIA is the higher of regular or special minimum per 42 USC 415(a)(1)
-      final_pia = pmax(cola_pia, special_min_pia),
+      # Final Retired Worker PIA is the higher of regular or special minimum per 42 USC 415(a)(1)
+      rw_pia = pmax(cola_pia, special_min_pia),
       
       #Marker for whether a worke received a special min PIA in a given year (informational only)
       received_smp = case_when(
@@ -66,7 +65,7 @@ special_min_pia <- function(worker, debugg=FALSE) {
       )
     ) %>% ungroup()
   
-  if(!debugg) worker <- worker %>% select(-received_smp, -special_min_rate_elig, -min_yoc_elig, -special_min_Pia) 
+  if(!debugg) worker <- worker %>% select(-received_smp, -special_min_rate, -min_yoc_elig, -special_min_pia) 
   
   return(worker)
   

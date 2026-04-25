@@ -1,5 +1,5 @@
 
-generate_single_worker <- function(sef, par,
+generate_earnings <- function(sef, par,
                                    birth_yr, type=NULL, career_length=44,
                                    custom_avg_earnings = NULL,
                                    debugg = FALSE) {
@@ -79,3 +79,4 @@ generate_single_worker <- function(sef, par,
   return(earn)
   
 }
+
