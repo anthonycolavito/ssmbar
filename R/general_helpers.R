@@ -29,3 +29,7 @@ join_all_assumptions <- function(worker, assumptions) {
   
   return(worker)
 }
+
+floor_dime <- function(x) {
+  floor(x * 10) / 10
+}
