@@ -12,12 +12,6 @@ generate_earnings <- function(sef, par,
   if (type == "custom" && is.null(custom_avg_earnings)) {
     stop("custom_avg_earnings is required when type = 'custom'")
   }
-
-  worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's ID
-  
-  # ID format: type-birthyr-career_length (e.g., "medium-1960-40")
-  id <- paste0(worker_type,"-", birth_yr, "-", career_length)
-  
   
   earn <- left_join(
     sef %>% mutate(year = age + birth_yr), #Selects scaled scaled factors dataframe and creates year column for merging
@@ -27,7 +21,6 @@ generate_earnings <- function(sef, par,
     mutate(
       prelim_earnings = factor * awi, #Scaled earnings equals factor * awi
       career_length = career_length, #Length of workers career
-      id = id
     )
 
   if (type == "max"){ #If a max earner, the values of the taxmax are taken as the earnings amounts at each age. 
@@ -73,7 +66,7 @@ generate_earnings <- function(sef, par,
     )
   
   if (!debugg) {
-    earn <- earn %>% select(id, year, age, earnings) #Selects only the needed variables.
+    earn <- earn %>% select(year, age, earnings) #Selects only the needed variables.
   }
   
   return(earn)
