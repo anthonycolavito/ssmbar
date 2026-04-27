@@ -34,8 +34,11 @@ calc_ben <- function(par, worker, spouse=NULL, debugg=FALSE, output="skinny") {
       spouse,
       by=c("id"="spouse_id","year")
     ) %>%
-      spousal_pia(debugg = debugg)
+      spousal_pia(debugg = debugg) %>%
+      spousal_benefit(debugg = debugg)
   }
+  
+  worker <- worker %>% mutate(final_ben = coalesce(wrk_ben, 0) + coalesce(spousal_ben, 0))
   
   if(output == "skinny") worker <- worker %>% select(id, year, age, earnings, wrk_ben)
   else if (output == "detailed") worker <- worker %>% remove_all_assumptions()

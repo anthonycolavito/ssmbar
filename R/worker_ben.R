@@ -59,7 +59,7 @@ worker_benefit <- function(worker, debugg = FALSE) {
       wrk_ben = case_when(
         age >= claim_age ~ floor(rw_pia * act_factor), #Computes worker benefit with COLA'd PIA and the actuarial adjustment
         TRUE ~ 0
-      )) %>% select(-claim_age) %>% ungroup()
+      )) %>% ungroup()
   
   if (!debugg) worker <- worker %>% select(-nra_ind, -rf1_ind, -rf2_ind, -drc_ind, -act_factor) 
   
