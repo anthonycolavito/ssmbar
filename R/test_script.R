@@ -16,10 +16,8 @@ source("./R/worker_ben.R")
 source("./R/spousal.R")
 source("./R/calc_ben.R")
 
-test_worker <- generate_retired_worker(sef2025, tr2025, birth_yr = 1960, claim_age = 67, type = "very_low")
-test_spouse <- generate_retired_worker(sef2025, tr2025, birth_yr = 1960, claim_age = 70, type = "high", spouse_id = "R-very_low-1960-44-67")
+test_worker <- generate_retired_worker(sef2025, tr2025, birth_yr = 1960, claim_age = 62, type = "very_low")
+test_spouse <- generate_retired_worker(sef2025, tr2025, birth_yr = 1980, claim_age = 70, type = "high", spouse_id = "R-very_low-1960-44-62")
 
 
-
-
-test_ben <- calc_ben(tr2025, test, output = "detailed")
+test_ben <- calc_ben(tr2025, test_worker, test_spouse, output = "detailed")
