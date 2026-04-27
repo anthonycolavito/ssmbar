@@ -1,5 +1,5 @@
 
-generate_worker <- function(sef, par,
+generate_retired_worker <- function(sef, par,
                             birth_yr, career_length=44, claim_age,
                             type=NULL, custom_avg_earnings = NULL,
                             spouse = NULL, s_type=NULL, s_custom_avg_earnings = NULL, #Will always assume that spouses, if they exist are born and claim in the same year
@@ -14,26 +14,32 @@ generate_worker <- function(sef, par,
     checkmate::assert_choice(s_type, c("very_low","low", "medium", "high", "custom"))
     if (s_type == "custom") checkmate::assert_numeric(custom_avg_earnings, lower = 0)
   }
-  checkmate::assert_int(claim_age, upper = 70, lower = 22)
-  
-  #Retired or disabled beneficiary type, used for ID'ing 
-  ben_type <- if(is.null(dis_age)) "R" else "D"
+  checkmate::assert_int(claim_age, upper = 70, lower = 62)
   
   worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's 
   
-
-  career_length <- min(career_length, claim_age - 21) #Ensures career length does not exceed # of years until worker becomes disabled
-  if(career_length > claim_age - 21) warning("Career length has been truncated to exclude earnings past disability age")
-  
   # ID format: type-birthyr-career_length (e.g., "medium-1960-40")
-  id <- paste0(ben_type, "-",worker_type,"-", birth_yr, "-", career_length,"-",claim_age)
+  id <- paste0("R","-",worker_type,"-", birth_yr, "-", career_length,"-",claim_age)
   
   first_yr <- birth_yr + 21
   last_yr <- birth_yr + 119
   years <- seq(first_yr, last_yr, 1)
   ages <- seq(21,119,1)
   
+  dis_age <- NA
   
+  worker <- data.frame(id = id, age=ages, year=years, birth_yr=birth_yr, claim_age=claim_age, dis_age=dis_age)
   
+  earnings <- generate_earnings(sef=sef, par=par,
+                                birth_yr=birth_yr, type=type, custom_avg_earnings=custom_avg_earnings,
+                                debugg=debugg)
+  
+  worker <- worker %>% left_join(earnings %>% select(age, earnings), by="age") %>%
+    mutate(earnings = case_when(
+      is.na(earnings) ~ 0,
+      TRUE ~ earnings
+    ))
+  
+  return(worker)
   
 }
