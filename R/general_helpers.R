@@ -16,7 +16,7 @@ join_all_assumptions <- function(worker, assumptions) {
                    "yoc_threshold", "special_min_rate", "min_yoc_for_special_min",
                    "cola", "nra", "rf1", "rf2", "drc", "max_drc_age",
                    "s_pia_share", "s_rf1", "s_rf2",
-                   "ret1", "ret_phaseout_rate")
+                   "ret1", "ret_phaseout_rate", "oasi_tr","di_tr")
   
   # Only join columns that aren't already present
   cols_present <- names(worker)
@@ -52,7 +52,7 @@ remove_all_assumptions <- function(worker) {
                    "yoc_threshold", "special_min_rate", "min_yoc_for_special_min",
                    "cola", "nra", "rf1", "rf2", "drc", "max_drc_age",
                    "s_pia_share", "s_rf1", "s_rf2",
-                   "ret1", "ret_phaseout_rate")
+                   "ret1", "ret_phaseout_rate","oasi_tr","di_tr")
   
   if (length(discard_cols) > 0) {  
     worker <- worker %>% select(-all_of(discard_cols))
@@ -60,3 +60,5 @@ remove_all_assumptions <- function(worker) {
   
   return(worker)
 }
+
+
