@@ -61,7 +61,7 @@ worker_benefit <- function(worker, debugg = FALSE) {
         TRUE ~ 0
       )) %>% select(-claim_age) %>% ungroup()
   
-  if (!debugg) worker <- worker %>% select(-nra_ind, -rf1_ind, -rf2_ind, -act_factor) 
+  if (!debugg) worker <- worker %>% select(-nra_ind, -rf1_ind, -rf2_ind, -drc_ind, -act_factor) 
   
   return(worker)
   
