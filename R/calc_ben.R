@@ -3,7 +3,7 @@ calc_ben <- function(par, worker, spouse=NULL, debugg=FALSE, output="skinny") {
   
   checkmate::assert_data_frame(par, null.ok = FALSE)
   checkmate::assert_data_frame(worker, null.ok = FALSE)
-  checkmate::assert_data_frame(worker, null.ok = TRUE)
+  checkmate::assert_data_frame(spouse, null.ok = TRUE)
   checkmate::assert_choice(output, c("skinny","detailed", "full"))
   
   if(debugg & output != "full") warning("Output must be set to mode full to view all parameters in debugg mode")
