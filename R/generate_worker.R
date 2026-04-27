@@ -8,7 +8,7 @@ generate_retired_worker <- function(sef, par,
   checkmate::assert_data_frame(sef, null.ok = FALSE)
   checkmate::assert_data_frame(par, null.ok = FALSE)
   checkmate::assert_int(birth_yr, lower = 1941, upper = 2036)
-  checkmate::assert_choice(type, c("very_low","low", "medium", "high", "custom"))
+  checkmate::assert_choice(type, c("very_low","low", "medium", "high", "max", "custom"))
   if (type == "custom") checkmate::assert_numeric(custom_avg_earnings, lower = 0)
   checkmate::assert_int(claim_age, upper = 70, lower = 62)
   
