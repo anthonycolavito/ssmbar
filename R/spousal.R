@@ -52,3 +52,18 @@ spousal_benefit <- function(worker, debugg = FALSE) {
   return(worker)
   
 }
+
+generate_spousal_info <- function(par, spouse) {
+  
+  spouse <- join_all_assumptions(spouse, par) #Joins needed assumption
+  
+  spouse <- spouse %>% 
+    eligibility() %>%
+    aime() %>%
+    basic_pia() %>%
+    cola() %>%
+    special_min_pia() %>%
+    select(s_id = id, year, s_age = age, s_claim_age = claim_age, s_pia = rw_pia)
+  
+  return(spouse)
+}

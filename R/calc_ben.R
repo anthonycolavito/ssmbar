@@ -19,28 +19,19 @@ calc_ben <- function(par, worker, spouse=NULL, debugg=FALSE, output="skinny") {
     worker_benefit(debugg = debugg)
   
   if(!is.null(spouse)) {
-    
-    spouse <- join_all_assumptions(spouse, par) #Joins needed assumption
-    
-    spouse <- spouse %>% 
-      eligibility(debugg = debugg) %>%
-      aime(debugg = debugg) %>%
-      basic_pia(debugg = debugg) %>%
-      cola(debugg = debugg) %>%
-      special_min_pia(debugg = debugg) %>%
-      select(s_id = id, spouse_id, year, s_age = age, s_claim_age = claim_age, s_pia = rw_pia)
       
     worker <- worker %>% left_join(
       spouse,
-      by=c("id"="spouse_id","year")
+      by=c("spouse_id"="s_id","year")
     ) %>%
       spousal_pia(debugg = debugg) %>%
       spousal_benefit(debugg = debugg)
   }
+  else worker <- worker %>% mutate(spousal_ben = 0)
   
-  worker <- worker %>% mutate(final_ben = coalesce(wrk_ben, 0) + coalesce(spousal_ben, 0))
+  worker <- worker %>% mutate(annual_ben = (coalesce(wrk_ben, 0) + coalesce(spousal_ben, 0))*12)
   
-  if(output == "skinny") worker <- worker %>% select(id, year, age, earnings, wrk_ben)
+  if(output == "skinny") worker <- worker %>% select(id, year, age, earnings, annual_ben)
   else if (output == "detailed") worker <- worker %>% remove_all_assumptions()
   
   return(worker)
