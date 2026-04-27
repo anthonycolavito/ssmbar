@@ -11,6 +11,34 @@ prep_assumptions <- function(dataset) {
   # Special Minimum PIA Base Rate: $11.50 in 1979, COLA'd out each year
 
   assume <- dataset
+  
+  # Extend the projection horizon by 10 years.
+  # AWI, GDP price index, CPI-W, and COLA are set explicitly; derived
+  # parameters are wiped so the projection loop below fills them in.
+  if (max(assume$year) < 2110) {
+    last_yr  <- max(assume$year)
+    ext_yrs  <- (last_yr + 1):2110
+    n_ext    <- length(ext_yrs)
+    last_row <- assume[assume$year == last_yr, ]
+    
+    extension <- last_row[rep(1, n_ext), ]
+    extension$year   <- ext_yrs
+    extension$awi    <- last_row$awi    * 1.0355^(ext_yrs - last_yr)
+    extension$gdp_pi <- last_row$gdp_pi * 1.0205^(ext_yrs - last_yr)
+    extension$cpi_w  <- last_row$cpi_w  * 1.024 ^(ext_yrs - last_yr)
+    extension$cola   <- 0.024
+    
+    extension$taxmax           <- NA_real_
+    extension$bp1              <- NA_real_
+    extension$bp2              <- NA_real_
+    extension$qc_rec           <- NA_real_
+    extension$ret1             <- NA_real_
+    extension$ret2             <- NA_real_
+    extension$old_law_base     <- NA_real_
+    extension$special_min_rate <- NA_real_
+    
+    assume <- rbind(assume, extension)
+  }
 
   #AWI bases
   awi_1976 <- assume[assume$year == 1976, "awi"] #Used for QC req indexing
