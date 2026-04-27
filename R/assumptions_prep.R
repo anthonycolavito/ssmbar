@@ -15,9 +15,12 @@ prep_assumptions <- function(dataset) {
   # Extend the projection horizon by 10 years.
   # AWI, GDP price index, CPI-W, and COLA are set explicitly; derived
   # parameters are wiped so the projection loop below fills them in.
-  if (max(assume$year) < 2110) {
+  # Extend the projection horizon by 50 years.
+  # AWI, GDP price index, CPI-W, and COLA are set explicitly; derived
+  # parameters are wiped so the projection loop below fills them in.
+  if (max(assume$year) < 2150) {
     last_yr  <- max(assume$year)
-    ext_yrs  <- (last_yr + 1):2110
+    ext_yrs  <- (last_yr + 1):2150
     n_ext    <- length(ext_yrs)
     last_row <- assume[assume$year == last_yr, ]
     
