@@ -65,7 +65,7 @@ special_min_pia <- function(worker, debugg=FALSE) {
       )
     ) %>% ungroup()
   
-  if(!debugg) worker <- worker %>% select(-received_smp, -special_min_rate, -min_yoc_elig, -special_min_pia) 
+  if(!debugg) worker <- worker %>% select(-received_smp, -min_yoc_elig, -special_min_pia) 
   
   return(worker)
   
