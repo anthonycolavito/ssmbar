@@ -2,7 +2,7 @@
 generate_retired_worker <- function(sef, par,
                             birth_yr, career_length=44, claim_age,
                             type=NULL, custom_avg_earnings = NULL,
-                            spouse = NULL, s_type=NULL, s_custom_avg_earnings = NULL, #Will always assume that spouses, if they exist are born and claim in the same year
+                            spouse_id = NULL,
                             debugg = FALSE) {
   
   checkmate::assert_data_frame(sef, null.ok = FALSE)
@@ -10,10 +10,6 @@ generate_retired_worker <- function(sef, par,
   checkmate::assert_int(birth_yr, lower = 1941, upper = 2036)
   checkmate::assert_choice(type, c("very_low","low", "medium", "high", "custom"))
   if (type == "custom") checkmate::assert_numeric(custom_avg_earnings, lower = 0)
-  if (!is.null(spouse)) {
-    checkmate::assert_choice(s_type, c("very_low","low", "medium", "high", "custom"))
-    if (s_type == "custom") checkmate::assert_numeric(custom_avg_earnings, lower = 0)
-  }
   checkmate::assert_int(claim_age, upper = 70, lower = 62)
   
   worker_type <- if_else(type == "custom", paste0("custom", custom_avg_earnings), type) #Used for constructing a worker's 
@@ -39,6 +35,8 @@ generate_retired_worker <- function(sef, par,
       is.na(earnings) ~ 0,
       TRUE ~ earnings
     ))
+  
+  if(!is.null(spouse_id)) worker <- worker %>% mutate(spouse_id = spouse_id)
   
   return(worker)
   
