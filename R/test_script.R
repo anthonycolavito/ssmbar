@@ -19,6 +19,7 @@ source("./R/calc_tax.R")
 
 test_worker <- generate_retired_worker(sef2025, tr2025, birth_yr = 1960, claim_age = 62, type = "very_low",spouse_id = "R-high-1980-44-70")
 test_spouse <- generate_retired_worker(sef2025, tr2025, birth_yr = 1980, claim_age = 70, type = "high")
+test_spouse <- generate_spousal_info(tr2025, test_spouse)
 
 
 test_ben <- calc_ben(tr2025, test_worker, test_spouse, output = "skinny")
