@@ -50,7 +50,7 @@ source("./R/calc_tax.R")
 
 # ---- Configuration -----------------------------------------------------------
 worker_types  <- c("very_low", "low", "medium", "high", "max")
-birth_years   <- c(1950L, 1960L, 1970L, 1980L, 1990L, 2000L, 2010L)
+birth_years   <- c(1940L, 1945L, 1950L, 1955L, 1960L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2000L, 2005L, 2010L)
 claim_age     <- 65L
 career_length <- 44L
 ref_year      <- 2026L
