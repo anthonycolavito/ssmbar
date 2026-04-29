@@ -47,8 +47,29 @@ const uiControls = (() => {
     });
     sel.addEventListener('change', () => {
       state.spouseType = sel.value;
+      syncLifetimeViewAvailability();
       emit();
     });
+  }
+
+  // Household view is meaningless for singles (it equals primary), so the
+  // toggle button is disabled and the view forced back to primary whenever
+  // the user is on a single-worker config.
+  function syncLifetimeViewAvailability() {
+    const host = document.getElementById('lifetimeViewControl');
+    if (!host) return;
+    const isSingle = state.spouseType === 'none';
+    const householdBtn = host.querySelector('button[data-view="household"]');
+    const primaryBtn   = host.querySelector('button[data-view="primary"]');
+    if (householdBtn) {
+      householdBtn.disabled = isSingle;
+      householdBtn.classList.toggle('disabled', isSingle);
+    }
+    if (isSingle && state.lifetimeView !== 'primary') {
+      state.lifetimeView = 'primary';
+      if (householdBtn) householdBtn.classList.remove('active');
+      if (primaryBtn)   primaryBtn.classList.add('active');
+    }
   }
 
   function buildCohortControl(years) {
@@ -114,6 +135,7 @@ const uiControls = (() => {
     buildCohortControl(dimensions.birth_years);
     buildRealToggle();
     buildLifetimeViewToggle();
+    syncLifetimeViewAvailability();
     buildTabs(onTab);
   }
 
