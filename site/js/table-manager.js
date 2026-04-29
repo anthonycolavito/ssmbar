@@ -1,7 +1,8 @@
 // =============================================================================
 // TableManager — Renders the year-by-year detail table and CSV export.
 // Defaults to ages 65 through cohort life-expectancy at 65; expander reveals
-// the full life table to age 119.
+// the full life table to age 119. Each retirement row shows scheduled and
+// payable benefits side by side.
 // =============================================================================
 
 const tableManager = (() => {
@@ -12,12 +13,15 @@ const tableManager = (() => {
 
   function render(cfg) {
     leAge = cfg.summary.death_age;
-    allRows = cfg.annual.ages.map((age, i) => ({
+    const a = cfg.annual;
+    allRows = a.ages.map((age, i) => ({
       age,
-      year:        cfg.annual.years[i],
-      earnings:    cfg.annual.earnings[i],
-      nominal_ben: cfg.annual.nominal[i],
-      real_ben:    cfg.annual.real[i]
+      year:           a.years[i],
+      earnings:       a.earnings[i],
+      nominal_sched:  a.scheduled.nominal[i],
+      real_sched:     a.scheduled.real[i],
+      nominal_pay:    a.payable.nominal[i],
+      real_pay:       a.payable.real[i]
     }));
 
     workingRows = cfg.nmtr.ages.map((age, i) => ({
@@ -45,10 +49,16 @@ const tableManager = (() => {
     tbl.innerHTML = `
       <thead>
         <tr>
-          <th>Age</th>
-          <th>Year</th>
-          <th class="text-end">Nominal Benefit</th>
-          <th class="text-end">Real Benefit</th>
+          <th rowspan="2">Age</th>
+          <th rowspan="2">Year</th>
+          <th class="text-end" colspan="2">Nominal Benefit</th>
+          <th class="text-end" colspan="2">Real Benefit</th>
+        </tr>
+        <tr>
+          <th class="text-end th-sub">Scheduled</th>
+          <th class="text-end th-sub">Payable</th>
+          <th class="text-end th-sub">Scheduled</th>
+          <th class="text-end th-sub">Payable</th>
         </tr>
       </thead>
       <tbody>
@@ -56,8 +66,10 @@ const tableManager = (() => {
           <tr>
             <td>${r.age}</td>
             <td>${r.year}</td>
-            <td class="text-end">${Fmt.currency(r.nominal_ben)}</td>
-            <td class="text-end">${Fmt.currency(r.real_ben)}</td>
+            <td class="text-end">${Fmt.currency(r.nominal_sched)}</td>
+            <td class="text-end td-secondary">${Fmt.currency(r.nominal_pay)}</td>
+            <td class="text-end">${Fmt.currency(r.real_sched)}</td>
+            <td class="text-end td-secondary">${Fmt.currency(r.real_pay)}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -72,23 +84,27 @@ const tableManager = (() => {
   }
 
   function downloadCsv() {
-    // CSV export includes BOTH working-year earnings (ages 21–64) and
-    // retirement-year benefits (65 → 119), with a `phase` column.
-    const header = ['phase', 'age', 'year', 'earnings_nominal', 'earnings_real', 'nominal_ben', 'real_ben'];
+    const header = [
+      'phase', 'age', 'year',
+      'earnings_nominal', 'earnings_real',
+      'nominal_ben_scheduled', 'nominal_ben_payable',
+      'real_ben_scheduled', 'real_ben_payable'
+    ];
     const lines = [header.join(',')];
 
     for (const r of workingRows) {
       lines.push([
         'working', r.age, r.year ?? '',
         r.earnings_nominal ?? '', r.earnings_real ?? '',
-        '', ''
+        '', '', '', ''
       ].join(','));
     }
     for (const r of allRows) {
       lines.push([
         'retired', r.age, r.year ?? '',
         '', '',
-        r.nominal_ben ?? '', r.real_ben ?? ''
+        r.nominal_sched ?? '', r.nominal_pay ?? '',
+        r.real_sched ?? '',    r.real_pay ?? ''
       ].join(','));
     }
 

@@ -929,6 +929,93 @@ a:hover { color: var(--brand-blue); }
   color: var(--brand-navy);
   font-weight: 600;
 }
+.hero-number-secondary {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: rgba(15, 23, 65, 0.62);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 1.1;
+  margin: 0.15rem 0 0;
+}
+.hero-unit-secondary {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.hero-scenario-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* --- Scenario legend ---------------------------------------------------- */
+.scenario-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.55rem 0.9rem;
+  margin: 0 0 1.1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.scenario-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.scenario-legend-item strong {
+  color: var(--brand-navy);
+  font-weight: 600;
+}
+.scenario-legend-item svg {
+  flex-shrink: 0;
+}
+
+/* --- Summary cards: dual-value (scheduled / payable) -------------------- */
+.summary-value-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.summary-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+.summary-card .summary-value-row--secondary .summary-value--secondary {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(15, 23, 65, 0.62);
+  margin-top: 0;
+}
+.summary-scenario-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* --- Detail table: scheduled vs payable column groups ------------------- */
+#detailTable th.th-sub {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+#detailTable td.td-secondary {
+  color: rgba(15, 23, 65, 0.62);
+}
 
 /* --- Tabs ---------------------------------------------------------------- */
 .nav-tabs {

@@ -1,31 +1,34 @@
 // =============================================================================
 // ChartManager — Chart.js helpers (light theme, current-law only).
 // Requires Chart.js v4 + chartjs-plugin-annotation v3 (loaded via CDN).
+//
+// Most line/cohort helpers accept a primary dataset plus an optional secondary
+// dataset (used for the payable scenario shown alongside scheduled). When the
+// secondary is present it renders dashed in a lighter shade of the primary
+// colour, and tooltip labels disambiguate "Scheduled" vs "Payable".
 // =============================================================================
 
 const CHART_COLORS = {
-  line:      '#2563EB',
-  fill:      'rgba(37, 99, 235, 0.05)',
-  earnings:  '#0D9488',  // working-year segment / negative NMTR (--nmtr-accrual)
-  benefits:  '#2563EB',  // retirement segment
-  taxAccent: '#D97706',  // positive NMTR (--nmtr-tax)
-  muted:     '#9ca3af',
-  grid:      'rgba(0, 0, 0, 0.06)',
-  axis:      '#6b7280'
+  line:           '#2563EB',
+  lineSecondary:  'rgba(37, 99, 235, 0.55)',
+  fill:           'rgba(37, 99, 235, 0.05)',
+  earnings:       '#0D9488',
+  earningsSecondary: 'rgba(13, 148, 136, 0.55)',
+  benefits:       '#2563EB',
+  benefitsSecondary: 'rgba(37, 99, 235, 0.55)',
+  taxAccent:      '#D97706',
+  muted:          '#9ca3af',
+  grid:           'rgba(0, 0, 0, 0.06)',
+  axis:           '#6b7280'
 };
+
+const SECONDARY_DASH = [6, 4];
 
 function makeDefaults() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    // Use index mode + intersect:false so hover tooltips fire when the cursor
-    // is anywhere over the chart, not just exactly on a (possibly invisible)
-    // data point. This is what makes the Individual tab line charts respond
-    // to hover the same way the Cohort tab bar charts do.
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
+    interaction: { mode: 'index', intersect: false },
     animation: { duration: 350, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
@@ -78,14 +81,15 @@ const chartManager = (() => {
     }
   }
 
-  // Generic line chart used for cohort and the secondary annual-benefits chart.
+  // Generic line chart used for the secondary annual-benefits chart.
+  // Pass `dataSecondary` to render a second (payable) line alongside the first.
   function lineChart(canvasId, opts) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
 
     const {
-      labels, data,
+      labels, data, dataSecondary = null,
       yFormat = 'currency', yMin = null, yMax = null,
       subtitle = null, leMarker = null, fadeAfterIdx = null
     } = opts;
@@ -96,15 +100,16 @@ const chartManager = (() => {
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
-      label: (item)  => formatYTick(item.parsed.y, yFormat)
+      label: (item)  => {
+        const prefix = dataSecondary ? `${item.dataset.label}: ` : '';
+        return `${prefix}${formatYTick(item.parsed.y, yFormat)}`;
+      }
     };
     if (subtitle) {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
     if (leMarker != null) {
-      // chartjs-plugin-annotation interprets numeric xMin/xMax as category
-      // indices when the x-axis is category — convert label → index.
       const leIdx = labels.indexOf(leMarker);
       if (leIdx >= 0) {
         o.plugins.annotation = {
@@ -130,7 +135,8 @@ const chartManager = (() => {
       }
     }
 
-    const dataset = {
+    const primary = {
+      label: dataSecondary ? 'Scheduled' : '',
       data,
       borderColor: CHART_COLORS.line,
       backgroundColor: CHART_COLORS.fill,
@@ -143,22 +149,41 @@ const chartManager = (() => {
     };
 
     if (fadeAfterIdx != null) {
-      dataset.segment = {
+      primary.segment = {
         borderColor: c => c.p1DataIndex > fadeAfterIdx ? 'rgba(37, 99, 235, 0.35)' : CHART_COLORS.line,
         borderDash:  c => c.p1DataIndex > fadeAfterIdx ? [4, 4] : undefined
       };
     }
 
+    const datasets = [primary];
+    if (dataSecondary) {
+      datasets.push({
+        label: 'Payable',
+        data: dataSecondary,
+        borderColor: CHART_COLORS.lineSecondary,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        borderDash: SECONDARY_DASH,
+        spanGaps: true
+      });
+    }
+
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels, datasets: [dataset] },
+      data: { labels, datasets },
       options: o
     });
   }
 
-  // Lifetime profile: combined earnings → benefits, two-color segments, no fill.
-  // Linear y-axis. Vertical reference at age 65 and at LE.
-  function lifetimeProfileChart(canvasId, { ages, values, transitionIdx, leAge, subtitle = null }) {
+  // Lifetime profile. Always plots the scheduled line with the existing
+  // earnings/benefit two-color segment encoding. `valuesSecondary` (payable)
+  // overlays a dashed line; in working years it duplicates the scheduled
+  // earnings (same data) and in retirement diverges below.
+  function lifetimeProfileChart(canvasId, { ages, values, valuesSecondary = null, transitionIdx, leAge, subtitle = null }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
@@ -168,7 +193,11 @@ const chartManager = (() => {
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
       label: (item)  => {
-        const phase = item.dataIndex < transitionIdx ? 'Earnings' : 'Benefit';
+        const inWorkYears = item.dataIndex < transitionIdx;
+        if (valuesSecondary && !inWorkYears) {
+          return `${item.dataset.label}: ${formatYTick(item.parsed.y, 'currency')}`;
+        }
+        const phase = inWorkYears ? 'Earnings' : 'Benefit';
         return `${phase}: ${formatYTick(item.parsed.y, 'currency')}`;
       }
     };
@@ -176,9 +205,7 @@ const chartManager = (() => {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
-    // chartjs-plugin-annotation treats numeric xMin/xMax on a category scale
-    // as indices, not label values. Convert the age values to indices.
-    const claimIdx = transitionIdx;            // index of age 65 in the combined array
+    const claimIdx = transitionIdx;
     const leIdx    = ages.indexOf(leAge);
     o.plugins.annotation = {
       annotations: {
@@ -207,7 +234,8 @@ const chartManager = (() => {
       }
     };
 
-    const dataset = {
+    const primary = {
+      label: valuesSecondary ? 'Scheduled' : '',
       data: values,
       borderColor: CHART_COLORS.benefits,
       fill: false,
@@ -220,16 +248,31 @@ const chartManager = (() => {
       }
     };
 
+    const datasets = [primary];
+    if (valuesSecondary) {
+      datasets.push({
+        label: 'Payable',
+        data: valuesSecondary,
+        borderColor: CHART_COLORS.benefitsSecondary,
+        fill: false,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        borderDash: SECONDARY_DASH,
+        segment: {
+          borderColor: c => c.p1DataIndex < transitionIdx ? CHART_COLORS.earningsSecondary : CHART_COLORS.benefitsSecondary
+        }
+      });
+    }
+
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels: ages, datasets: [dataset] },
+      data: { labels: ages, datasets },
       options: o
     });
   }
 
-  // Net Tax Rate by Age — two-color segments. Y-axis is bounded so the
-  // model-artifact spike at age 30 (which can dive to ~-400%) doesn't
-  // compress the rest of the chart into a flat line.
   function netTaxRateChart(canvasId, { ages, values, subtitle = null,
                                        yMin = -0.50, yMax = 0.20 }) {
     const ctx = document.getElementById(canvasId);
@@ -278,15 +321,16 @@ const chartManager = (() => {
     });
   }
 
-  // Cohort line chart — clean line with visible round points, optional
-  // two-color encoding around a threshold, optional horizontal reference line.
+  // Cohort line chart. Pass `dataSecondary` to add the payable line alongside
+  // scheduled. When secondary is present, two-color threshold encoding is
+  // suppressed (the dashed vs solid contrast carries enough information).
   function cohortLineChart(canvasId, opts) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
 
     const {
-      labels, data,
+      labels, data, dataSecondary = null,
       yFormat = 'currency',
       twoColorThreshold = null,
       referenceY = null,
@@ -294,12 +338,17 @@ const chartManager = (() => {
       subtitle = null
     } = opts;
 
+    const dual = dataSecondary != null;
+
     const o = makeDefaults();
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     o.scales.y.beginAtZero = (yFormat === 'currency');
     o.plugins.tooltip.callbacks = {
       title: (items) => `Born ${items[0].label}`,
-      label: (item)  => formatYTick(item.parsed.y, yFormat)
+      label: (item)  => {
+        const prefix = dual ? `${item.dataset.label}: ` : '';
+        return `${prefix}${formatYTick(item.parsed.y, yFormat)}`;
+      }
     };
     if (subtitle) {
       o.plugins.subtitle.display = true;
@@ -331,11 +380,13 @@ const chartManager = (() => {
       };
     }
 
-    const pointColors = (twoColorThreshold == null)
-      ? CHART_COLORS.line
-      : (data || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccent : CHART_COLORS.line);
+    const useThreshold = !dual && twoColorThreshold != null;
+    const pointColors = useThreshold
+      ? (data || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccent : CHART_COLORS.line)
+      : CHART_COLORS.line;
 
-    const dataset = {
+    const primary = {
+      label: dual ? 'Scheduled' : '',
       data,
       borderColor: CHART_COLORS.line,
       backgroundColor: 'rgba(37, 99, 235, 0.06)',
@@ -349,15 +400,34 @@ const chartManager = (() => {
       borderWidth: 2.25
     };
 
-    if (twoColorThreshold != null) {
-      dataset.segment = {
+    if (useThreshold) {
+      primary.segment = {
         borderColor: c => (c.p1.parsed.y >= twoColorThreshold ? CHART_COLORS.line : CHART_COLORS.taxAccent)
       };
     }
 
+    const datasets = [primary];
+    if (dual) {
+      datasets.push({
+        label: 'Payable',
+        data: dataSecondary,
+        borderColor: CHART_COLORS.lineSecondary,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: CHART_COLORS.lineSecondary,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        borderWidth: 2,
+        borderDash: SECONDARY_DASH
+      });
+    }
+
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels, datasets: [dataset] },
+      data: { labels, datasets },
       options: o
     });
   }
