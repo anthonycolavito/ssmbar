@@ -127,6 +127,21 @@
       </div>
     </div>
 
+    <!-- Marginal IRR by working age -->
+    <div class="chart-section" id="marginalIrrSection">
+      <h2 class="chart-title">Marginal Internal Rate of Return by Age</h2>
+      <div class="chart-subtitle" id="marginalIrrSubtitle">
+        Real annualized return on each year's OASDI contribution. Solid = scheduled, dashed = payable. Years before the worker becomes insured are shaded — those contributions earn no marginal benefit.
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="marginalIrrChart"></canvas>
+        <div class="chart-empty-state" id="marginalIrrEmpty" hidden>
+          <i class="bi bi-hourglass-split"></i>
+          <span>Marginal IRR data is not yet available for this cohort.</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Data table -->
     <div class="table-section">
       <div class="table-header">
@@ -161,11 +176,6 @@
         <div class="chart-canvas-wrap"><canvas id="cohortRatioChart"></canvas></div>
       </div>
       <div class="chart-section">
-        <h2 class="chart-title">Internal Rate of Return</h2>
-        <div class="chart-subtitle">Real annualized return on lifetime OASDI contributions.</div>
-        <div class="chart-canvas-wrap"><canvas id="cohortIrrChart"></canvas></div>
-      </div>
-      <div class="chart-section">
         <h2 class="chart-title">PV Lifetime Benefits</h2>
         <div class="chart-canvas-wrap"><canvas id="cohortPvBenChart"></canvas></div>
       </div>
@@ -182,6 +192,16 @@
         <h2 class="chart-title">Replacement Rate (AWI)</h2>
         <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
         <div class="chart-canvas-wrap"><canvas id="cohortRrAwiChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Internal Rate of Return</h2>
+        <div class="chart-subtitle">Real annualized return on lifetime OASDI contributions.</div>
+        <div class="chart-canvas-wrap"><canvas id="cohortIrrChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Marginal IRR (Final Year of Work)</h2>
+        <div class="chart-subtitle">Real return on the worker's age-64 contribution.</div>
+        <div class="chart-canvas-wrap"><canvas id="cohortMirrFinalChart"></canvas></div>
       </div>
     </div>
   </section>

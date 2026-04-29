@@ -61,6 +61,7 @@ function render(state) {
   renderLifetimeProfile(cfg, state);
   renderAnnualBenefitsChart(cfg, state.real);
   renderNetTaxRateChart(cfg);
+  renderMarginalIrrChart(cfg);
   tableManager.render(cfg);
 
   if (!document.getElementById('panel-cohort').hidden) {
@@ -273,6 +274,25 @@ function renderNetTaxRateChart(cfg) {
   });
 }
 
+function renderMarginalIrrChart(cfg) {
+  const canvas  = document.getElementById('marginalIrrChart');
+  const empty   = document.getElementById('marginalIrrEmpty');
+  const hasData = dataLoader.hasNmtr(cfg) && !dataLoader.nmtrValuesPending();
+
+  if (canvas) canvas.hidden = !hasData;
+  if (empty)  empty.hidden  =  hasData;
+  if (!hasData) {
+    chartManager.destroyChart('marginalIrrChart');
+    return;
+  }
+
+  chartManager.marginalIrrChart('marginalIrrChart', {
+    ages:            cfg.nmtr.ages,
+    valuesScheduled: cfg.nmtr.scheduled.marginal_irr,
+    valuesPayable:   cfg.nmtr.payable.marginal_irr
+  });
+}
+
 // -----------------------------------------------------------------------------
 // Cohort charts
 // -----------------------------------------------------------------------------
@@ -297,12 +317,6 @@ function renderCohortCharts(state) {
     twoColorThreshold: 1.0,
     referenceY: 1.0,
     referenceLabel: 'Break-even (1.0)'
-  });
-
-  const irr = dataLoader.getCohortSeries(w, s, 'irr');
-  chartManager.cohortLineChart('cohortIrrChart', {
-    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
-    yFormat: 'percent', yMin: 0
   });
 
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
@@ -336,6 +350,19 @@ function renderCohortCharts(state) {
   chartManager.cohortLineChart('cohortRrAwiChart', {
     labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
     yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+
+  // Bottom row: the two IRR charts.
+  const irr = dataLoader.getCohortSeries(w, s, 'irr');
+  chartManager.cohortLineChart('cohortIrrChart', {
+    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', yMin: 0
+  });
+
+  const mirrFinal = dataLoader.getCohortSeries(w, s, 'marginal_irr_age64');
+  chartManager.cohortLineChart('cohortMirrFinalChart', {
+    labels: mirrFinal.years, data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
+    yFormat: 'percent'
   });
 }
 
