@@ -9,17 +9,18 @@
 // =============================================================================
 
 const CHART_COLORS = {
-  line:           '#2563EB',
-  lineSecondary:  'rgba(37, 99, 235, 0.55)',
-  fill:           'rgba(37, 99, 235, 0.05)',
-  earnings:       '#0D9488',
-  earningsSecondary: 'rgba(13, 148, 136, 0.55)',
-  benefits:       '#2563EB',
-  benefitsSecondary: 'rgba(37, 99, 235, 0.55)',
-  taxAccent:      '#D97706',
-  muted:          '#9ca3af',
-  grid:           'rgba(0, 0, 0, 0.06)',
-  axis:           '#6b7280'
+  line:               '#2563EB',
+  lineSecondary:      'rgba(37, 99, 235, 0.55)',
+  fill:               'rgba(37, 99, 235, 0.05)',
+  earnings:           '#0D9488',
+  earningsSecondary:  'rgba(13, 148, 136, 0.55)',
+  benefits:           '#2563EB',
+  benefitsSecondary:  'rgba(37, 99, 235, 0.55)',
+  taxAccent:          '#D97706',
+  taxAccentSecondary: 'rgba(217, 119, 6, 0.55)',
+  muted:              '#9ca3af',
+  grid:               'rgba(0, 0, 0, 0.06)',
+  axis:               '#6b7280'
 };
 
 const SECONDARY_DASH = [6, 4];
@@ -384,8 +385,11 @@ const chartManager = (() => {
       };
     }
 
-    const useThreshold = !dual && twoColorThreshold != null;
-    const pointColors = useThreshold
+    // Threshold encoding flips line colour at twoColorThreshold and is applied
+    // independently to each dataset when present, so both scheduled and
+    // payable lines can highlight where the metric crosses the threshold.
+    const useThreshold = twoColorThreshold != null;
+    const primaryPointColors = useThreshold
       ? (data || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccent : CHART_COLORS.line)
       : CHART_COLORS.line;
 
@@ -398,7 +402,7 @@ const chartManager = (() => {
       tension: 0.3,
       pointRadius: 3.5,
       pointHoverRadius: 6,
-      pointBackgroundColor: pointColors,
+      pointBackgroundColor: primaryPointColors,
       pointBorderColor: '#fff',
       pointBorderWidth: 1.5,
       borderWidth: 2.25
@@ -412,7 +416,10 @@ const chartManager = (() => {
 
     const datasets = [primary];
     if (dual) {
-      datasets.push({
+      const secondaryPointColors = useThreshold
+        ? (dataSecondary || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccentSecondary : CHART_COLORS.lineSecondary)
+        : CHART_COLORS.lineSecondary;
+      const secondary = {
         label: 'Payable',
         data: dataSecondary,
         borderColor: CHART_COLORS.lineSecondary,
@@ -421,12 +428,18 @@ const chartManager = (() => {
         tension: 0.3,
         pointRadius: 3,
         pointHoverRadius: 5,
-        pointBackgroundColor: CHART_COLORS.lineSecondary,
+        pointBackgroundColor: secondaryPointColors,
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         borderWidth: 2,
         borderDash: SECONDARY_DASH
-      });
+      };
+      if (useThreshold) {
+        secondary.segment = {
+          borderColor: c => (c.p1.parsed.y >= twoColorThreshold ? CHART_COLORS.lineSecondary : CHART_COLORS.taxAccentSecondary)
+        };
+      }
+      datasets.push(secondary);
     }
 
     charts[canvasId] = new Chart(ctx, {

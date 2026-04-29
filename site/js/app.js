@@ -277,13 +277,15 @@ function renderCohortCharts(state) {
     yFormat: 'currency'
   });
 
-  // Benefit/Tax Ratio: solid scheduled + dashed payable, dashed reference at
-  // 1.0; threshold colouring suppressed when both lines are shown so the
-  // dual-line story stays readable.
+  // Benefit/Tax Ratio: solid scheduled + dashed payable, both lines colored
+  // around the 1.0 threshold (blue for net beneficiary, amber for net
+  // taxpayer; the secondary line uses lighter shades to match its dashed
+  // weight). Dashed reference at 1.0.
   const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
   chartManager.cohortLineChart('cohortRatioChart', {
     labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
     yFormat: 'number',
+    twoColorThreshold: 1.0,
     referenceY: 1.0,
     referenceLabel: 'Break-even (1.0)'
   });
