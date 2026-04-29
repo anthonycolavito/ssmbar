@@ -858,3 +858,199 @@ a:hover { color: var(--brand-blue); }
     text-align: left;
   }
 }
+
+/* =============================================================================
+   Current-law dashboard layout (additive — uses existing CSS variables)
+   ============================================================================= */
+
+.app-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* --- Tabs ---------------------------------------------------------------- */
+.nav-tabs {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+.nav-tabs .nav-link {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0.7rem 1rem;
+  border-radius: 0;
+}
+.nav-tabs .nav-link:hover {
+  color: var(--text-primary);
+}
+.nav-tabs .nav-link.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+  background: transparent;
+}
+
+.tab-panel { display: block; }
+.tab-panel[hidden] { display: none !important; }
+
+/* --- Worker config row --------------------------------------------------- */
+.config-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding: 1rem 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+.config-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+.config-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+/* --- Summary cards ------------------------------------------------------- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+}
+.summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.85rem 1rem;
+  box-shadow: var(--shadow-card);
+}
+.summary-card .summary-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.summary-card .summary-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+  margin-top: 0.25rem;
+  line-height: 1.1;
+}
+.summary-card .summary-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 0.4rem;
+  line-height: 1.35;
+}
+
+/* --- Chart sections ------------------------------------------------------ */
+.chart-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.chart-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+  margin: 0 0 0.5rem 0;
+}
+.chart-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 320px;
+}
+
+/* --- Cohort grid --------------------------------------------------------- */
+.cohort-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1rem;
+}
+.cohort-grid .chart-canvas-wrap {
+  height: 240px;
+}
+
+/* --- Data table section -------------------------------------------------- */
+.table-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.table-section .table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.table-wrap {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+}
+.table-wrap table {
+  margin-bottom: 0;
+}
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card-alt);
+  z-index: 1;
+}
+
+/* --- Reform placeholder card -------------------------------------------- */
+.reform-placeholder {
+  display: flex;
+  gap: 0.625rem;
+  align-items: flex-start;
+  padding: 0.875rem 1rem;
+  margin: 2rem 0 0.5rem;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.reform-placeholder .bi {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* --- Worker type segmented control --------------------------------------- */
+#workerTypeControl .btn {
+  border-color: var(--border);
+}
+#workerTypeControl .btn.active {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
