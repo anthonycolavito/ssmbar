@@ -50,7 +50,7 @@ source("./R/calc_tax.R")
 # ---- Configuration -----------------------------------------------------------
 worker_types  <- c("very_low", "low", "medium", "high", "max")
 spouse_types  <- c("none", "very_low", "low", "medium", "high", "max")
-new_cohorts <- c(1930L, 1935L, 1940L, 1945L, 1950L, 1955L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2005L, 2010L)
+new_cohorts <- c(1930L, 1935L, 1940L, 1945L, 1950L, 1955L, 1960L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2000L, 2005L, 2010L)
 birth_years   <- new_cohorts
 claim_age     <- 65L
 career_length <- 44L
@@ -169,7 +169,7 @@ gen_net_tax <- function(worker_type, spouse_type, birth_yr, claim_age,
     t, pri$worker, partner_baseline, partner_info, par, rfl, death_age,
     partner_solo_ben))
   
-  delta_pv_ben <- pv_bens - c(0, head(pv_bens[1], -1))
+  delta_pv_ben <- pv_bens - c(0, head(pv_bens, -1))
   
   earn_tax <- pri$worker %>%
     filter(age %in% work_ages) %>%
