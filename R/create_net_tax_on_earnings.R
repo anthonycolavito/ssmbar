@@ -215,42 +215,6 @@ all_net_tax <- grid %>%
                        le_at_65  = le_at_65),
            .progress = TRUE)
 
-# ---- Save -------------------------------------------------------------------
-saveRDS(all_net_tax,  "./output/net_tax_on_earnings.rds")
-write_csv(all_net_tax, "./output/net_tax_on_earnings.csv")
-
-
-
-# ---- Merge with previously saved cohorts and save ---------------------------
-prior <- readRDS("./output/net_tax_on_earnings.rds")
-
-# Newly-computed rows take precedence over prior on duplicate keys.
-all_net_tax <- bind_rows(all_net_tax, prior) %>%
-  distinct(worker_type, spouse_type, birth_yr, age, .keep_all = TRUE) %>%
-  arrange(worker_type, spouse_type, birth_yr, age)
-
-saveRDS(all_net_tax,  "./output/net_tax_on_earnings.rds")
-write_csv(all_net_tax, "./output/net_tax_on_earnings.csv")
-
-# fix_net_tax_t21.R
-# -----------------------------------------------------------------------------
-# Post-hoc correction to net_tax_on_earnings.rds:
-#
-# At age 21, no worker can be insured (one year of earnings -> 4 QCs vs the
-# 40 required). So earnings at t=21 cannot raise primary's PIA, cannot raise
-# partner's spousal benefit on primary's record, and cannot affect primary's
-# own benefit. The marginal PV of benefits is mechanically zero, and
-# net_tax(21) = tax(21) / earnings(21) (i.e., the gross OASDI rate).
-#
-# The original script set the baseline at t=21 to 0 instead of carrying it
-# from the prior period, so for couples delta_pv_ben(21) erroneously
-# included the partner's solo benefit PV. Singles were unaffected.
-# -----------------------------------------------------------------------------
-
-library(tidyverse)
-
-all_net_tax <- readRDS("./output/net_tax_on_earnings.rds")
-
 all_net_tax_fixed <- all_net_tax %>%
   mutate(
     delta_pv_ben = if_else(age == 21L, 0, delta_pv_ben),
@@ -258,7 +222,8 @@ all_net_tax_fixed <- all_net_tax %>%
                            tax / earnings,
                            net_tax)
   )
-
+# ---- Save -------------------------------------------------------------------
 saveRDS(all_net_tax_fixed,  "./output/net_tax_on_earnings.rds")
 write_csv(all_net_tax_fixed, "./output/net_tax_on_earnings.csv")
+
 
