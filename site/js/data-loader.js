@@ -1,5 +1,10 @@
 // =============================================================================
 // DataLoader — Fetches site_data.json and exposes config lookups.
+//
+// JSON shape (per config):
+//   annual:   { ages, years, earnings, scheduled:{...}, payable:{...} }
+//   nmtr:     { ages, years, values, earnings_*, household_earnings_* }   // shared
+//   summary:  { death_age, pv_taxes, scheduled:{...}, payable:{...} }
 // =============================================================================
 
 const dataLoader = (() => {
@@ -40,39 +45,61 @@ const dataLoader = (() => {
     return Boolean(payload.meta && payload.meta.nmtr_values_pending);
   }
 
-  function getCohortSeries(workerType, spouseType, summaryField) {
-    const years = payload.dimensions.birth_years;
-    const values = years.map(y => {
-      const cfg = payload.configs[configKey(workerType, spouseType, y)];
-      if (!cfg) return null;
-      const v = cfg.summary[summaryField];
-      return (v == null) ? null : v;
-    });
-    return { years, values };
+  function pbNmtrPending() {
+    return Boolean(payload.meta && payload.meta.pb_nmtr_pending);
   }
 
-  // Lifetime profile: working-year earnings (21–64) followed by retirement
-  // benefits (65 → life expectancy). Honours the real/nominal toggle and the
-  // primary/household view toggle. When NMTR data is missing for a cohort,
-  // returns retirement-only with earnings_available=false so the caller can
-  // adjust labelling.
+  // Per-cohort cohort-tab series. Each metric gets parallel scheduled/payable
+  // arrays of equal length. PV taxes is scenario-invariant; for that field the
+  // two arrays are identical and the caller can render a single line.
+  function getCohortSeries(workerType, spouseType, summaryField) {
+    const years = payload.dimensions.birth_years;
+    const scheduled = [];
+    const payable   = [];
+    for (const y of years) {
+      const cfg = payload.configs[configKey(workerType, spouseType, y)];
+      if (!cfg) { scheduled.push(null); payable.push(null); continue; }
+      if (summaryField === 'pv_taxes') {
+        const v = cfg.summary.pv_taxes;
+        scheduled.push(v ?? null);
+        payable.push(v ?? null);
+      } else {
+        scheduled.push(cfg.summary.scheduled?.[summaryField] ?? null);
+        payable.push(cfg.summary.payable?.[summaryField]     ?? null);
+      }
+    }
+    return { years, scheduled, payable };
+  }
+
+  // Lifetime profile pieces. Returns work-year ages + earnings (scenario-
+  // invariant) plus parallel retirement-year arrays for scheduled and payable.
+  // The chart can plot both retirement series and overlay them on the same
+  // earnings prefix. When NMTR is missing, the work segment is empty and
+  // earnings_available is false.
   function getLifetimeProfile(workerType, spouseType, birthYear, real = true, view = 'primary') {
     const cfg = getConfig(workerType, spouseType, birthYear);
     const leAge = cfg.summary.death_age;
     const household = view === 'household';
 
     const retAgesAll = cfg.annual.ages;
-    const retValsAll = household
-      ? (real ? cfg.annual.household_real    : cfg.annual.household_nominal)
-      : (real ? cfg.annual.real              : cfg.annual.nominal);
-    const retAges = retAgesAll.filter(a => a <= leAge);
-    const retVals = retValsAll.slice(0, retAges.length);
+    const pickRet = scenarioObj => household
+      ? (real ? scenarioObj.household_real    : scenarioObj.household_nominal)
+      : (real ? scenarioObj.real              : scenarioObj.nominal);
+
+    const retSchedAll = pickRet(cfg.annual.scheduled);
+    const retPayAll   = pickRet(cfg.annual.payable);
+
+    const keepIdx = retAgesAll.reduce((acc, a, i) => (a <= leAge ? acc.concat(i) : acc), []);
+    const retAges       = keepIdx.map(i => retAgesAll[i]);
+    const retScheduled  = keepIdx.map(i => retSchedAll[i]);
+    const retPayable    = keepIdx.map(i => retPayAll[i]);
 
     if (!hasNmtr(cfg)) {
       return {
-        ages: retAges,
-        values: retVals,
-        transitionIdx: 0,
+        ages:           retAges,
+        scheduled:      retScheduled,
+        payable:        retPayable,
+        transitionIdx:  0,
         leAge,
         earnings_available: false
       };
@@ -83,18 +110,19 @@ const dataLoader = (() => {
       ? (real ? cfg.nmtr.household_earnings_real    : cfg.nmtr.household_earnings_nominal)
       : (real ? cfg.nmtr.earnings_real              : cfg.nmtr.earnings_nominal);
 
-    const ages   = [...workAges, ...retAges];
-    const values = [...workVals, ...retVals];
+    const ages       = [...workAges, ...retAges];
+    const scheduled  = [...workVals, ...retScheduled];
+    const payable    = [...workVals, ...retPayable];
     const transitionIdx = workAges.length;
 
     if (ages[transitionIdx] !== 65) {
       throw new Error(`Lifetime profile transition mis-aligned: ages[${transitionIdx}]=${ages[transitionIdx]}, expected 65`);
     }
-    return { ages, values, transitionIdx, leAge, earnings_available: true };
+    return { ages, scheduled, payable, transitionIdx, leAge, earnings_available: true };
   }
 
   return {
     init, ready, meta, dimensions, getConfig, getCohortSeries, getLifetimeProfile,
-    hasNmtr, nmtrMissingBirthYears, nmtrValuesPending
+    hasNmtr, nmtrMissingBirthYears, nmtrValuesPending, pbNmtrPending
   };
 })();

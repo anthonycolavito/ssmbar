@@ -65,9 +65,26 @@
     <p class="hero-lede" id="heroLede">A medium earner born in 1980 can expect at age 65:</p>
     <p class="hero-number">
       <span id="heroValue">--</span><span class="hero-unit"> / month</span>
+      <span class="hero-scenario-label">scheduled</span>
+    </p>
+    <p class="hero-number-secondary">
+      <span id="heroValuePayable">--</span><span class="hero-unit-secondary"> / month</span>
+      <span class="hero-scenario-label">payable</span>
     </p>
     <p class="hero-subline" id="heroSubline"></p>
   </section>
+
+  <!-- Scenario legend (shown across both tabs) -->
+  <div class="scenario-legend" role="note">
+    <span class="scenario-legend-item">
+      <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="#2563EB" stroke-width="2.4"/></svg>
+      <span><strong>Scheduled</strong> — what current law promises</span>
+    </span>
+    <span class="scenario-legend-item">
+      <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="rgba(37,99,235,0.55)" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
+      <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
+    </span>
+  </div>
 
   <!-- Individual tab -->
   <section id="panel-individual" class="tab-panel active">
@@ -115,9 +132,6 @@
       <div class="table-header">
         <h2 class="chart-title">Year-by-Year Detail</h2>
         <div class="table-actions">
-          <button id="toggleFullTableBtn" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrows-expand"></i> Show full life table
-          </button>
           <button id="downloadCsvBtn" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-download"></i> Download CSV
           </button>
@@ -131,20 +145,20 @@
 
   <!-- Cohort tab -->
   <section id="panel-cohort" class="tab-panel" hidden>
+    <div class="cohort-tab-toolbar">
+      <button id="downloadCohortCsvBtn" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download"></i> Download CSV
+      </button>
+    </div>
     <div class="cohort-grid">
       <div class="chart-section">
         <h2 class="chart-title">Monthly Benefit at 65 (Real $)</h2>
         <div class="chart-canvas-wrap"><canvas id="cohortMonthlyChart"></canvas></div>
       </div>
       <div class="chart-section">
-        <h2 class="chart-title">Replacement Rate (Career)</h2>
-        <div class="chart-subtitle">First-year benefit ÷ worker's average real lifetime earnings.</div>
-        <div class="chart-canvas-wrap"><canvas id="cohortRrCareerChart"></canvas></div>
-      </div>
-      <div class="chart-section">
-        <h2 class="chart-title">Replacement Rate (AWI)</h2>
-        <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
-        <div class="chart-canvas-wrap"><canvas id="cohortRrAwiChart"></canvas></div>
+        <h2 class="chart-title">Benefit / Tax Ratio</h2>
+        <div class="chart-subtitle">Blue ≥ 1.0 (lifetime net beneficiary). Amber &lt; 1.0 (net taxpayer). Dashed reference at 1.0.</div>
+        <div class="chart-canvas-wrap"><canvas id="cohortRatioChart"></canvas></div>
       </div>
       <div class="chart-section">
         <h2 class="chart-title">PV Lifetime Benefits</h2>
@@ -155,9 +169,14 @@
         <div class="chart-canvas-wrap"><canvas id="cohortPvTaxChart"></canvas></div>
       </div>
       <div class="chart-section">
-        <h2 class="chart-title">Benefit / Tax Ratio</h2>
-        <div class="chart-subtitle">Blue ≥ 1.0 (lifetime net beneficiary). Amber &lt; 1.0 (net taxpayer).</div>
-        <div class="chart-canvas-wrap"><canvas id="cohortRatioChart"></canvas></div>
+        <h2 class="chart-title">Replacement Rate (Career)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ worker's average real lifetime earnings.</div>
+        <div class="chart-canvas-wrap"><canvas id="cohortRrCareerChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Replacement Rate (AWI)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
+        <div class="chart-canvas-wrap"><canvas id="cohortRrAwiChart"></canvas></div>
       </div>
     </div>
   </section>
@@ -172,6 +191,10 @@
       simple average of male and female cohort life expectancy at 65 from the Trustees
       Report. Earnings profiles follow SSA scaled-earner conventions (very low, low,
       medium, high, max). Couples are assumed to share birth years and claim ages.
+      Each metric is shown under both the <strong>scheduled</strong> scenario (the
+      formula-based benefit current law promises) and the <strong>payable</strong>
+      scenario (the share of scheduled benefits the OASDI trust fund can actually
+      finance after its projected depletion).
     </p>
     <p class="methodology-meta">
       Data: SSA Trustees Report 2025 · Built <span id="metaGenerated">—</span> ·
