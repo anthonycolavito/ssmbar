@@ -18,6 +18,12 @@ SPOUSE_TYPES <- c("none", "very_low", "low", "medium", "high", "max")
 BIRTH_YEARS  <- seq(1930, 2010, by = 5)
 CLAIM_AGE    <- 65L
 
+# Flip to FALSE once the post-bug-fix net_tax_on_earnings re-run lands. While
+# TRUE, the Net Tax Rate chart on the Individual tab is forced into its
+# "data not yet available" empty state for every cohort, since the values
+# in the current CSV are produced by the buggy delta_pv_ben calculation.
+NMTR_VALUES_PENDING <- TRUE
+
 WORKER_LABELS <- c(
   very_low = "Very Low Earner",
   low      = "Low Earner",
@@ -230,7 +236,8 @@ out <- list(
     data_mode = "current_law_only",
     claim_age = CLAIM_AGE,
     generated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    nmtr_missing_birth_years = as.list(nmtr_missing_years)
+    nmtr_missing_birth_years = as.list(nmtr_missing_years),
+    nmtr_values_pending      = NMTR_VALUES_PENDING
   ),
   dimensions = list(
     worker_types = lapply(WORKER_TYPES, function(k) list(key = k, label = unname(WORKER_LABELS[[k]]))),

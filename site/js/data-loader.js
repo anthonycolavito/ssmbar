@@ -36,6 +36,10 @@ const dataLoader = (() => {
     return (payload.meta && payload.meta.nmtr_missing_birth_years) || [];
   }
 
+  function nmtrValuesPending() {
+    return Boolean(payload.meta && payload.meta.nmtr_values_pending);
+  }
+
   function getCohortSeries(workerType, spouseType, summaryField) {
     const years = payload.dimensions.birth_years;
     const values = years.map(y => {
@@ -91,6 +95,6 @@ const dataLoader = (() => {
 
   return {
     init, ready, meta, dimensions, getConfig, getCohortSeries, getLifetimeProfile,
-    hasNmtr, nmtrMissingBirthYears
+    hasNmtr, nmtrMissingBirthYears, nmtrValuesPending
   };
 })();

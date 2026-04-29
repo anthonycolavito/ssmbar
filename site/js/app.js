@@ -199,10 +199,19 @@ function renderAnnualBenefitsChart(cfg, real) {
 function renderNetTaxRateChart(cfg) {
   const canvas  = document.getElementById('netTaxRateChart');
   const empty   = document.getElementById('netTaxRateEmpty');
-  const hasData = dataLoader.hasNmtr(cfg);
+  const pending = dataLoader.nmtrValuesPending();
+  const hasData = dataLoader.hasNmtr(cfg) && !pending;
 
   if (canvas) canvas.hidden = !hasData;
-  if (empty)  empty.hidden  =  hasData;
+  if (empty) {
+    empty.hidden = hasData;
+    const msg = empty.querySelector('span');
+    if (msg) {
+      msg.textContent = pending
+        ? 'Net tax rate data is being recomputed — currently unavailable.'
+        : 'Net tax data is not yet available for this cohort.';
+    }
+  }
 
   if (!hasData) {
     chartManager.destroyChart('netTaxRateChart');
