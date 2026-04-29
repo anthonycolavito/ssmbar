@@ -4,10 +4,11 @@
 
 const uiControls = (() => {
   const state = {
-    workerType: 'medium',
-    spouseType: 'none',
-    birthYear:  1980,
-    real:       true
+    workerType:   'medium',
+    spouseType:   'none',
+    birthYear:    1980,
+    real:         true,
+    lifetimeView: 'primary'
   };
 
   const listeners = new Set();
@@ -46,8 +47,29 @@ const uiControls = (() => {
     });
     sel.addEventListener('change', () => {
       state.spouseType = sel.value;
+      syncLifetimeViewAvailability();
       emit();
     });
+  }
+
+  // Household view is meaningless for singles (it equals primary), so the
+  // toggle button is disabled and the view forced back to primary whenever
+  // the user is on a single-worker config.
+  function syncLifetimeViewAvailability() {
+    const host = document.getElementById('lifetimeViewControl');
+    if (!host) return;
+    const isSingle = state.spouseType === 'none';
+    const householdBtn = host.querySelector('button[data-view="household"]');
+    const primaryBtn   = host.querySelector('button[data-view="primary"]');
+    if (householdBtn) {
+      householdBtn.disabled = isSingle;
+      householdBtn.classList.toggle('disabled', isSingle);
+    }
+    if (isSingle && state.lifetimeView !== 'primary') {
+      state.lifetimeView = 'primary';
+      if (householdBtn) householdBtn.classList.remove('active');
+      if (primaryBtn)   primaryBtn.classList.add('active');
+    }
   }
 
   function buildCohortControl(years) {
@@ -79,6 +101,20 @@ const uiControls = (() => {
     });
   }
 
+  function buildLifetimeViewToggle() {
+    const host = document.getElementById('lifetimeViewControl');
+    if (!host) return;
+    host.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        if (view === state.lifetimeView) return;
+        state.lifetimeView = view;
+        host.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+        emit();
+      });
+    });
+  }
+
   function buildTabs(onTab) {
     document.querySelectorAll('.nav-tabs .nav-link').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -98,6 +134,8 @@ const uiControls = (() => {
     buildSpouseControl(dimensions.spouse_types);
     buildCohortControl(dimensions.birth_years);
     buildRealToggle();
+    buildLifetimeViewToggle();
+    syncLifetimeViewAvailability();
     buildTabs(onTab);
   }
 

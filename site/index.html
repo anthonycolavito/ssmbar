@@ -76,7 +76,13 @@
 
     <!-- Lifetime profile chart (primary) -->
     <div class="chart-section">
-      <h2 class="chart-title">Lifetime Income Profile</h2>
+      <div class="chart-section-header">
+        <h2 class="chart-title">Lifetime Income Profile</h2>
+        <div id="lifetimeViewControl" class="btn-group btn-group-sm" role="group" aria-label="View mode">
+          <button type="button" class="btn btn-outline-primary active" data-view="primary">Primary worker</button>
+          <button type="button" class="btn btn-outline-primary" data-view="household">Household</button>
+        </div>
+      </div>
       <div class="chart-subtitle" id="lifetimeProfileSubtitle">
         Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).
       </div>
@@ -91,10 +97,16 @@
         <div class="chart-canvas-wrap"><canvas id="annualBenefitsChart"></canvas></div>
       </div>
 
-      <div class="chart-section">
+      <div class="chart-section" id="netTaxRateSection">
         <h2 class="chart-title">Net Tax Rate by Age</h2>
-        <div class="chart-subtitle">Payroll tax rate net of accrued value of benefits by age</div>
-        <div class="chart-canvas-wrap"><canvas id="netTaxRateChart"></canvas></div>
+        <div class="chart-subtitle" id="netTaxRateSubtitle">Payroll tax rate net of accrued value of benefits by age</div>
+        <div class="chart-canvas-wrap">
+          <canvas id="netTaxRateChart"></canvas>
+          <div class="chart-empty-state" id="netTaxRateEmpty" hidden>
+            <i class="bi bi-hourglass-split"></i>
+            <span>Net tax data is not yet available for this cohort.</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -137,6 +149,10 @@
       <div class="chart-section">
         <h2 class="chart-title">PV Lifetime Benefits</h2>
         <div class="chart-canvas-wrap"><canvas id="cohortPvBenChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">PV Lifetime Taxes</h2>
+        <div class="chart-canvas-wrap"><canvas id="cohortPvTaxChart"></canvas></div>
       </div>
       <div class="chart-section">
         <h2 class="chart-title">Benefit / Tax Ratio</h2>

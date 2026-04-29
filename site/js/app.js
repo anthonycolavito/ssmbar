@@ -147,13 +147,26 @@ function escapeAttr(s) {
 // -----------------------------------------------------------------------------
 
 function renderLifetimeProfile(cfg, state) {
-  const profile = dataLoader.getLifetimeProfile(state.workerType, state.spouseType, state.birthYear, state.real);
+  const view = state.lifetimeView || 'primary';
+  const profile = dataLoader.getLifetimeProfile(
+    state.workerType, state.spouseType, state.birthYear, state.real, view
+  );
 
   const subtitleEl = document.getElementById('lifetimeProfileSubtitle');
   if (subtitleEl) {
-    subtitleEl.textContent = state.real
-      ? 'Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).'
-      : 'Nominal dollars (year of receipt). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).';
+    const dollars = state.real ? 'Real 2026 dollars (GDP price index)' : 'Nominal dollars (year of receipt)';
+    let scope;
+    if (view === 'household') {
+      scope = state.spouseType === 'none'
+        ? 'Single-worker household — earnings (ages 21–64) and Social Security benefits (age 65 to life expectancy).'
+        : 'Household totals — combined earnings of both spouses (ages 21–64) and combined Social Security benefits (age 65 to life expectancy).';
+    } else {
+      scope = "Primary worker only — own earnings (ages 21–64) and own Social Security benefit including any supplemental spousal benefit (age 65 to life expectancy).";
+    }
+    const fallback = profile.earnings_available
+      ? ''
+      : ' Working-year earnings data not yet available for this cohort — only retirement years shown.';
+    subtitleEl.textContent = `${dollars}. ${scope}${fallback}`;
   }
 
   chartManager.lifetimeProfileChart('lifetimeProfileChart', {
@@ -183,6 +196,18 @@ function renderAnnualBenefitsChart(cfg, real) {
 }
 
 function renderNetTaxRateChart(cfg) {
+  const canvas  = document.getElementById('netTaxRateChart');
+  const empty   = document.getElementById('netTaxRateEmpty');
+  const hasData = dataLoader.hasNmtr(cfg);
+
+  if (canvas) canvas.hidden = !hasData;
+  if (empty)  empty.hidden  =  hasData;
+
+  if (!hasData) {
+    chartManager.destroyChart('netTaxRateChart');
+    return;
+  }
+
   chartManager.netTaxRateChart('netTaxRateChart', {
     ages:   cfg.nmtr.ages,
     values: cfg.nmtr.values
@@ -214,6 +239,11 @@ function renderCohortCharts(state) {
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
   chartManager.cohortLineChart('cohortPvBenChart', {
     labels: pvBen.years, data: pvBen.values, yFormat: 'currency'
+  });
+
+  const pvTax = dataLoader.getCohortSeries(w, s, 'pv_taxes');
+  chartManager.cohortLineChart('cohortPvTaxChart', {
+    labels: pvTax.years, data: pvTax.values, yFormat: 'currency'
   });
 
   // Benefit/Tax Ratio gets two-color encoding around 1.0 plus a dashed
