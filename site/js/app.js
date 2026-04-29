@@ -106,16 +106,17 @@ function renderSummaryCards(cfg) {
     {
       label: 'PV Lifetime Benefits',
       value: Fmt.currency(s.pv_benefits),
-      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars'
+      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
     },
     {
       label: 'PV Lifetime Taxes',
       value: Fmt.currency(s.pv_taxes),
-      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars'
+      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
     },
     {
       label: 'Benefit / Tax Ratio',
-      value: (s.ben_tax_ratio == null) ? '--' : s.ben_tax_ratio.toFixed(2)
+      value: (s.ben_tax_ratio == null) ? '--' : s.ben_tax_ratio.toFixed(2),
+      info:  'PV Lifetime Benefits divided by PV Lifetime Taxes.'
     },
     {
       label: 'Replacement Rate (Career)',
