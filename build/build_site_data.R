@@ -13,8 +13,9 @@
 #     output/pb_benefits_by_worker_age.csv
 #     output/pb_initial_replacement_rates.csv
 #     output/pb_pv_lifetime_taxes_benefits.csv
-#     (pb_net_tax_on_earnings.csv: not yet computed; nmtr stays scenario-shared
-#      until it lands and PB_NMTR_PENDING flips to FALSE.)
+#     output/pb_net_tax_on_earnings.csv  (carries net_tax_pb; net_tax_sched
+#                                         column is redundant with the
+#                                         scheduled file and ignored)
 #
 # Output: site/data/site_data.json
 
@@ -32,11 +33,9 @@ CLAIM_AGE    <- 65L
 # CSV is regenerated. Normal operation: FALSE.
 NMTR_VALUES_PENDING <- FALSE
 
-# Flip to FALSE once pb_net_tax_on_earnings.csv lands. While TRUE, the Net Tax
-# Rate chart shows only the scheduled line plus a "payable scenario coming
-# soon" caption. Earnings columns stay shared across scenarios since worker
-# earnings are exogenous to the scheduled/payable distinction.
-PB_NMTR_PENDING <- TRUE
+# Flip to TRUE if pb_net_tax_on_earnings.csv is regenerated and the values
+# need to be hidden in the meantime. Normal operation: FALSE.
+PB_NMTR_PENDING <- FALSE
 
 WORKER_LABELS <- c(
   very_low = "Very Low Earner",
@@ -68,6 +67,7 @@ rep_rates    <- read_csv_strict("output/initial_replacement_rates.csv")
 ben_age_pb   <- read_csv_strict("output/pb_benefits_by_worker_age.csv")
 pv_pb        <- read_csv_strict("output/pb_pv_lifetime_taxes_benefits.csv")
 rep_rates_pb <- read_csv_strict("output/pb_initial_replacement_rates.csv")
+nmtr_pb      <- read_csv_strict("output/pb_net_tax_on_earnings.csv")
 
 # Period unisex life expectancy at age 65 by claim year, derived from tr2025.
 load("data/tr2025.rda")
@@ -181,7 +181,11 @@ for (w in WORKER_TYPES) {
       ba    <- lookup_panel(ben_age,    w, s, b)
       ba_pb <- lookup_panel(ben_age_pb, w, s, b)
       nm    <- lookup_panel(nmtr,       w, s, b)
+      nm_pb <- lookup_panel(nmtr_pb,    w, s, b)
       stopifnot(nrow(ba_pb) == nrow(ba), all(ba_pb$age == ba$age))
+      if (nrow(nm) > 0) {
+        stopifnot(nrow(nm_pb) == nrow(nm), all(nm_pb$age == nm$age))
+      }
 
       pvr    <- lookup_one(pv,    w, s, b, swap_fallback = TRUE)
       pvr_pb <- lookup_one(pv_pb, w, s, b, swap_fallback = TRUE)
@@ -250,11 +254,12 @@ for (w in WORKER_TYPES) {
         nmtr = list(
           ages                       = nm$age,
           years                      = nm$year,
-          values                     = round(nm$net_tax, 6),
           earnings_nominal           = round(nm$earnings, 2),
           earnings_real              = round(nm$earnings * price_factor_by_year[as.character(nm$year)], 2),
           household_earnings_nominal = if (length(nm_house_earn) > 0) round(nm_house_earn, 2) else numeric(0),
-          household_earnings_real    = if (length(nm_house_earn) > 0) round(nm_house_earn * price_factor_by_year[as.character(nm$year)], 2) else numeric(0)
+          household_earnings_real    = if (length(nm_house_earn) > 0) round(nm_house_earn * price_factor_by_year[as.character(nm$year)], 2) else numeric(0),
+          scheduled                  = list(values = round(nm$net_tax,        6)),
+          payable                    = list(values = round(nm_pb$net_tax_pb,  6))
         ),
         summary = list(
           death_age = death_age,

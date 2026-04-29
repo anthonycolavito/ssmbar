@@ -314,11 +314,13 @@ const chartManager = (() => {
     });
   }
 
-  function netTaxRateChart(canvasId, { ages, values, subtitle = null,
+  function netTaxRateChart(canvasId, { ages, values, valuesSecondary = null, subtitle = null,
                                        yMin = -0.50, yMax = 0.20 }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
+
+    const dual = valuesSecondary != null;
 
     const o = makeDefaults();
     o.scales.y.min = yMin;
@@ -326,7 +328,10 @@ const chartManager = (() => {
     o.scales.y.ticks.callback = (v) => Fmt.percent(v);
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
-      label: (item)  => Fmt.percent(item.parsed.y)
+      label: (item)  => {
+        const prefix = dual ? `${item.dataset.label}: ` : '';
+        return `${prefix}${Fmt.percent(item.parsed.y)}`;
+      }
     };
     if (subtitle) {
       o.plugins.subtitle.display = true;
@@ -342,7 +347,8 @@ const chartManager = (() => {
       }
     };
 
-    const dataset = {
+    const primary = {
+      label: dual ? 'Scheduled' : '',
       data: values,
       borderColor: CHART_COLORS.taxAccent,
       fill: false,
@@ -354,10 +360,27 @@ const chartManager = (() => {
         borderColor: c => (c.p1.parsed.y >= 0 ? CHART_COLORS.taxAccent : CHART_COLORS.earnings)
       }
     };
+    const datasets = [primary];
+    if (dual) {
+      datasets.push({
+        label: 'Payable',
+        data: valuesSecondary,
+        borderColor: CHART_COLORS.taxAccentSecondary,
+        fill: false,
+        tension: 0.15,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        borderDash: SECONDARY_DASH,
+        segment: {
+          borderColor: c => (c.p1.parsed.y >= 0 ? CHART_COLORS.taxAccentSecondary : CHART_COLORS.earningsSecondary)
+        }
+      });
+    }
 
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
-      data: { labels: ages, datasets: [dataset] },
+      data: { labels: ages, datasets },
       options: o
     });
   }
