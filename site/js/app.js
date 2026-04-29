@@ -91,9 +91,7 @@ function renderNetTaxRateChart(cfg) {
   chartManager.lineChart('netTaxRateChart', {
     labels: cfg.nmtr.ages,
     data:   cfg.nmtr.values,
-    yFormat: 'percent',
-    yMin: -0.10,
-    yMax: 0.25
+    yFormat: 'percent'
   });
 }
 
