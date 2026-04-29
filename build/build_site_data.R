@@ -1,0 +1,162 @@
+# build_site_data.R
+#
+# Reshapes the four output CSVs into a single nested JSON file consumed by
+# the static dashboard at site/. Run by the GitHub Action on every push.
+#
+# Inputs:  output/benefits_by_worker_age.csv
+#          output/net_tax_on_earnings.csv
+#          output/pv_lifetime_taxes_benefits.csv
+#          output/initial_replacement_rates.csv
+# Output:  site/data/site_data.json
+
+suppressPackageStartupMessages({
+  library(jsonlite)
+})
+
+WORKER_TYPES <- c("very_low", "low", "medium", "high", "max")
+SPOUSE_TYPES <- c("none", "very_low", "low", "medium", "high", "max")
+BIRTH_YEARS  <- seq(1940, 2010, by = 5)
+CLAIM_AGE    <- 65L
+
+WORKER_LABELS <- c(
+  very_low = "Very Low Earner",
+  low      = "Low Earner",
+  medium   = "Medium Earner",
+  high     = "High Earner",
+  max      = "Maximum Earner"
+)
+SPOUSE_LABELS <- c(
+  none     = "None (Single)",
+  very_low = "Very Low Earner",
+  low      = "Low Earner",
+  medium   = "Medium Earner",
+  high     = "High Earner",
+  max      = "Maximum Earner"
+)
+
+# ---- Load --------------------------------------------------------------------
+read_csv_strict <- function(path) {
+  stopifnot(file.exists(path))
+  read.csv(path, stringsAsFactors = FALSE)
+}
+
+ben_age   <- read_csv_strict("output/benefits_by_worker_age.csv")
+nmtr      <- read_csv_strict("output/net_tax_on_earnings.csv")
+pv        <- read_csv_strict("output/pv_lifetime_taxes_benefits.csv")
+rep_rates <- read_csv_strict("output/initial_replacement_rates.csv")
+
+# ---- Validate dimensions -----------------------------------------------------
+expected_combos <- expand.grid(
+  worker_type = WORKER_TYPES,
+  spouse_type = SPOUSE_TYPES,
+  birth_yr    = BIRTH_YEARS,
+  stringsAsFactors = FALSE
+)
+expected_keys <- with(expected_combos, paste(worker_type, spouse_type, birth_yr, sep = "|"))
+
+assert_all_combos_present <- function(df, name) {
+  uniq <- unique(df[c("worker_type", "spouse_type", "birth_yr")])
+  uniq_keys <- with(uniq, paste(worker_type, spouse_type, birth_yr, sep = "|"))
+  missing <- setdiff(expected_keys, uniq_keys)
+  if (length(missing) > 0) {
+    stop(sprintf("[%s] missing %d configurations; first: %s",
+                 name, length(missing), missing[1]),
+         call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+# ben_age, nmtr, and rep_rates are required to have every (worker, spouse, birth_yr).
+# pv is allowed to be partial — the new package currently only emits PV rows where
+# the spouse's earner type is greater than or equal to the worker's. For missing
+# combos we emit null PV fields and the dashboard renders "—" instead of a value.
+assert_all_combos_present(ben_age,   "benefits_by_worker_age")
+assert_all_combos_present(nmtr,      "net_tax_on_earnings")
+assert_all_combos_present(rep_rates, "initial_replacement_rates")
+
+pv_keys     <- with(pv, paste(worker_type, spouse_type, birth_yr, sep = "|"))
+pv_missing  <- setdiff(expected_keys, pv_keys)
+n_pv_total  <- length(expected_keys)
+n_pv_have   <- n_pv_total - length(pv_missing)
+
+# ---- Build configs map -------------------------------------------------------
+configs <- list()
+
+for (w in WORKER_TYPES) {
+  for (s in SPOUSE_TYPES) {
+    for (b in BIRTH_YEARS) {
+      key <- paste(w, s, b, sep = "|")
+
+      ba <- ben_age[ben_age$worker_type == w &
+                    ben_age$spouse_type == s &
+                    ben_age$birth_yr    == b &
+                    ben_age$claim_age   == CLAIM_AGE, ]
+      ba <- ba[order(ba$age), ]
+
+      nm <- nmtr[nmtr$worker_type == w &
+                 nmtr$spouse_type == s &
+                 nmtr$birth_yr    == b &
+                 nmtr$claim_age   == CLAIM_AGE, ]
+      nm <- nm[order(nm$age), ]
+
+      pvr <- pv[pv$worker_type == w &
+                pv$spouse_type == s &
+                pv$birth_yr    == b &
+                pv$claim_age   == CLAIM_AGE, ]
+      stopifnot(nrow(pvr) %in% c(0, 1))
+      have_pv <- nrow(pvr) == 1
+
+      rr <- rep_rates[rep_rates$worker_type == w &
+                      rep_rates$spouse_type == s &
+                      rep_rates$birth_yr    == b &
+                      rep_rates$claim_age   == CLAIM_AGE, ]
+      stopifnot(nrow(rr) == 1)
+
+      ben_at_65 <- ba$real_ben[ba$age == 65]
+      stopifnot(length(ben_at_65) == 1)
+
+      configs[[key]] <- list(
+        annual = list(
+          ages     = ba$age,
+          years    = ba$year,
+          nominal  = round(ba$nominal_ben, 2),
+          real     = round(ba$real_ben,    2),
+          earnings = round(ba$earnings,    2)
+        ),
+        nmtr = list(
+          ages   = nm$age,
+          values = round(nm$net_tax, 6)
+        ),
+        summary = list(
+          monthly_real_at_65 = round(ben_at_65 / 12, 2),
+          pv_benefits        = if (have_pv) round(pvr$pv_benefits,    2) else NA_real_,
+          pv_taxes           = if (have_pv) round(pvr$pv_taxes,       2) else NA_real_,
+          ben_tax_ratio      = if (have_pv) round(pvr$ben_tax_ratio,  4) else NA_real_,
+          rep_rate_career    = round(rr$rep_rate_career, 6),
+          rep_rate_awi       = round(rr$rep_rate_awi,    6)
+        )
+      )
+    }
+  }
+}
+
+# ---- Write -------------------------------------------------------------------
+out <- list(
+  meta = list(
+    data_mode = "current_law_only",
+    claim_age = CLAIM_AGE,
+    generated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  ),
+  dimensions = list(
+    worker_types = lapply(WORKER_TYPES, function(k) list(key = k, label = unname(WORKER_LABELS[[k]]))),
+    spouse_types = lapply(SPOUSE_TYPES, function(k) list(key = k, label = unname(SPOUSE_LABELS[[k]]))),
+    birth_years  = BIRTH_YEARS
+  ),
+  configs = configs
+)
+
+dir.create("site/data", recursive = TRUE, showWarnings = FALSE)
+write_json(out, "site/data/site_data.json", auto_unbox = TRUE, digits = NA, na = "null")
+
+cat(sprintf("Wrote site/data/site_data.json with %d configs (%d with PV, %d PV-missing)\n",
+            length(configs), n_pv_have, length(pv_missing)))
