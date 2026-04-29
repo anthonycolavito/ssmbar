@@ -21,32 +21,23 @@
 
 <div class="app-container container-fluid">
 
-  <!-- Hero summary -->
-  <section class="hero" id="hero">
-    <p class="hero-lede" id="heroLede">A medium earner born in 1980 can expect at age 65:</p>
-    <p class="hero-number">
-      <span id="heroValue">--</span><span class="hero-unit"> / month</span>
-    </p>
-    <p class="hero-subline" id="heroSubline"></p>
-  </section>
-
-  <!-- Tabs -->
-  <ul class="nav nav-tabs" role="tablist">
-    <li class="nav-item">
-      <button class="nav-link active" id="tab-individual" data-tab="individual" type="button">Individual Worker</button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tab-cohort" data-tab="cohort" type="button">Cohort Comparison</button>
-    </li>
-  </ul>
-
-  <!-- Reform-status chip (shows in both tabs) -->
-  <div class="reform-chip" role="status" aria-live="polite">
-    <span class="reform-chip-dot"></span>
-    <span>Current law only · reform comparisons coming soon</span>
+  <!-- Tabs + reform-status chip (single bar at top) -->
+  <div class="tab-bar">
+    <ul class="nav nav-tabs" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active" id="tab-individual" data-tab="individual" type="button">Individual Worker</button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-cohort" data-tab="cohort" type="button">Cohort Comparison</button>
+      </li>
+    </ul>
+    <span class="reform-chip" role="status" aria-live="polite">
+      <span class="reform-chip-dot"></span>
+      <span>Current law only · reform comparisons coming soon</span>
+    </span>
   </div>
 
-  <!-- Worker config row -->
+  <!-- Worker config row (always visible, top of page) -->
   <section class="config-row">
     <div class="config-control">
       <label class="config-label">Worker Type</label>
@@ -67,6 +58,15 @@
         <button type="button" class="btn btn-outline-primary" data-mode="nominal">Nominal</button>
       </div>
     </div>
+  </section>
+
+  <!-- Hero summary (live read-out of the current selection) -->
+  <section class="hero" id="hero">
+    <p class="hero-lede" id="heroLede">A medium earner born in 1980 can expect at age 65:</p>
+    <p class="hero-number">
+      <span id="heroValue">--</span><span class="hero-unit"> / month</span>
+    </p>
+    <p class="hero-subline" id="heroSubline"></p>
   </section>
 
   <!-- Individual tab -->

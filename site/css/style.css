@@ -869,23 +869,42 @@ a:hover { color: var(--brand-blue); }
   margin: 0 auto;
 }
 
-/* --- Hero ---------------------------------------------------------------- */
+/* --- Tab bar (tabs + reform chip, top of page) --------------------------- */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+.tab-bar .nav-tabs {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.tab-bar .reform-chip {
+  margin: 0 0 0.5rem 0;   /* aligned to bottom of tab strip */
+}
+
+/* --- Hero (live summary readout, sits below the controls) --------------- */
 .hero {
   text-align: center;
-  padding: 1.5rem 1rem 1.25rem;
-  margin-bottom: 0.5rem;
+  padding: 1rem 1rem 0.5rem;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 .hero-lede {
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   color: var(--text-secondary);
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.25rem;
 }
 .hero-lede strong {
   color: var(--brand-navy);
   font-weight: 600;
 }
 .hero-number {
-  font-size: 2.6rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: var(--brand-navy);
   font-variant-numeric: tabular-nums;
@@ -894,14 +913,14 @@ a:hover { color: var(--brand-blue); }
   margin: 0;
 }
 .hero-unit {
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 400;
   color: var(--text-secondary);
 }
 .hero-subline {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   color: var(--text-secondary);
-  margin: 0.5rem 0 0;
+  margin: 0.4rem 0 0;
   line-height: 1.5;
 }
 .hero-subline strong {
@@ -940,13 +959,13 @@ a:hover { color: var(--brand-blue); }
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0.75rem 0 0.25rem;
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.7rem;
   background: rgba(15, 23, 65, 0.04);
   border: 1px solid rgba(15, 23, 65, 0.08);
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 .reform-chip-dot {
   width: 6px;
