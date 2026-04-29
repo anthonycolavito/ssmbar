@@ -1063,12 +1063,66 @@ a:hover { color: var(--brand-blue); }
   line-height: 1.4;
 }
 .summary-card .summary-info {
+  position: relative;
   display: inline-flex;
   align-items: center;
   margin-left: 0.3rem;
   color: var(--text-muted);
   cursor: help;
   font-size: 0.85em;
+}
+.summary-card .summary-info:hover,
+.summary-card .summary-info:focus {
+  color: var(--brand-navy);
+  outline: none;
+}
+
+/* CSS tooltip — replaces native `title` which was unreliable */
+.summary-info::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  background: var(--brand-navy);
+  color: #fff;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 1000;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.summary-info::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--brand-navy);
+  margin-bottom: 3px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+}
+.summary-info:hover::after,
+.summary-info:hover::before,
+.summary-info:focus::after,
+.summary-info:focus::before {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* --- Chart sections ------------------------------------------------------ */
@@ -1119,11 +1173,14 @@ a:hover { color: var(--brand-blue); }
 /* --- Cohort grid --------------------------------------------------------- */
 .cohort-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1.25rem;
 }
 .cohort-grid .chart-canvas-wrap {
-  height: 240px;
+  height: 260px;
+}
+.cohort-grid .chart-section {
+  padding: 1.1rem 1.25rem 1.4rem;
 }
 
 /* --- Data table section -------------------------------------------------- */

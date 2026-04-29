@@ -40,15 +40,15 @@ const dataLoader = (() => {
   }
 
   // Lifetime profile: working-year earnings (21–64) followed by retirement
-  // benefits (65 → life expectancy). Both series are in real 2026 dollars.
-  function getLifetimeProfile(workerType, spouseType, birthYear) {
+  // benefits (65 → life expectancy). Honours the real/nominal toggle.
+  function getLifetimeProfile(workerType, spouseType, birthYear, real = true) {
     const cfg = getConfig(workerType, spouseType, birthYear);
     const leAge = cfg.summary.death_age;
 
     const workAges = cfg.nmtr.ages;          // 21..64
-    const workVals = cfg.nmtr.earnings_real; // real 2026 $, working years
+    const workVals = real ? cfg.nmtr.earnings_real : cfg.nmtr.earnings_nominal;
     const retAgesAll = cfg.annual.ages;      // 65..119
-    const retValsAll = cfg.annual.real;      // real 2026 $, retirement years
+    const retValsAll = real ? cfg.annual.real : cfg.annual.nominal;
 
     const retAges = retAgesAll.filter(a => a <= leAge);
     const retVals = retValsAll.slice(0, retAges.length);

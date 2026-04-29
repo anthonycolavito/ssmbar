@@ -99,17 +99,19 @@ function renderSummaryCards(cfg) {
   const s = cfg.summary;
   const cards = [
     {
-      label: 'First-year monthly benefit',
+      label: 'Initial Monthly Benefit',
       value: Fmt.currency(s.monthly_real_at_65),
-      subtitle: 'Real 2026 dollars at age 65. Real benefit drifts up over retirement (CPI-W COLA vs. GDP-PI deflator).'
+      info:  'Initial benefit at age 65, 2026 dollars'
     },
     {
       label: 'PV Lifetime Benefits',
-      value: Fmt.currency(s.pv_benefits)
+      value: Fmt.currency(s.pv_benefits),
+      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars'
     },
     {
       label: 'PV Lifetime Taxes',
-      value: Fmt.currency(s.pv_taxes)
+      value: Fmt.currency(s.pv_taxes),
+      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars'
     },
     {
       label: 'Benefit / Tax Ratio',
@@ -118,23 +120,20 @@ function renderSummaryCards(cfg) {
     {
       label: 'Replacement Rate (Career)',
       value: Fmt.percent(s.rep_rate_career),
-      subtitle: "First-year benefit ÷ worker's average real lifetime earnings.",
-      info: "How much of the worker's own real average career earnings the initial Social Security benefit replaces. This is the SSA convention used in the Trustees Report scaled-earner tables."
+      info:  "Initial real benefit divided by worker's average real annual career earnings"
     },
     {
-      label: 'Replacement Rate (AWI)',
+      label: 'Replacement Rate (Average Wage)',
       value: Fmt.percent(s.rep_rate_awi),
-      subtitle: "First-year benefit ÷ economy-wide average wage in claim year.",
-      info: "How the initial benefit compares to overall U.S. average earnings in the year the worker claims. Closer to the everyday meaning of 'how generous is Social Security right now,' but differs from the SSA scaled-earner replacement rate."
+      info:  'Initial benefit divided by the national average wage.'
     }
   ];
 
   const host = document.getElementById('summaryCards');
   host.innerHTML = cards.map(c => `
     <div class="summary-card">
-      <div class="summary-label">${c.label}${c.info ? `<span class="summary-info" title="${escapeAttr(c.info)}"><i class="bi bi-info-circle"></i></span>` : ''}</div>
+      <div class="summary-label">${c.label}${c.info ? `<span class="summary-info" data-tip="${escapeAttr(c.info)}" tabindex="0" aria-label="${escapeAttr(c.info)}"><i class="bi bi-question-circle"></i></span>` : ''}</div>
       <div class="summary-value">${c.value}</div>
-      ${c.subtitle ? `<div class="summary-subtitle">${c.subtitle}</div>` : ''}
     </div>
   `).join('');
 }
@@ -148,7 +147,15 @@ function escapeAttr(s) {
 // -----------------------------------------------------------------------------
 
 function renderLifetimeProfile(cfg, state) {
-  const profile = dataLoader.getLifetimeProfile(state.workerType, state.spouseType, state.birthYear);
+  const profile = dataLoader.getLifetimeProfile(state.workerType, state.spouseType, state.birthYear, state.real);
+
+  const subtitleEl = document.getElementById('lifetimeProfileSubtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = state.real
+      ? 'Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).'
+      : 'Nominal dollars (year of receipt). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).';
+  }
+
   chartManager.lifetimeProfileChart('lifetimeProfileChart', {
     ages:           profile.ages,
     values:         profile.values,
@@ -162,8 +169,8 @@ function renderAnnualBenefitsChart(cfg, real) {
   const leAge = cfg.summary.death_age;
   const fadeIdx = (leAge != null) ? cfg.annual.ages.indexOf(leAge) : null;
   const subtitle = real
-    ? `Real 2026 dollars (GDP price index)${leAge ? `. Dashed segment beyond age ${leAge} = post-life-expectancy projection.` : '.'}`
-    : 'Nominal dollars (year of receipt).';
+    ? 'Real 2026 dollars (GDP price index)'
+    : 'Nominal dollars (year of receipt)';
   document.getElementById('annualBenefitsSubtitle').textContent = subtitle;
 
   chartManager.lineChart('annualBenefitsChart', {
@@ -190,29 +197,33 @@ function renderCohortCharts(state) {
   const w = state.workerType, s = state.spouseType;
 
   const monthly = dataLoader.getCohortSeries(w, s, 'monthly_real_at_65');
-  chartManager.barChart('cohortMonthlyChart', {
+  chartManager.cohortLineChart('cohortMonthlyChart', {
     labels: monthly.years, data: monthly.values, yFormat: 'currency'
   });
 
   const rrCareer = dataLoader.getCohortSeries(w, s, 'rep_rate_career');
-  chartManager.barChart('cohortRrCareerChart', {
+  chartManager.cohortLineChart('cohortRrCareerChart', {
     labels: rrCareer.years, data: rrCareer.values, yFormat: 'percent'
   });
 
   const rrAwi = dataLoader.getCohortSeries(w, s, 'rep_rate_awi');
-  chartManager.barChart('cohortRrAwiChart', {
+  chartManager.cohortLineChart('cohortRrAwiChart', {
     labels: rrAwi.years, data: rrAwi.values, yFormat: 'percent'
   });
 
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
-  chartManager.barChart('cohortPvBenChart', {
+  chartManager.cohortLineChart('cohortPvBenChart', {
     labels: pvBen.years, data: pvBen.values, yFormat: 'currency'
   });
 
-  // Two-color encoding for Benefit/Tax Ratio: blue ≥ 1.0, amber < 1.0.
+  // Benefit/Tax Ratio gets two-color encoding around 1.0 plus a dashed
+  // reference line at 1.0 (the "even on the program" threshold).
   const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
-  chartManager.barChart('cohortRatioChart', {
-    labels: ratio.years, data: ratio.values, yFormat: 'number', twoColorThreshold: 1.0
+  chartManager.cohortLineChart('cohortRatioChart', {
+    labels: ratio.years, data: ratio.values, yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
   });
 }
 

@@ -18,6 +18,14 @@ function makeDefaults() {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    // Use index mode + intersect:false so hover tooltips fire when the cursor
+    // is anywhere over the chart, not just exactly on a (possibly invisible)
+    // data point. This is what makes the Individual tab line charts respond
+    // to hover the same way the Cohort tab bar charts do.
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     animation: { duration: 350, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
@@ -95,26 +103,31 @@ const chartManager = (() => {
       o.plugins.subtitle.text = subtitle;
     }
     if (leMarker != null) {
-      o.plugins.annotation = {
-        annotations: {
-          le: {
-            type: 'line',
-            xMin: leMarker, xMax: leMarker,
-            borderColor: 'rgba(217, 119, 6, 0.6)',
-            borderWidth: 1,
-            borderDash: [3, 3],
-            label: {
-              display: true,
-              content: `LE ≈ ${leMarker}`,
-              position: 'start',
-              backgroundColor: 'rgba(217, 119, 6, 0.9)',
-              color: '#fff',
-              font: { family: 'Inter', size: 10 },
-              padding: 3
+      // chartjs-plugin-annotation interprets numeric xMin/xMax as category
+      // indices when the x-axis is category — convert label → index.
+      const leIdx = labels.indexOf(leMarker);
+      if (leIdx >= 0) {
+        o.plugins.annotation = {
+          annotations: {
+            le: {
+              type: 'line',
+              xMin: leIdx, xMax: leIdx,
+              borderColor: 'rgba(217, 119, 6, 0.6)',
+              borderWidth: 1,
+              borderDash: [3, 3],
+              label: {
+                display: true,
+                content: `Life Expectancy ≈ ${leMarker}`,
+                position: 'start',
+                backgroundColor: 'rgba(217, 119, 6, 0.9)',
+                color: '#fff',
+                font: { family: 'Inter', size: 10 },
+                padding: 3
+              }
             }
           }
-        }
-      };
+        };
+      }
     }
 
     const dataset = {
@@ -163,10 +176,14 @@ const chartManager = (() => {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
+    // chartjs-plugin-annotation treats numeric xMin/xMax on a category scale
+    // as indices, not label values. Convert the age values to indices.
+    const claimIdx = transitionIdx;            // index of age 65 in the combined array
+    const leIdx    = ages.indexOf(leAge);
     o.plugins.annotation = {
       annotations: {
         claim: {
-          type: 'line', xMin: 65, xMax: 65,
+          type: 'line', xMin: claimIdx, xMax: claimIdx,
           borderColor: 'rgba(0, 0, 0, 0.25)',
           borderWidth: 1, borderDash: [2, 4],
           label: {
@@ -175,16 +192,18 @@ const chartManager = (() => {
             font: { family: 'Inter', size: 10 }, padding: 3
           }
         },
-        le: {
-          type: 'line', xMin: leAge, xMax: leAge,
-          borderColor: 'rgba(217, 119, 6, 0.6)',
-          borderWidth: 1, borderDash: [3, 3],
-          label: {
-            display: true, content: `LE ≈ ${leAge}`, position: 'end',
-            backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
-            font: { family: 'Inter', size: 10 }, padding: 3
+        ...(leIdx >= 0 ? {
+          le: {
+            type: 'line', xMin: leIdx, xMax: leIdx,
+            borderColor: 'rgba(217, 119, 6, 0.6)',
+            borderWidth: 1, borderDash: [3, 3],
+            label: {
+              display: true, content: `Life Expectancy ≈ ${leAge}`, position: 'end',
+              backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
+              font: { family: 'Inter', size: 10 }, padding: 3
+            }
           }
-        }
+        } : {})
       }
     };
 
@@ -208,13 +227,18 @@ const chartManager = (() => {
     });
   }
 
-  // Net Tax Rate by Age — two-color segments + annotated age-30 spike.
-  function netTaxRateChart(canvasId, { ages, values, subtitle = null }) {
+  // Net Tax Rate by Age — two-color segments. Y-axis is bounded so the
+  // model-artifact spike at age 30 (which can dive to ~-400%) doesn't
+  // compress the rest of the chart into a flat line.
+  function netTaxRateChart(canvasId, { ages, values, subtitle = null,
+                                       yMin = -0.50, yMax = 0.20 }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
 
     const o = makeDefaults();
+    o.scales.y.min = yMin;
+    o.scales.y.max = yMax;
     o.scales.y.ticks.callback = (v) => Fmt.percent(v);
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
@@ -230,23 +254,6 @@ const chartManager = (() => {
           type: 'line', yMin: 0, yMax: 0,
           borderColor: 'rgba(0, 0, 0, 0.25)',
           borderWidth: 1, borderDash: [2, 4]
-        },
-        spike: {
-          type: 'label',
-          xValue: 33, yValue: -1.5,
-          content: [
-            'Spike at age 30: model artifact.',
-            'The full PV of accrued benefits is booked the moment',
-            'the worker first becomes fully insured.',
-            'Values from age 31 onward are the meaningful ones.'
-          ],
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          borderColor: 'rgba(0, 0, 0, 0.15)',
-          borderWidth: 1,
-          font: { family: 'Inter', size: 10 },
-          color: CHART_COLORS.axis,
-          padding: 6,
-          textAlign: 'left'
         }
       }
     };
@@ -267,6 +274,90 @@ const chartManager = (() => {
     charts[canvasId] = new Chart(ctx, {
       type: 'line',
       data: { labels: ages, datasets: [dataset] },
+      options: o
+    });
+  }
+
+  // Cohort line chart — clean line with visible round points, optional
+  // two-color encoding around a threshold, optional horizontal reference line.
+  function cohortLineChart(canvasId, opts) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    destroyExisting(canvasId);
+
+    const {
+      labels, data,
+      yFormat = 'currency',
+      twoColorThreshold = null,
+      referenceY = null,
+      referenceLabel = null,
+      subtitle = null
+    } = opts;
+
+    const o = makeDefaults();
+    o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
+    o.scales.y.beginAtZero = (yFormat === 'currency');
+    o.plugins.tooltip.callbacks = {
+      title: (items) => `Born ${items[0].label}`,
+      label: (item)  => formatYTick(item.parsed.y, yFormat)
+    };
+    if (subtitle) {
+      o.plugins.subtitle.display = true;
+      o.plugins.subtitle.text = subtitle;
+    }
+    if (referenceY != null) {
+      o.plugins.annotation = {
+        annotations: {
+          ref: {
+            type: 'line',
+            yMin: referenceY, yMax: referenceY,
+            borderColor: 'rgba(0, 0, 0, 0.28)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            label: referenceLabel ? {
+              display: true,
+              content: referenceLabel,
+              position: 'end',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              color: CHART_COLORS.axis,
+              borderColor: 'rgba(0, 0, 0, 0.15)',
+              borderWidth: 1,
+              font: { family: 'Inter', size: 10 },
+              padding: 3,
+              yAdjust: -10
+            } : { display: false }
+          }
+        }
+      };
+    }
+
+    const pointColors = (twoColorThreshold == null)
+      ? CHART_COLORS.line
+      : (data || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccent : CHART_COLORS.line);
+
+    const dataset = {
+      data,
+      borderColor: CHART_COLORS.line,
+      backgroundColor: 'rgba(37, 99, 235, 0.06)',
+      fill: false,
+      tension: 0.3,
+      pointRadius: 3.5,
+      pointHoverRadius: 6,
+      pointBackgroundColor: pointColors,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      borderWidth: 2.25
+    };
+
+    if (twoColorThreshold != null) {
+      dataset.segment = {
+        borderColor: c => (c.p1.parsed.y >= twoColorThreshold ? CHART_COLORS.line : CHART_COLORS.taxAccent)
+      };
+    }
+
+    charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [dataset] },
       options: o
     });
   }
@@ -318,5 +409,5 @@ const chartManager = (() => {
     Object.keys(charts).forEach(k => delete charts[k]);
   }
 
-  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, destroyAll };
+  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, cohortLineChart, destroyAll };
 })();
