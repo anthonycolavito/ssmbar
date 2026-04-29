@@ -37,7 +37,7 @@ spousal_benefit <- function(worker, debugg = FALSE) {
       s_rf1_ind = s_rf1[match(age, elig_age)], #First spousal reduction factor
       s_rf2_ind = s_rf2[match(age, elig_age)], #Second spousal reduction factor
       nra_ind = nra[match(age, elig_age)], #NRA for age 62 cohort
-      age_at_spouse_claim = age[match(s_age, s_claim_age)], #Age when spouse first claims benefits
+      age_at_spouse_claim = age[match(s_claim_age, s_age)], #Age when spouse first claims benefits
       spousal_ben_claim_age = pmax(claim_age, age_at_spouse_claim), #Age when worker claims spousal benefits -- cannot be before spouse claims benefits
       
       #Spousal benefit actuarial adjustment
