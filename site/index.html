@@ -132,9 +132,6 @@
       <div class="table-header">
         <h2 class="chart-title">Year-by-Year Detail</h2>
         <div class="table-actions">
-          <button id="toggleFullTableBtn" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrows-expand"></i> Show full life table
-          </button>
           <button id="downloadCsvBtn" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-download"></i> Download CSV
           </button>
@@ -148,6 +145,11 @@
 
   <!-- Cohort tab -->
   <section id="panel-cohort" class="tab-panel" hidden>
+    <div class="cohort-tab-toolbar">
+      <button id="downloadCohortCsvBtn" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download"></i> Download CSV
+      </button>
+    </div>
     <div class="cohort-grid">
       <div class="chart-section">
         <h2 class="chart-title">Monthly Benefit at 65 (Real $)</h2>

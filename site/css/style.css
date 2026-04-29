@@ -1016,6 +1016,17 @@ a:hover { color: var(--brand-blue); }
 #detailTable td.td-secondary {
   color: rgba(15, 23, 65, 0.62);
 }
+#detailTable td.td-blank {
+  color: var(--text-muted);
+  font-weight: 300;
+}
+
+/* --- Cohort tab toolbar (download button) ----------------------------- */
+.cohort-tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
 
 /* --- Tabs ---------------------------------------------------------------- */
 .nav-tabs {

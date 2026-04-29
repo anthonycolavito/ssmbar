@@ -47,6 +47,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   uiControls.onChange(state => render(state));
   render(uiControls.getState());
+
+  const cohortCsvBtn = document.getElementById('downloadCohortCsvBtn');
+  if (cohortCsvBtn) {
+    cohortCsvBtn.addEventListener('click', () => tableManager.downloadCohortCsv(uiControls.getState()));
+  }
 });
 
 function render(state) {
