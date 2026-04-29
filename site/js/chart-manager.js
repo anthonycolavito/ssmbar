@@ -95,26 +95,31 @@ const chartManager = (() => {
       o.plugins.subtitle.text = subtitle;
     }
     if (leMarker != null) {
-      o.plugins.annotation = {
-        annotations: {
-          le: {
-            type: 'line',
-            xMin: leMarker, xMax: leMarker,
-            borderColor: 'rgba(217, 119, 6, 0.6)',
-            borderWidth: 1,
-            borderDash: [3, 3],
-            label: {
-              display: true,
-              content: `LE ≈ ${leMarker}`,
-              position: 'start',
-              backgroundColor: 'rgba(217, 119, 6, 0.9)',
-              color: '#fff',
-              font: { family: 'Inter', size: 10 },
-              padding: 3
+      // chartjs-plugin-annotation interprets numeric xMin/xMax as category
+      // indices when the x-axis is category — convert label → index.
+      const leIdx = labels.indexOf(leMarker);
+      if (leIdx >= 0) {
+        o.plugins.annotation = {
+          annotations: {
+            le: {
+              type: 'line',
+              xMin: leIdx, xMax: leIdx,
+              borderColor: 'rgba(217, 119, 6, 0.6)',
+              borderWidth: 1,
+              borderDash: [3, 3],
+              label: {
+                display: true,
+                content: `LE ≈ ${leMarker}`,
+                position: 'start',
+                backgroundColor: 'rgba(217, 119, 6, 0.9)',
+                color: '#fff',
+                font: { family: 'Inter', size: 10 },
+                padding: 3
+              }
             }
           }
-        }
-      };
+        };
+      }
     }
 
     const dataset = {
@@ -163,10 +168,14 @@ const chartManager = (() => {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
+    // chartjs-plugin-annotation treats numeric xMin/xMax on a category scale
+    // as indices, not label values. Convert the age values to indices.
+    const claimIdx = transitionIdx;            // index of age 65 in the combined array
+    const leIdx    = ages.indexOf(leAge);
     o.plugins.annotation = {
       annotations: {
         claim: {
-          type: 'line', xMin: 65, xMax: 65,
+          type: 'line', xMin: claimIdx, xMax: claimIdx,
           borderColor: 'rgba(0, 0, 0, 0.25)',
           borderWidth: 1, borderDash: [2, 4],
           label: {
@@ -175,16 +184,18 @@ const chartManager = (() => {
             font: { family: 'Inter', size: 10 }, padding: 3
           }
         },
-        le: {
-          type: 'line', xMin: leAge, xMax: leAge,
-          borderColor: 'rgba(217, 119, 6, 0.6)',
-          borderWidth: 1, borderDash: [3, 3],
-          label: {
-            display: true, content: `LE ≈ ${leAge}`, position: 'end',
-            backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
-            font: { family: 'Inter', size: 10 }, padding: 3
+        ...(leIdx >= 0 ? {
+          le: {
+            type: 'line', xMin: leIdx, xMax: leIdx,
+            borderColor: 'rgba(217, 119, 6, 0.6)',
+            borderWidth: 1, borderDash: [3, 3],
+            label: {
+              display: true, content: `LE ≈ ${leAge}`, position: 'end',
+              backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
+              font: { family: 'Inter', size: 10 }, padding: 3
+            }
           }
-        }
+        } : {})
       }
     };
 
@@ -230,23 +241,6 @@ const chartManager = (() => {
           type: 'line', yMin: 0, yMax: 0,
           borderColor: 'rgba(0, 0, 0, 0.25)',
           borderWidth: 1, borderDash: [2, 4]
-        },
-        spike: {
-          type: 'label',
-          xValue: 33, yValue: -1.5,
-          content: [
-            'Spike at age 30: model artifact.',
-            'The full PV of accrued benefits is booked the moment',
-            'the worker first becomes fully insured.',
-            'Values from age 31 onward are the meaningful ones.'
-          ],
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          borderColor: 'rgba(0, 0, 0, 0.15)',
-          borderWidth: 1,
-          font: { family: 'Inter', size: 10 },
-          color: CHART_COLORS.axis,
-          padding: 6,
-          textAlign: 'left'
         }
       }
     };

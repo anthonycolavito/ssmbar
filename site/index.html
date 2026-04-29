@@ -76,10 +76,9 @@
 
     <!-- Lifetime profile chart (primary) -->
     <div class="chart-section">
-      <h2 class="chart-title">Lifetime profile — earnings then benefits</h2>
-      <div class="chart-subtitle">
-        Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64).
-        Blue = real annual Social Security benefit (age 65 to life expectancy).
+      <h2 class="chart-title">Lifetime Income Profile</h2>
+      <div class="chart-subtitle" id="lifetimeProfileSubtitle">
+        Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).
       </div>
       <div class="chart-canvas-wrap chart-canvas-wrap--tall"><canvas id="lifetimeProfileChart"></canvas></div>
     </div>
@@ -94,10 +93,7 @@
 
       <div class="chart-section">
         <h2 class="chart-title">Net Tax Rate by Age</h2>
-        <div class="chart-subtitle">
-          Marginal payroll tax rate net of accrued PV of benefits, by working-year age.
-          Negative = marginal accrued benefits exceed the 12.4% OASDI tax that year.
-        </div>
+        <div class="chart-subtitle">Payroll tax rate net of accrued value of benefits by age</div>
         <div class="chart-canvas-wrap"><canvas id="netTaxRateChart"></canvas></div>
       </div>
     </div>
