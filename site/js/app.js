@@ -197,29 +197,33 @@ function renderCohortCharts(state) {
   const w = state.workerType, s = state.spouseType;
 
   const monthly = dataLoader.getCohortSeries(w, s, 'monthly_real_at_65');
-  chartManager.barChart('cohortMonthlyChart', {
+  chartManager.cohortLineChart('cohortMonthlyChart', {
     labels: monthly.years, data: monthly.values, yFormat: 'currency'
   });
 
   const rrCareer = dataLoader.getCohortSeries(w, s, 'rep_rate_career');
-  chartManager.barChart('cohortRrCareerChart', {
+  chartManager.cohortLineChart('cohortRrCareerChart', {
     labels: rrCareer.years, data: rrCareer.values, yFormat: 'percent'
   });
 
   const rrAwi = dataLoader.getCohortSeries(w, s, 'rep_rate_awi');
-  chartManager.barChart('cohortRrAwiChart', {
+  chartManager.cohortLineChart('cohortRrAwiChart', {
     labels: rrAwi.years, data: rrAwi.values, yFormat: 'percent'
   });
 
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
-  chartManager.barChart('cohortPvBenChart', {
+  chartManager.cohortLineChart('cohortPvBenChart', {
     labels: pvBen.years, data: pvBen.values, yFormat: 'currency'
   });
 
-  // Two-color encoding for Benefit/Tax Ratio: blue ≥ 1.0, amber < 1.0.
+  // Benefit/Tax Ratio gets two-color encoding around 1.0 plus a dashed
+  // reference line at 1.0 (the "even on the program" threshold).
   const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
-  chartManager.barChart('cohortRatioChart', {
-    labels: ratio.years, data: ratio.values, yFormat: 'number', twoColorThreshold: 1.0
+  chartManager.cohortLineChart('cohortRatioChart', {
+    labels: ratio.years, data: ratio.values, yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
   });
 }
 

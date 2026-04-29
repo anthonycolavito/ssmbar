@@ -1173,11 +1173,14 @@ a:hover { color: var(--brand-blue); }
 /* --- Cohort grid --------------------------------------------------------- */
 .cohort-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1.25rem;
 }
 .cohort-grid .chart-canvas-wrap {
-  height: 240px;
+  height: 260px;
+}
+.cohort-grid .chart-section {
+  padding: 1.1rem 1.25rem 1.4rem;
 }
 
 /* --- Data table section -------------------------------------------------- */

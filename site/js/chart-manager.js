@@ -18,6 +18,14 @@ function makeDefaults() {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    // Use index mode + intersect:false so hover tooltips fire when the cursor
+    // is anywhere over the chart, not just exactly on a (possibly invisible)
+    // data point. This is what makes the Individual tab line charts respond
+    // to hover the same way the Cohort tab bar charts do.
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
     animation: { duration: 350, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
@@ -270,6 +278,90 @@ const chartManager = (() => {
     });
   }
 
+  // Cohort line chart — clean line with visible round points, optional
+  // two-color encoding around a threshold, optional horizontal reference line.
+  function cohortLineChart(canvasId, opts) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    destroyExisting(canvasId);
+
+    const {
+      labels, data,
+      yFormat = 'currency',
+      twoColorThreshold = null,
+      referenceY = null,
+      referenceLabel = null,
+      subtitle = null
+    } = opts;
+
+    const o = makeDefaults();
+    o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
+    o.scales.y.beginAtZero = (yFormat === 'currency');
+    o.plugins.tooltip.callbacks = {
+      title: (items) => `Born ${items[0].label}`,
+      label: (item)  => formatYTick(item.parsed.y, yFormat)
+    };
+    if (subtitle) {
+      o.plugins.subtitle.display = true;
+      o.plugins.subtitle.text = subtitle;
+    }
+    if (referenceY != null) {
+      o.plugins.annotation = {
+        annotations: {
+          ref: {
+            type: 'line',
+            yMin: referenceY, yMax: referenceY,
+            borderColor: 'rgba(0, 0, 0, 0.28)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            label: referenceLabel ? {
+              display: true,
+              content: referenceLabel,
+              position: 'end',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              color: CHART_COLORS.axis,
+              borderColor: 'rgba(0, 0, 0, 0.15)',
+              borderWidth: 1,
+              font: { family: 'Inter', size: 10 },
+              padding: 3,
+              yAdjust: -10
+            } : { display: false }
+          }
+        }
+      };
+    }
+
+    const pointColors = (twoColorThreshold == null)
+      ? CHART_COLORS.line
+      : (data || []).map(v => (v != null && v < twoColorThreshold) ? CHART_COLORS.taxAccent : CHART_COLORS.line);
+
+    const dataset = {
+      data,
+      borderColor: CHART_COLORS.line,
+      backgroundColor: 'rgba(37, 99, 235, 0.06)',
+      fill: false,
+      tension: 0.3,
+      pointRadius: 3.5,
+      pointHoverRadius: 6,
+      pointBackgroundColor: pointColors,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      borderWidth: 2.25
+    };
+
+    if (twoColorThreshold != null) {
+      dataset.segment = {
+        borderColor: c => (c.p1.parsed.y >= twoColorThreshold ? CHART_COLORS.line : CHART_COLORS.taxAccent)
+      };
+    }
+
+    charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [dataset] },
+      options: o
+    });
+  }
+
   function barChart(canvasId, { labels, data, yFormat = 'currency', twoColorThreshold = null, subtitle = null }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
@@ -317,5 +409,5 @@ const chartManager = (() => {
     Object.keys(charts).forEach(k => delete charts[k]);
   }
 
-  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, destroyAll };
+  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, cohortLineChart, destroyAll };
 })();
