@@ -180,10 +180,13 @@ const tableManager = (() => {
     const pvTax    = dataLoader.getCohortSeries(w, s, 'pv_taxes');
     const ratio    = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
 
+    const irr = dataLoader.getCohortSeries(w, s, 'irr');
+
     const header = [
       'birth_year', 'worker_type', 'spouse_type',
       'monthly_real_at_65_scheduled', 'monthly_real_at_65_payable',
       'ben_tax_ratio_scheduled',      'ben_tax_ratio_payable',
+      'irr_scheduled',                'irr_payable',
       'pv_benefits_scheduled',        'pv_benefits_payable',
       'pv_taxes',
       'rep_rate_career_scheduled',    'rep_rate_career_payable',
@@ -195,6 +198,7 @@ const tableManager = (() => {
         y, w, s,
         monthly.scheduled[i] ?? '',  monthly.payable[i] ?? '',
         ratio.scheduled[i] ?? '',    ratio.payable[i] ?? '',
+        irr.scheduled[i] ?? '',      irr.payable[i] ?? '',
         pvBen.scheduled[i] ?? '',    pvBen.payable[i] ?? '',
         pvTax.scheduled[i] ?? '',
         rrCareer.scheduled[i] ?? '', rrCareer.payable[i] ?? '',

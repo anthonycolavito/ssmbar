@@ -128,6 +128,12 @@ function renderSummaryCards(cfg) {
       info:  'PV Lifetime Benefits divided by PV Lifetime Taxes.'
     },
     {
+      label: 'Internal Rate of Return',
+      scheduled: Fmt.percent(s.scheduled.irr, { decimals: 2 }),
+      payable:   Fmt.percent(s.payable.irr,   { decimals: 2 }),
+      info:  'Real annualized return on lifetime OASDI contributions — the discount rate that equates the present value of taxes paid to the present value of benefits received.'
+    },
+    {
       label: 'Replacement Rate (Career)',
       scheduled: Fmt.percent(s.scheduled.rep_rate_career),
       payable:   Fmt.percent(s.payable.rep_rate_career),
@@ -291,6 +297,12 @@ function renderCohortCharts(state) {
     twoColorThreshold: 1.0,
     referenceY: 1.0,
     referenceLabel: 'Break-even (1.0)'
+  });
+
+  const irr = dataLoader.getCohortSeries(w, s, 'irr');
+  chartManager.cohortLineChart('cohortIrrChart', {
+    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', yMin: 0
   });
 
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
