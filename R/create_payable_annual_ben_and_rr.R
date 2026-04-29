@@ -33,8 +33,8 @@ pb_rr <- irr %>% left_join(tr2025 %>% select(year, payable), by=c("year_at_65"="
   mutate(
     ben_at_65_pb = ben_at_65 * payable,
     real_ben_at_65_pb = real_ben_at_65 * payable, 
-    rep_rate_awi_pb = ben_at_65 / awi_at_65,
-    rep_rate_career_pb = real_ben_at_65 / real_career_avg_earn
+    rep_rate_awi_pb = ben_at_65_pb / awi_at_65,
+    rep_rate_career_pb = real_ben_at_65_pb / real_career_avg_earn
   ) %>% select(-payable, -ben_at_65, -real_ben_at_65, -rep_rate_awi, -rep_rate_career)
 
 saveRDS(pb_rr,  "./output/pb_initial_replacement_rates.rds")
