@@ -189,6 +189,7 @@ const chartManager = (() => {
     destroyExisting(canvasId);
 
     const o = makeDefaults();
+    o.scales.y.min = 0;
     o.scales.y.ticks.callback = (v) => formatYTick(v, 'currency');
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
@@ -332,6 +333,7 @@ const chartManager = (() => {
     const {
       labels, data, dataSecondary = null,
       yFormat = 'currency',
+      yMin = null, yMax = null,
       twoColorThreshold = null,
       referenceY = null,
       referenceLabel = null,
@@ -343,6 +345,8 @@ const chartManager = (() => {
     const o = makeDefaults();
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     o.scales.y.beginAtZero = (yFormat === 'currency');
+    if (yMin != null) o.scales.y.min = yMin;
+    if (yMax != null) o.scales.y.max = yMax;
     o.plugins.tooltip.callbacks = {
       title: (items) => `Born ${items[0].label}`,
       label: (item)  => {

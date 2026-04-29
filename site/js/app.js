@@ -217,6 +217,7 @@ function renderAnnualBenefitsChart(cfg, real) {
     data:          sched,
     dataSecondary: pay,
     yFormat:       'currency',
+    yMin:          0,
     leMarker:      leAge,
     fadeAfterIdx:  (fadeIdx != null && fadeIdx >= 0) ? fadeIdx : null
   });
@@ -271,16 +272,15 @@ function renderCohortCharts(state) {
     yFormat: 'currency'
   });
 
-  const rrCareer = dataLoader.getCohortSeries(w, s, 'rep_rate_career');
-  chartManager.cohortLineChart('cohortRrCareerChart', {
-    labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
-    yFormat: 'percent'
-  });
-
-  const rrAwi = dataLoader.getCohortSeries(w, s, 'rep_rate_awi');
-  chartManager.cohortLineChart('cohortRrAwiChart', {
-    labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
-    yFormat: 'percent'
+  // Benefit/Tax Ratio: solid scheduled + dashed payable, dashed reference at
+  // 1.0; threshold colouring suppressed when both lines are shown so the
+  // dual-line story stays readable.
+  const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
+  chartManager.cohortLineChart('cohortRatioChart', {
+    labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
   });
 
   const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
@@ -296,15 +296,24 @@ function renderCohortCharts(state) {
     yFormat: 'currency'
   });
 
-  // Benefit/Tax Ratio: solid scheduled + dashed payable, dashed reference at
-  // 1.0; threshold colouring suppressed when both lines are shown so the
-  // dual-line story stays readable.
-  const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
-  chartManager.cohortLineChart('cohortRatioChart', {
-    labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
-    yFormat: 'number',
-    referenceY: 1.0,
-    referenceLabel: 'Break-even (1.0)'
+  // The two replacement-rate charts share a common y-axis (0 to the larger of
+  // the two metrics' max across cohorts and scenarios) so they're directly
+  // comparable.
+  const rrCareer = dataLoader.getCohortSeries(w, s, 'rep_rate_career');
+  const rrAwi    = dataLoader.getCohortSeries(w, s, 'rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortLineChart('cohortRrCareerChart', {
+    labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+  chartManager.cohortLineChart('cohortRrAwiChart', {
+    labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
   });
 }
 
