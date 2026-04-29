@@ -1,0 +1,49 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'R/**'
+      - 'output/**'
+      - 'site/**'
+      - 'build/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+
+      - name: Install jsonlite
+        run: Rscript -e 'install.packages("jsonlite", repos = "https://cloud.r-project.org")'
+
+      - name: Build site data
+        run: Rscript build/build_site_data.R
+
+      - name: Verify JSON exists
+        run: |
+          test -f site/data/site_data.json
+          echo "site_data.json size: $(wc -c < site/data/site_data.json) bytes"
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy site from ${{ github.sha }}'
