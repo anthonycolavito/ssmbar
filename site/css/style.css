@@ -869,6 +869,46 @@ a:hover { color: var(--brand-blue); }
   margin: 0 auto;
 }
 
+/* --- Hero ---------------------------------------------------------------- */
+.hero {
+  text-align: center;
+  padding: 1.5rem 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.hero-lede {
+  font-size: 0.98rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.4rem;
+}
+.hero-lede strong {
+  color: var(--brand-navy);
+  font-weight: 600;
+}
+.hero-number {
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 1.05;
+  margin: 0;
+}
+.hero-unit {
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.hero-subline {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0;
+  line-height: 1.5;
+}
+.hero-subline strong {
+  color: var(--brand-navy);
+  font-weight: 600;
+}
+
 /* --- Tabs ---------------------------------------------------------------- */
 .nav-tabs {
   border-bottom: 1px solid var(--border);
@@ -895,21 +935,42 @@ a:hover { color: var(--brand-blue); }
 .tab-panel { display: block; }
 .tab-panel[hidden] { display: none !important; }
 
+/* --- Reform-status chip -------------------------------------------------- */
+.reform-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.35rem 0.7rem;
+  background: rgba(15, 23, 65, 0.04);
+  border: 1px solid rgba(15, 23, 65, 0.08);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.reform-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.6;
+}
+
 /* --- Worker config row --------------------------------------------------- */
 .config-row {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  padding: 1rem 0 1.25rem;
+  display: grid;
+  grid-template-columns: 1.6fr 1.6fr 1fr 1fr;
+  gap: 1.25rem;
+  align-items: end;
+  padding: 0.75rem 0 1rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 .config-control {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  min-width: 160px;
+  min-width: 0;
 }
 .config-label {
   font-size: 0.72rem;
@@ -918,6 +979,12 @@ a:hover { color: var(--brand-blue); }
   letter-spacing: 0.06em;
   font-weight: 600;
   margin-bottom: 0;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .config-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* --- Summary cards ------------------------------------------------------- */
@@ -942,18 +1009,27 @@ a:hover { color: var(--brand-blue); }
   font-weight: 600;
 }
 .summary-card .summary-value {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--brand-navy);
   margin-top: 0.25rem;
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 .summary-card .summary-subtitle {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  font-style: italic;
+  font-size: 0.74rem;
+  color: var(--text-muted);
   margin-top: 0.4rem;
-  line-height: 1.35;
+  line-height: 1.4;
+}
+.summary-card .summary-info {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.3rem;
+  color: var(--text-muted);
+  cursor: help;
+  font-size: 0.85em;
 }
 
 /* --- Chart sections ------------------------------------------------------ */
@@ -980,7 +1056,25 @@ a:hover { color: var(--brand-blue); }
 .chart-canvas-wrap {
   position: relative;
   width: 100%;
-  height: 320px;
+  height: 300px;
+}
+.chart-canvas-wrap--tall {
+  height: 380px;
+}
+
+/* --- Secondary charts row ----------------------------------------------- */
+.secondary-charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 1000px) {
+  .secondary-charts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .secondary-charts .chart-canvas-wrap {
+    height: 260px;
+  }
 }
 
 /* --- Cohort grid --------------------------------------------------------- */
@@ -1007,6 +1101,23 @@ a:hover { color: var(--brand-blue); }
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.table-section .table-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+#detailTable th,
+#detailTable td {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+#detailTable tbody tr:nth-child(odd) td {
+  background: rgba(243, 244, 246, 0.4);
+}
+#detailTable tbody tr:hover td {
+  background: rgba(37, 99, 235, 0.06);
 }
 .table-wrap {
   max-height: 360px;
@@ -1024,25 +1135,33 @@ a:hover { color: var(--brand-blue); }
   z-index: 1;
 }
 
-/* --- Reform placeholder card -------------------------------------------- */
-.reform-placeholder {
-  display: flex;
-  gap: 0.625rem;
-  align-items: flex-start;
-  padding: 0.875rem 1rem;
-  margin: 2rem 0 0.5rem;
-  background: var(--bg-card-alt);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
+/* --- Methodology footer ------------------------------------------------- */
+.methodology {
+  margin-top: 2.5rem;
+  padding: 1.25rem 0 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  line-height: 1.55;
   color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.45;
+  max-width: 70ch;
 }
-.reform-placeholder .bi {
-  font-size: 1.1rem;
+.methodology p {
+  margin-bottom: 0.5rem;
+}
+.methodology strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.methodology-meta {
+  font-size: 0.75rem;
   color: var(--text-muted);
-  flex-shrink: 0;
-  margin-top: 0.1rem;
+}
+.methodology-meta a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+.methodology-meta a:hover {
+  text-decoration: underline;
 }
 
 /* --- Worker type segmented control --------------------------------------- */

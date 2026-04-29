@@ -21,6 +21,15 @@
 
 <div class="app-container container-fluid">
 
+  <!-- Hero summary -->
+  <section class="hero" id="hero">
+    <p class="hero-lede" id="heroLede">A medium earner born in 1980 can expect at age 65:</p>
+    <p class="hero-number">
+      <span id="heroValue">--</span><span class="hero-unit"> / month</span>
+    </p>
+    <p class="hero-subline" id="heroSubline"></p>
+  </section>
+
   <!-- Tabs -->
   <ul class="nav nav-tabs" role="tablist">
     <li class="nav-item">
@@ -31,7 +40,13 @@
     </li>
   </ul>
 
-  <!-- Worker config row (always visible above both tabs) -->
+  <!-- Reform-status chip (shows in both tabs) -->
+  <div class="reform-chip" role="status" aria-live="polite">
+    <span class="reform-chip-dot"></span>
+    <span>Current law only · reform comparisons coming soon</span>
+  </div>
+
+  <!-- Worker config row -->
   <section class="config-row">
     <div class="config-control">
       <label class="config-label">Worker Type</label>
@@ -59,24 +74,46 @@
     <!-- Summary cards -->
     <div class="summary-grid" id="summaryCards"></div>
 
-    <!-- Charts -->
+    <!-- Lifetime profile chart (primary) -->
     <div class="chart-section">
-      <h2 class="chart-title">Annual Benefits by Age</h2>
-      <div class="chart-canvas-wrap"><canvas id="annualBenefitsChart"></canvas></div>
+      <h2 class="chart-title">Lifetime profile — earnings then benefits</h2>
+      <div class="chart-subtitle">
+        Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64).
+        Blue = real annual Social Security benefit (age 65 to life expectancy).
+      </div>
+      <div class="chart-canvas-wrap chart-canvas-wrap--tall"><canvas id="lifetimeProfileChart"></canvas></div>
     </div>
 
-    <div class="chart-section">
-      <h2 class="chart-title">Net Tax Rate by Age</h2>
-      <div class="chart-canvas-wrap"><canvas id="netTaxRateChart"></canvas></div>
+    <!-- Secondary charts row: retirement detail + NMTR -->
+    <div class="secondary-charts">
+      <div class="chart-section">
+        <h2 class="chart-title">Annual Benefits by Age</h2>
+        <div class="chart-subtitle" id="annualBenefitsSubtitle">Real 2026 dollars.</div>
+        <div class="chart-canvas-wrap"><canvas id="annualBenefitsChart"></canvas></div>
+      </div>
+
+      <div class="chart-section">
+        <h2 class="chart-title">Net Tax Rate by Age</h2>
+        <div class="chart-subtitle">
+          Marginal payroll tax rate net of accrued PV of benefits, by working-year age.
+          Negative = marginal accrued benefits exceed the 12.4% OASDI tax that year.
+        </div>
+        <div class="chart-canvas-wrap"><canvas id="netTaxRateChart"></canvas></div>
+      </div>
     </div>
 
     <!-- Data table -->
     <div class="table-section">
       <div class="table-header">
         <h2 class="chart-title">Year-by-Year Detail</h2>
-        <button id="downloadCsvBtn" class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-download"></i> Download CSV
-        </button>
+        <div class="table-actions">
+          <button id="toggleFullTableBtn" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrows-expand"></i> Show full life table
+          </button>
+          <button id="downloadCsvBtn" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-download"></i> Download CSV
+          </button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="detailTable" class="table table-sm table-hover"></table>
@@ -93,12 +130,12 @@
       </div>
       <div class="chart-section">
         <h2 class="chart-title">Replacement Rate (Career)</h2>
-        <div class="chart-subtitle">Initial benefit as a share of the worker's average real career earnings.</div>
+        <div class="chart-subtitle">First-year benefit ÷ worker's average real lifetime earnings.</div>
         <div class="chart-canvas-wrap"><canvas id="cohortRrCareerChart"></canvas></div>
       </div>
       <div class="chart-section">
         <h2 class="chart-title">Replacement Rate (AWI)</h2>
-        <div class="chart-subtitle">Initial benefit as a share of that year's average wage index.</div>
+        <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
         <div class="chart-canvas-wrap"><canvas id="cohortRrAwiChart"></canvas></div>
       </div>
       <div class="chart-section">
@@ -107,22 +144,48 @@
       </div>
       <div class="chart-section">
         <h2 class="chart-title">Benefit / Tax Ratio</h2>
+        <div class="chart-subtitle">Blue ≥ 1.0 (lifetime net beneficiary). Amber &lt; 1.0 (net taxpayer).</div>
         <div class="chart-canvas-wrap"><canvas id="cohortRatioChart"></canvas></div>
       </div>
     </div>
   </section>
 
-  <!-- Reform placeholder -->
-  <aside class="reform-placeholder">
-    <i class="bi bi-info-circle"></i>
-    Reforms not yet supported in this version. The new ssmbar package computes
-    current-law benefits only; reform comparisons may be added in a future release.
-  </aside>
+  <!-- Methodology footer -->
+  <footer class="methodology" id="methodology">
+    <p>
+      <strong>About this dashboard.</strong>
+      Benefits are computed at claim age 65 under current law, using SSA's 2025 Trustees
+      Report intermediate assumptions. Real values are expressed in 2026 dollars using the
+      GDP price index. Period unisex life expectancy at age 65 is the simple average of
+      male and female period LE-at-65 from the Trustees Report, not a weighted population
+      average. Earnings profiles follow SSA scaled-earner conventions (very-low, low,
+      medium, high, max). A worker with custom dollar earnings — e.g., $50,000 — is not
+      directly modeled, but their benefit can be approximated by interpolating between
+      adjacent scaled types. Spousal benefits are modeled at the household level: the
+      worker's own retired-worker benefit, the worker's spousal benefit on the partner's
+      record, and the partner's spousal benefit on the worker's record. Both spouses are
+      assumed to share the worker's birth year and claim age. Replacement rates are
+      first-year benefit ratios, not lifetime averages.
+    </p>
+    <p class="methodology-meta">
+      Data: SSA Trustees Report 2025 · Built <span id="metaGenerated">—</span> ·
+      <a href="https://github.com/anthonycolavito/ssmbar">Source on GitHub</a>
+    </p>
+  </footer>
 
 </div>
 
 <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script>
+  // Register the annotation plugin once the libraries have loaded.
+  if (typeof Chart !== 'undefined' && typeof window.ChartAnnotation !== 'undefined') {
+    Chart.register(window.ChartAnnotation);
+  } else if (typeof Chart !== 'undefined' && typeof window['chartjs-plugin-annotation'] !== 'undefined') {
+    Chart.register(window['chartjs-plugin-annotation']);
+  }
+</script>
 
 <!-- App scripts -->
 <script src="js/formatters.js"></script>

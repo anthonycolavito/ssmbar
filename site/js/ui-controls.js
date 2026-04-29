@@ -6,7 +6,7 @@ const uiControls = (() => {
   const state = {
     workerType: 'medium',
     spouseType: 'none',
-    birthYear:  1960,
+    birthYear:  1980,
     real:       true
   };
 

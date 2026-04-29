@@ -39,5 +39,29 @@ const dataLoader = (() => {
     return { years, values };
   }
 
-  return { init, ready, meta, dimensions, getConfig, getCohortSeries };
+  // Lifetime profile: working-year earnings (21–64) followed by retirement
+  // benefits (65 → life expectancy). Both series are in real 2026 dollars.
+  function getLifetimeProfile(workerType, spouseType, birthYear) {
+    const cfg = getConfig(workerType, spouseType, birthYear);
+    const leAge = cfg.summary.death_age;
+
+    const workAges = cfg.nmtr.ages;          // 21..64
+    const workVals = cfg.nmtr.earnings_real; // real 2026 $, working years
+    const retAgesAll = cfg.annual.ages;      // 65..119
+    const retValsAll = cfg.annual.real;      // real 2026 $, retirement years
+
+    const retAges = retAgesAll.filter(a => a <= leAge);
+    const retVals = retValsAll.slice(0, retAges.length);
+
+    const ages   = [...workAges, ...retAges];
+    const values = [...workVals, ...retVals];
+    const transitionIdx = workAges.length;   // first retirement-year index
+
+    if (ages[transitionIdx] !== 65) {
+      throw new Error(`Lifetime profile transition mis-aligned: ages[${transitionIdx}]=${ages[transitionIdx]}, expected 65`);
+    }
+    return { ages, values, transitionIdx, leAge };
+  }
+
+  return { init, ready, meta, dimensions, getConfig, getCohortSeries, getLifetimeProfile };
 })();

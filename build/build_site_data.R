@@ -155,6 +155,7 @@ for (w in WORKER_TYPES) {
         ),
         nmtr = list(
           ages              = nm$age,
+          years             = nm$year,
           values            = round(nm$net_tax, 6),
           earnings_nominal  = round(nm$earnings, 2),
           earnings_real     = round(nm$earnings * price_factor_by_year[as.character(nm$year)], 2)
