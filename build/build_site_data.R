@@ -16,6 +16,8 @@
 #     output/pb_net_tax_on_earnings.csv  (carries net_tax_pb; net_tax_sched
 #                                         column is redundant with the
 #                                         scheduled file and ignored)
+#   Internal rate of return (real, both scenarios in one file):
+#     output/irr_by_config.csv
 #
 # Output: site/data/site_data.json
 
@@ -68,6 +70,7 @@ ben_age_pb   <- read_csv_strict("output/pb_benefits_by_worker_age.csv")
 pv_pb        <- read_csv_strict("output/pb_pv_lifetime_taxes_benefits.csv")
 rep_rates_pb <- read_csv_strict("output/pb_initial_replacement_rates.csv")
 nmtr_pb      <- read_csv_strict("output/pb_net_tax_on_earnings.csv")
+irr          <- read_csv_strict("output/irr_by_config.csv")
 
 # Period unisex life expectancy at age 65 by claim year, derived from tr2025.
 load("data/tr2025.rda")
@@ -131,6 +134,7 @@ assert_all_combos_present(ben_age,      "benefits_by_worker_age")
 assert_all_combos_present(rep_rates,    "initial_replacement_rates")
 assert_all_combos_present(ben_age_pb,   "pb_benefits_by_worker_age")
 assert_all_combos_present(rep_rates_pb, "pb_initial_replacement_rates")
+assert_all_combos_present(irr,          "irr_by_config")
 nmtr_missing_years <- report_missing_combos(nmtr, "net_tax_on_earnings")
 
 # pv (and pv_pb) are de-duplicated under primary/spouse swap; the union of
@@ -196,7 +200,8 @@ for (w in WORKER_TYPES) {
 
       rr    <- lookup_one(rep_rates,    w, s, b)
       rr_pb <- lookup_one(rep_rates_pb, w, s, b)
-      stopifnot(nrow(rr) == 1, nrow(rr_pb) == 1)
+      irrr  <- lookup_one(irr,          w, s, b)
+      stopifnot(nrow(rr) == 1, nrow(rr_pb) == 1, nrow(irrr) == 1)
 
       ben_at_65    <- ba$real_ben[ba$age == 65]
       ben_at_65_pb <- ba_pb$real_ben_pb[ba_pb$age == 65]
@@ -270,14 +275,16 @@ for (w in WORKER_TYPES) {
             pv_benefits        = if (have_pv) round(pvr$pv_benefits,   2) else NA_real_,
             ben_tax_ratio      = if (have_pv) round(pvr$ben_tax_ratio, 4) else NA_real_,
             rep_rate_career    = round(rr$rep_rate_career, 6),
-            rep_rate_awi       = round(rr$rep_rate_awi,    6)
+            rep_rate_awi       = round(rr$rep_rate_awi,    6),
+            irr                = round(irrr$irr_scheduled, 6)
           ),
           payable = list(
             monthly_real_at_65 = round(ben_at_65_pb / 12, 2),
             pv_benefits        = if (have_pv_pb) round(pvr_pb$pv_ben_pb,        2) else NA_real_,
             ben_tax_ratio      = if (have_pv_pb) round(pvr_pb$ben_tax_ratio_pb, 4) else NA_real_,
             rep_rate_career    = round(rr_pb$rep_rate_career_pb, 6),
-            rep_rate_awi       = round(rr_pb$rep_rate_awi_pb,    6)
+            rep_rate_awi       = round(rr_pb$rep_rate_awi_pb,    6),
+            irr                = round(irrr$irr_payable,   6)
           )
         )
       )
