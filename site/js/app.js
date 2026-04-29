@@ -106,16 +106,17 @@ function renderSummaryCards(cfg) {
     {
       label: 'PV Lifetime Benefits',
       value: Fmt.currency(s.pv_benefits),
-      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars'
+      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
     },
     {
       label: 'PV Lifetime Taxes',
       value: Fmt.currency(s.pv_taxes),
-      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars'
+      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
     },
     {
       label: 'Benefit / Tax Ratio',
-      value: (s.ben_tax_ratio == null) ? '--' : s.ben_tax_ratio.toFixed(2)
+      value: (s.ben_tax_ratio == null) ? '--' : s.ben_tax_ratio.toFixed(2),
+      info:  'PV Lifetime Benefits divided by PV Lifetime Taxes.'
     },
     {
       label: 'Replacement Rate (Career)',
@@ -198,10 +199,19 @@ function renderAnnualBenefitsChart(cfg, real) {
 function renderNetTaxRateChart(cfg) {
   const canvas  = document.getElementById('netTaxRateChart');
   const empty   = document.getElementById('netTaxRateEmpty');
-  const hasData = dataLoader.hasNmtr(cfg);
+  const pending = dataLoader.nmtrValuesPending();
+  const hasData = dataLoader.hasNmtr(cfg) && !pending;
 
   if (canvas) canvas.hidden = !hasData;
-  if (empty)  empty.hidden  =  hasData;
+  if (empty) {
+    empty.hidden = hasData;
+    const msg = empty.querySelector('span');
+    if (msg) {
+      msg.textContent = pending
+        ? 'Net tax rate data is being recomputed — currently unavailable.'
+        : 'Net tax data is not yet available for this cohort.';
+    }
+  }
 
   if (!hasData) {
     chartManager.destroyChart('netTaxRateChart');
