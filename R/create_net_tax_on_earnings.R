@@ -50,7 +50,7 @@ source("./R/calc_tax.R")
 # ---- Configuration -----------------------------------------------------------
 worker_types  <- c("very_low", "low", "medium", "high", "max")
 spouse_types  <- c("none", "very_low", "low", "medium", "high", "max")
-new_cohorts <- c(1940L, 1945L, 1955L, 1965L, 1975L, 1985L, 1995L, 2005L)
+new_cohorts <- c(1940L, 1945L, 1950L, 1955L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2005L, 2010L)
 birth_years   <- new_cohorts
 claim_age     <- 65L
 career_length <- 44L
