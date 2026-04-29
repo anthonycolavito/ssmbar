@@ -67,17 +67,19 @@ assert_all_combos_present <- function(df, name) {
 }
 
 # ben_age, nmtr, and rep_rates are required to have every (worker, spouse, birth_yr).
-# pv is allowed to be partial — the new package currently only emits PV rows where
-# the spouse's earner type is greater than or equal to the worker's. For missing
-# combos we emit null PV fields and the dashboard renders "—" instead of a value.
+# pv is de-duplicated: for two non-zero earners, the household's PV is symmetric
+# under swapping primary/spouse, so the package stores only the canonical ordering.
+# When the direct (worker, spouse) lookup is missing, we fall back to (spouse, worker).
+# After the fallback, the union should cover all 450 configs.
 assert_all_combos_present(ben_age,   "benefits_by_worker_age")
 assert_all_combos_present(nmtr,      "net_tax_on_earnings")
 assert_all_combos_present(rep_rates, "initial_replacement_rates")
 
-pv_keys     <- with(pv, paste(worker_type, spouse_type, birth_yr, sep = "|"))
-pv_missing  <- setdiff(expected_keys, pv_keys)
-n_pv_total  <- length(expected_keys)
-n_pv_have   <- n_pv_total - length(pv_missing)
+pv_keys_direct  <- with(pv, paste(worker_type, spouse_type, birth_yr, sep = "|"))
+pv_keys_swapped <- with(pv, paste(spouse_type, worker_type, birth_yr, sep = "|"))
+pv_keys_all     <- union(pv_keys_direct, pv_keys_swapped)
+pv_uncovered    <- setdiff(expected_keys, pv_keys_all)
+n_pv_have       <- length(expected_keys) - length(pv_uncovered)
 
 # ---- Build configs map -------------------------------------------------------
 configs <- list()
@@ -103,6 +105,13 @@ for (w in WORKER_TYPES) {
                 pv$spouse_type == s &
                 pv$birth_yr    == b &
                 pv$claim_age   == CLAIM_AGE, ]
+      if (nrow(pvr) == 0 && s != "none" && w != "none") {
+        # Fall back to the swapped pair — household PV is symmetric.
+        pvr <- pv[pv$worker_type == s &
+                  pv$spouse_type == w &
+                  pv$birth_yr    == b &
+                  pv$claim_age   == CLAIM_AGE, ]
+      }
       stopifnot(nrow(pvr) %in% c(0, 1))
       have_pv <- nrow(pvr) == 1
 
@@ -159,4 +168,8 @@ dir.create("site/data", recursive = TRUE, showWarnings = FALSE)
 write_json(out, "site/data/site_data.json", auto_unbox = TRUE, digits = NA, na = "null")
 
 cat(sprintf("Wrote site/data/site_data.json with %d configs (%d with PV, %d PV-missing)\n",
-            length(configs), n_pv_have, length(pv_missing)))
+            length(configs), n_pv_have, length(pv_uncovered)))
+if (length(pv_uncovered) > 0) {
+  warning(sprintf("PV remains missing for %d configs after symmetric fallback; first: %s",
+                  length(pv_uncovered), pv_uncovered[1]))
+}
