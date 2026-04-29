@@ -977,13 +977,18 @@ a:hover { color: var(--brand-blue); }
 
 /* --- Worker config row --------------------------------------------------- */
 .config-row {
-  display: grid;
-  grid-template-columns: 1.6fr 1.6fr 1fr 1fr;
-  gap: 1.25rem;
-  align-items: end;
-  padding: 0.75rem 0 1rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1.25rem 1.75rem;
+  padding: 1rem 1.25rem 1.1rem;
+  margin: 0.75rem auto 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  box-shadow: var(--shadow-card);
+  max-width: 1080px;
 }
 .config-control {
   display: flex;
@@ -991,6 +996,10 @@ a:hover { color: var(--brand-blue); }
   gap: 0.35rem;
   min-width: 0;
 }
+.config-control--worker { min-width: 320px; }
+.config-control--spouse { min-width: 200px; }
+.config-control--cohort { min-width: 130px; }
+.config-control--dollars { min-width: 150px; }
 .config-label {
   font-size: 0.72rem;
   color: var(--text-secondary);
@@ -999,10 +1008,20 @@ a:hover { color: var(--brand-blue); }
   font-weight: 600;
   margin-bottom: 0;
   white-space: nowrap;
+  text-align: center;
 }
 @media (max-width: 768px) {
   .config-row {
-    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 0.875rem 0.875rem 1rem;
+  }
+  .config-control,
+  .config-control--worker,
+  .config-control--spouse,
+  .config-control--cohort,
+  .config-control--dollars {
+    min-width: 0;
+    flex-basis: 100%;
   }
 }
 
