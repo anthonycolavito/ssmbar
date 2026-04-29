@@ -39,6 +39,7 @@ prep_assumptions <- function(dataset) {
     extension$ret2             <- NA_real_
     extension$old_law_base     <- NA_real_
     extension$special_min_rate <- NA_real_
+    extension$payable <- assume$payable[which(assume$year == 2100)]
     
     assume <- rbind(assume, extension)
   }
