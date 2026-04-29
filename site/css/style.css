@@ -864,6 +864,8 @@ a:hover { color: var(--brand-blue); }
    ============================================================================= */
 
 .app-container {
+  display: block;
+  min-height: 0;
   padding: 1.5rem;
   max-width: 1200px;
   margin: 0 auto;
