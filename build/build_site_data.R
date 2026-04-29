@@ -18,6 +18,8 @@
 #                                         scheduled file and ignored)
 #   Internal rate of return (real, both scenarios in one file):
 #     output/irr_by_config.csv
+#   Marginal IRR by working-age year (real, both scenarios):
+#     output/marginal_irr_by_age.csv
 #
 # Output: site/data/site_data.json
 
@@ -71,6 +73,7 @@ pv_pb        <- read_csv_strict("output/pb_pv_lifetime_taxes_benefits.csv")
 rep_rates_pb <- read_csv_strict("output/pb_initial_replacement_rates.csv")
 nmtr_pb      <- read_csv_strict("output/pb_net_tax_on_earnings.csv")
 irr          <- read_csv_strict("output/irr_by_config.csv")
+mirr         <- read_csv_strict("output/marginal_irr_by_age.csv")
 
 # Period unisex life expectancy at age 65 by claim year, derived from tr2025.
 load("data/tr2025.rda")
@@ -186,10 +189,14 @@ for (w in WORKER_TYPES) {
       ba_pb <- lookup_panel(ben_age_pb, w, s, b)
       nm    <- lookup_panel(nmtr,       w, s, b)
       nm_pb <- lookup_panel(nmtr_pb,    w, s, b)
+      mr    <- lookup_panel(mirr,       w, s, b)
       stopifnot(nrow(ba_pb) == nrow(ba), all(ba_pb$age == ba$age))
       if (nrow(nm) > 0) {
         stopifnot(nrow(nm_pb) == nrow(nm), all(nm_pb$age == nm$age))
+        stopifnot(nrow(mr)    == nrow(nm), all(mr$age    == nm$age))
       }
+      mirr_final_sched <- if (nrow(mr) > 0) mr$marginal_irr_scheduled[mr$age == 64L] else NA_real_
+      mirr_final_pay   <- if (nrow(mr) > 0) mr$marginal_irr_payable  [mr$age == 64L] else NA_real_
 
       pvr    <- lookup_one(pv,    w, s, b, swap_fallback = TRUE)
       pvr_pb <- lookup_one(pv_pb, w, s, b, swap_fallback = TRUE)
@@ -263,28 +270,36 @@ for (w in WORKER_TYPES) {
           earnings_real              = round(nm$earnings * price_factor_by_year[as.character(nm$year)], 2),
           household_earnings_nominal = if (length(nm_house_earn) > 0) round(nm_house_earn, 2) else numeric(0),
           household_earnings_real    = if (length(nm_house_earn) > 0) round(nm_house_earn * price_factor_by_year[as.character(nm$year)], 2) else numeric(0),
-          scheduled                  = list(values = round(nm$net_tax,        6)),
-          payable                    = list(values = round(nm_pb$net_tax_pb,  6))
+          scheduled                  = list(
+            values        = round(nm$net_tax, 6),
+            marginal_irr  = if (nrow(mr) > 0) round(mr$marginal_irr_scheduled, 6) else numeric(0)
+          ),
+          payable                    = list(
+            values        = round(nm_pb$net_tax_pb, 6),
+            marginal_irr  = if (nrow(mr) > 0) round(mr$marginal_irr_payable,   6) else numeric(0)
+          )
         ),
         summary = list(
           death_age = death_age,
           nra       = round(nra, 4),
           pv_taxes  = if (have_pv) round(pvr$pv_taxes, 2) else NA_real_,
           scheduled = list(
-            monthly_real_at_65 = round(ben_at_65 / 12, 2),
-            pv_benefits        = if (have_pv) round(pvr$pv_benefits,   2) else NA_real_,
-            ben_tax_ratio      = if (have_pv) round(pvr$ben_tax_ratio, 4) else NA_real_,
-            rep_rate_career    = round(rr$rep_rate_career, 6),
-            rep_rate_awi       = round(rr$rep_rate_awi,    6),
-            irr                = round(irrr$irr_scheduled, 6)
+            monthly_real_at_65    = round(ben_at_65 / 12, 2),
+            pv_benefits           = if (have_pv) round(pvr$pv_benefits,   2) else NA_real_,
+            ben_tax_ratio         = if (have_pv) round(pvr$ben_tax_ratio, 4) else NA_real_,
+            rep_rate_career       = round(rr$rep_rate_career, 6),
+            rep_rate_awi          = round(rr$rep_rate_awi,    6),
+            irr                   = round(irrr$irr_scheduled, 6),
+            marginal_irr_age64    = if (length(mirr_final_sched) == 1) round(mirr_final_sched, 6) else NA_real_
           ),
           payable = list(
-            monthly_real_at_65 = round(ben_at_65_pb / 12, 2),
-            pv_benefits        = if (have_pv_pb) round(pvr_pb$pv_ben_pb,        2) else NA_real_,
-            ben_tax_ratio      = if (have_pv_pb) round(pvr_pb$ben_tax_ratio_pb, 4) else NA_real_,
-            rep_rate_career    = round(rr_pb$rep_rate_career_pb, 6),
-            rep_rate_awi       = round(rr_pb$rep_rate_awi_pb,    6),
-            irr                = round(irrr$irr_payable,   6)
+            monthly_real_at_65    = round(ben_at_65_pb / 12, 2),
+            pv_benefits           = if (have_pv_pb) round(pvr_pb$pv_ben_pb,        2) else NA_real_,
+            ben_tax_ratio         = if (have_pv_pb) round(pvr_pb$ben_tax_ratio_pb, 4) else NA_real_,
+            rep_rate_career       = round(rr_pb$rep_rate_career_pb, 6),
+            rep_rate_awi          = round(rr_pb$rep_rate_awi_pb,    6),
+            irr                   = round(irrr$irr_payable,   6),
+            marginal_irr_age64    = if (length(mirr_final_pay) == 1) round(mirr_final_pay, 6) else NA_real_
           )
         )
       )
