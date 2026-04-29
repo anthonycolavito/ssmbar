@@ -151,7 +151,7 @@ all_flows <- grid %>%
 # ---- LE-based death age (truncation cap) ------------------------------------
 le_at_65 <- tr2025 %>%
   transmute(year_at_65 = year,
-            death_age  = round(65 + (le_m + le_f) / 2))
+            death_age  = round((le_m + le_f) / 2))
 
 # ---- Real PV factor: discount to age 65, then express in 2026 dollars -------
 # For a flow at year y belonging to a worker who turns 65 in year y_65:

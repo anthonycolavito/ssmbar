@@ -86,7 +86,7 @@ names(cache) <- paste(type_combos$type, type_combos$birth_yr, sep = "-")
 
 # ---- Cohort lookups ---------------------------------------------------------
 le_at_65 <- tr2025 %>%
-  transmute(year_at_65 = year, death_age = round(65 + (le_m + le_f) / 2))
+  transmute(year_at_65 = year, death_age = round((le_m + le_f) / 2))
 
 # Real factor: nominal flow at year y -> real PV at age 65 in $2026
 make_real_factor <- function(birth_yr, par) {

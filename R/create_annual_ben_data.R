@@ -115,7 +115,7 @@ deflator <- tr2025 %>%
 # Period LE-at-65 in the calendar year the worker turns 65, averaged across sex.
 le_at_65 <- tr2025 %>%
   transmute(year_at_65 = year,
-            death_age  = round(65 + (le_m + le_f) / 2))
+            death_age  = round((le_m + le_f) / 2))
 
 ben_by_age <- all_ben %>%
   left_join(deflator, by = "year") %>%
