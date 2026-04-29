@@ -3,3 +3,6 @@
 .RData
 .Ruserdata
 .Renviron
+
+# Generated dashboard data (built by GitHub Action; never committed)
+site/data/site_data.json
