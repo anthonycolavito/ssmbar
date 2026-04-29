@@ -261,8 +261,9 @@ function renderNetTaxRateChart(cfg) {
   }
 
   chartManager.netTaxRateChart('netTaxRateChart', {
-    ages:   cfg.nmtr.ages,
-    values: cfg.nmtr.values
+    ages:            cfg.nmtr.ages,
+    values:          cfg.nmtr.scheduled.values,
+    valuesSecondary: pbPending ? null : cfg.nmtr.payable.values
   });
 }
 
