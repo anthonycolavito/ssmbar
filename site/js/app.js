@@ -151,9 +151,15 @@ function renderLifetimeProfile(cfg, state) {
 
   const subtitleEl = document.getElementById('lifetimeProfileSubtitle');
   if (subtitleEl) {
-    subtitleEl.textContent = state.real
-      ? 'Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).'
-      : 'Nominal dollars (year of receipt). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).';
+    if (!profile.earnings_available) {
+      subtitleEl.textContent = state.real
+        ? 'Real 2026 dollars (GDP price index). Working-year earnings data not yet available for this cohort — only retirement years (age 65 to life expectancy) shown.'
+        : 'Nominal dollars (year of receipt). Working-year earnings data not yet available for this cohort — only retirement years (age 65 to life expectancy) shown.';
+    } else {
+      subtitleEl.textContent = state.real
+        ? 'Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).'
+        : 'Nominal dollars (year of receipt). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).';
+    }
   }
 
   chartManager.lifetimeProfileChart('lifetimeProfileChart', {
@@ -183,6 +189,18 @@ function renderAnnualBenefitsChart(cfg, real) {
 }
 
 function renderNetTaxRateChart(cfg) {
+  const canvas  = document.getElementById('netTaxRateChart');
+  const empty   = document.getElementById('netTaxRateEmpty');
+  const hasData = dataLoader.hasNmtr(cfg);
+
+  if (canvas) canvas.hidden = !hasData;
+  if (empty)  empty.hidden  =  hasData;
+
+  if (!hasData) {
+    chartManager.destroyChart('netTaxRateChart');
+    return;
+  }
+
   chartManager.netTaxRateChart('netTaxRateChart', {
     ages:   cfg.nmtr.ages,
     values: cfg.nmtr.values

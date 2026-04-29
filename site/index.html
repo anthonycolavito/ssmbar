@@ -91,10 +91,16 @@
         <div class="chart-canvas-wrap"><canvas id="annualBenefitsChart"></canvas></div>
       </div>
 
-      <div class="chart-section">
+      <div class="chart-section" id="netTaxRateSection">
         <h2 class="chart-title">Net Tax Rate by Age</h2>
-        <div class="chart-subtitle">Payroll tax rate net of accrued value of benefits by age</div>
-        <div class="chart-canvas-wrap"><canvas id="netTaxRateChart"></canvas></div>
+        <div class="chart-subtitle" id="netTaxRateSubtitle">Payroll tax rate net of accrued value of benefits by age</div>
+        <div class="chart-canvas-wrap">
+          <canvas id="netTaxRateChart"></canvas>
+          <div class="chart-empty-state" id="netTaxRateEmpty" hidden>
+            <i class="bi bi-hourglass-split"></i>
+            <span>Net tax data is not yet available for this cohort.</span>
+          </div>
+        </div>
       </div>
     </div>
 

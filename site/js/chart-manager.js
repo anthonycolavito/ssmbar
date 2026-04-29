@@ -409,5 +409,9 @@ const chartManager = (() => {
     Object.keys(charts).forEach(k => delete charts[k]);
   }
 
-  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, cohortLineChart, destroyAll };
+  function destroyChart(canvasId) {
+    destroyExisting(canvasId);
+  }
+
+  return { lineChart, lifetimeProfileChart, netTaxRateChart, barChart, cohortLineChart, destroyAll, destroyChart };
 })();
