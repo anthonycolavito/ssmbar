@@ -147,19 +147,26 @@ function escapeAttr(s) {
 // -----------------------------------------------------------------------------
 
 function renderLifetimeProfile(cfg, state) {
-  const profile = dataLoader.getLifetimeProfile(state.workerType, state.spouseType, state.birthYear, state.real);
+  const view = state.lifetimeView || 'primary';
+  const profile = dataLoader.getLifetimeProfile(
+    state.workerType, state.spouseType, state.birthYear, state.real, view
+  );
 
   const subtitleEl = document.getElementById('lifetimeProfileSubtitle');
   if (subtitleEl) {
-    if (!profile.earnings_available) {
-      subtitleEl.textContent = state.real
-        ? 'Real 2026 dollars (GDP price index). Working-year earnings data not yet available for this cohort — only retirement years (age 65 to life expectancy) shown.'
-        : 'Nominal dollars (year of receipt). Working-year earnings data not yet available for this cohort — only retirement years (age 65 to life expectancy) shown.';
+    const dollars = state.real ? 'Real 2026 dollars (GDP price index)' : 'Nominal dollars (year of receipt)';
+    let scope;
+    if (view === 'household') {
+      scope = state.spouseType === 'none'
+        ? 'Single-worker household — earnings (ages 21–64) and Social Security benefits (age 65 to life expectancy).'
+        : 'Household totals — combined earnings of both spouses (ages 21–64) and combined Social Security benefits (age 65 to life expectancy).';
     } else {
-      subtitleEl.textContent = state.real
-        ? 'Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).'
-        : 'Nominal dollars (year of receipt). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).';
+      scope = "Primary worker only — own earnings (ages 21–64) and own Social Security benefit including any supplemental spousal benefit (age 65 to life expectancy).";
     }
+    const fallback = profile.earnings_available
+      ? ''
+      : ' Working-year earnings data not yet available for this cohort — only retirement years shown.';
+    subtitleEl.textContent = `${dollars}. ${scope}${fallback}`;
   }
 
   chartManager.lifetimeProfileChart('lifetimeProfileChart', {

@@ -1140,6 +1140,15 @@ a:hover { color: var(--brand-blue); }
   color: var(--brand-navy);
   margin: 0 0 0.5rem 0;
 }
+.chart-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.chart-section-header .chart-title { margin-bottom: 0; }
 .chart-subtitle {
   font-size: 0.8rem;
   color: var(--text-secondary);

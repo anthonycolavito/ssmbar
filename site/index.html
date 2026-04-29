@@ -76,7 +76,13 @@
 
     <!-- Lifetime profile chart (primary) -->
     <div class="chart-section">
-      <h2 class="chart-title">Lifetime Income Profile</h2>
+      <div class="chart-section-header">
+        <h2 class="chart-title">Lifetime Income Profile</h2>
+        <div id="lifetimeViewControl" class="btn-group btn-group-sm" role="group" aria-label="View mode">
+          <button type="button" class="btn btn-outline-primary active" data-view="primary">Primary worker</button>
+          <button type="button" class="btn btn-outline-primary" data-view="household">Household</button>
+        </div>
+      </div>
       <div class="chart-subtitle" id="lifetimeProfileSubtitle">
         Real 2026 dollars (GDP price index). Teal = annual earnings (ages 21–64). Blue = annual Social Security benefit (age 65 to life expectancy).
       </div>

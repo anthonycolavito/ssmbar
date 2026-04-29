@@ -4,10 +4,11 @@
 
 const uiControls = (() => {
   const state = {
-    workerType: 'medium',
-    spouseType: 'none',
-    birthYear:  1980,
-    real:       true
+    workerType:   'medium',
+    spouseType:   'none',
+    birthYear:    1980,
+    real:         true,
+    lifetimeView: 'primary'
   };
 
   const listeners = new Set();
@@ -79,6 +80,20 @@ const uiControls = (() => {
     });
   }
 
+  function buildLifetimeViewToggle() {
+    const host = document.getElementById('lifetimeViewControl');
+    if (!host) return;
+    host.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        if (view === state.lifetimeView) return;
+        state.lifetimeView = view;
+        host.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+        emit();
+      });
+    });
+  }
+
   function buildTabs(onTab) {
     document.querySelectorAll('.nav-tabs .nav-link').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -98,6 +113,7 @@ const uiControls = (() => {
     buildSpouseControl(dimensions.spouse_types);
     buildCohortControl(dimensions.birth_years);
     buildRealToggle();
+    buildLifetimeViewToggle();
     buildTabs(onTab);
   }
 

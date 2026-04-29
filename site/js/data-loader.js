@@ -48,15 +48,19 @@ const dataLoader = (() => {
   }
 
   // Lifetime profile: working-year earnings (21–64) followed by retirement
-  // benefits (65 → life expectancy). Honours the real/nominal toggle. When
-  // NMTR data is missing for a cohort, returns retirement-only with the
-  // earnings_available flag false so the caller can adjust labelling.
-  function getLifetimeProfile(workerType, spouseType, birthYear, real = true) {
+  // benefits (65 → life expectancy). Honours the real/nominal toggle and the
+  // primary/household view toggle. When NMTR data is missing for a cohort,
+  // returns retirement-only with earnings_available=false so the caller can
+  // adjust labelling.
+  function getLifetimeProfile(workerType, spouseType, birthYear, real = true, view = 'primary') {
     const cfg = getConfig(workerType, spouseType, birthYear);
     const leAge = cfg.summary.death_age;
+    const household = view === 'household';
 
     const retAgesAll = cfg.annual.ages;
-    const retValsAll = real ? cfg.annual.real : cfg.annual.nominal;
+    const retValsAll = household
+      ? (real ? cfg.annual.household_real    : cfg.annual.household_nominal)
+      : (real ? cfg.annual.real              : cfg.annual.nominal);
     const retAges = retAgesAll.filter(a => a <= leAge);
     const retVals = retValsAll.slice(0, retAges.length);
 
@@ -71,7 +75,9 @@ const dataLoader = (() => {
     }
 
     const workAges = cfg.nmtr.ages;
-    const workVals = real ? cfg.nmtr.earnings_real : cfg.nmtr.earnings_nominal;
+    const workVals = household
+      ? (real ? cfg.nmtr.household_earnings_real    : cfg.nmtr.household_earnings_nominal)
+      : (real ? cfg.nmtr.earnings_real              : cfg.nmtr.earnings_nominal);
 
     const ages   = [...workAges, ...retAges];
     const values = [...workVals, ...retVals];

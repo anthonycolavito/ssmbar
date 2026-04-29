@@ -161,20 +161,54 @@ for (w in WORKER_TYPES) {
       le_row     <- le_at_65[le_at_65$claim_year == claim_year, ]
       death_age  <- if (nrow(le_row) == 1) le_row$le_age_at_death else NA_integer_
 
+      # Household = primary + spouse-as-primary records. Both members of a
+      # couple share the same birth_yr, claim_age, and (model-derived) death
+      # age, so the swap-pair has the same age vector and we can sum directly.
+      # For singles, household equals primary.
+      if (s == "none") {
+        ba_house_nom <- ba$nominal_ben
+        ba_house_real <- ba$real_ben
+        nm_house_earn <- nm$earnings
+      } else {
+        ba_swap <- ben_age[ben_age$worker_type == s &
+                           ben_age$spouse_type == w &
+                           ben_age$birth_yr    == b &
+                           ben_age$claim_age   == CLAIM_AGE, ]
+        ba_swap <- ba_swap[order(ba_swap$age), ]
+        stopifnot(nrow(ba_swap) == nrow(ba), all(ba_swap$age == ba$age))
+        ba_house_nom  <- ba$nominal_ben + ba_swap$nominal_ben
+        ba_house_real <- ba$real_ben    + ba_swap$real_ben
+
+        nm_swap <- nmtr[nmtr$worker_type == s &
+                        nmtr$spouse_type == w &
+                        nmtr$birth_yr    == b &
+                        nmtr$claim_age   == CLAIM_AGE, ]
+        nm_swap <- nm_swap[order(nm_swap$age), ]
+        if (nrow(nm) > 0 && nrow(nm_swap) == nrow(nm) && all(nm_swap$age == nm$age)) {
+          nm_house_earn <- nm$earnings + nm_swap$earnings
+        } else {
+          nm_house_earn <- numeric(0)
+        }
+      }
+
       configs[[key]] <- list(
         annual = list(
-          ages     = ba$age,
-          years    = ba$year,
-          nominal  = round(ba$nominal_ben, 2),
-          real     = round(ba$real_ben,    2),
-          earnings = round(ba$earnings,    2)
+          ages              = ba$age,
+          years             = ba$year,
+          nominal           = round(ba$nominal_ben, 2),
+          real              = round(ba$real_ben,    2),
+          earnings          = round(ba$earnings,    2),
+          household_nominal = round(ba_house_nom,   2),
+          household_real    = round(ba_house_real,  2)
         ),
         nmtr = list(
-          ages              = nm$age,
-          years             = nm$year,
-          values            = round(nm$net_tax, 6),
-          earnings_nominal  = round(nm$earnings, 2),
-          earnings_real     = round(nm$earnings * price_factor_by_year[as.character(nm$year)], 2)
+          ages                       = nm$age,
+          years                      = nm$year,
+          values                     = round(nm$net_tax, 6),
+          earnings_nominal           = round(nm$earnings, 2),
+          earnings_real              = round(nm$earnings * price_factor_by_year[as.character(nm$year)], 2),
+          household_earnings_nominal = if (length(nm_house_earn) > 0) round(nm_house_earn, 2) else numeric(0),
+          household_earnings_real    = if (length(nm_house_earn) > 0) round(nm_house_earn * price_factor_by_year[as.character(nm$year)], 2) else numeric(0)
         ),
         summary = list(
           monthly_real_at_65 = round(ben_at_65 / 12, 2),
