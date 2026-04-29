@@ -77,6 +77,17 @@ le_at_65 <- data.frame(
   le_age_at_death = round((tr2025$le_m + tr2025$le_f) / 2)
 )
 
+# Normal Retirement Age by birth cohort. tr2025$nra is keyed by the calendar
+# year the cohort reaches age 62 (the EEA), so we look it up at birth_yr + 62.
+nra_by_birth_year <- function(birth_yr) {
+  hit <- tr2025$nra[tr2025$year == birth_yr + 62L]
+  if (length(hit) != 1 || is.na(hit)) {
+    stop(sprintf("No NRA in tr2025 for birth_yr %d (expected at year %d)",
+                 birth_yr, birth_yr + 62L))
+  }
+  hit
+}
+
 # Price factor for converting nominal $year to real $2026 (GDP price index).
 gdp_pi_2026 <- tr2025$gdp_pi[tr2025$year == BASE_YEAR]
 stopifnot(length(gdp_pi_2026) == 1, !is.na(gdp_pi_2026))
@@ -190,6 +201,7 @@ for (w in WORKER_TYPES) {
       claim_year <- b + CLAIM_AGE
       le_row     <- le_at_65[le_at_65$claim_year == claim_year, ]
       death_age  <- if (nrow(le_row) == 1) le_row$le_age_at_death else NA_integer_
+      nra        <- nra_by_birth_year(b)
 
       # Household = primary + spouse-as-primary records (both members share
       # birth_yr / claim_age / death_age, so age vectors line up).
@@ -246,6 +258,7 @@ for (w in WORKER_TYPES) {
         ),
         summary = list(
           death_age = death_age,
+          nra       = round(nra, 4),
           pv_taxes  = if (have_pv) round(pvr$pv_taxes, 2) else NA_real_,
           scheduled = list(
             monthly_real_at_65 = round(ben_at_65 / 12, 2),

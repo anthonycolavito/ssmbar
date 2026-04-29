@@ -60,5 +60,16 @@ const Fmt = {
     if (value > 0) return positiveIsGood ? 'positive' : 'negative';
     if (value < 0) return positiveIsGood ? 'negative' : 'positive';
     return '';
+  },
+
+  /**
+   * Format an age in years and months (e.g., 66.8333 -> "66y10m", 67 -> "67").
+   * Used for Normal Retirement Age annotations.
+   */
+  yearsMonths(value) {
+    if (value == null || isNaN(value)) return '--';
+    const years  = Math.floor(value);
+    const months = Math.round((value - years) * 12);
+    return months === 0 ? `${years}` : `${years}y${months}m`;
   }
 };

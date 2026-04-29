@@ -203,7 +203,8 @@ function renderLifetimeProfile(cfg, state) {
     values:          profile.scheduled,
     valuesSecondary: profile.payable,
     transitionIdx:   profile.transitionIdx,
-    leAge:           profile.leAge
+    leAge:           profile.leAge,
+    nraAge:          cfg.summary.nra
   });
 }
 
@@ -224,6 +225,7 @@ function renderAnnualBenefitsChart(cfg, real) {
     yFormat:       'currency',
     yMin:          0,
     leMarker:      leAge,
+    nraAge:        cfg.summary.nra,
     fadeAfterIdx:  (fadeIdx != null && fadeIdx >= 0) ? fadeIdx : null
   });
 }

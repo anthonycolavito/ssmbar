@@ -25,6 +25,38 @@ const CHART_COLORS = {
 
 const SECONDARY_DASH = [6, 4];
 
+// Convert an age (possibly fractional, e.g., 66.8333 for "66y10m") to its
+// index along a category x-axis whose categories are integer ages. Returns
+// -1 if the floor age is not in the labels array.
+function ageToIndex(ages, age) {
+  if (age == null) return -1;
+  const lo  = Math.floor(age);
+  const idx = ages.indexOf(lo);
+  return idx < 0 ? -1 : idx + (age - lo);
+}
+
+// Annotation for Normal Retirement Age: dashed navy vertical with a label
+// at the bottom, distinct from the existing claim-age (top, dark) and LE
+// (top-right, amber) annotations.
+function nraAnnotation(nraIdx, nraAge) {
+  return {
+    type: 'line',
+    xMin: nraIdx, xMax: nraIdx,
+    borderColor: 'rgba(15, 23, 65, 0.45)',
+    borderWidth: 1,
+    borderDash: [5, 3],
+    label: {
+      display: true,
+      content: `NRA ${Fmt.yearsMonths(nraAge)}`,
+      position: 'end',
+      backgroundColor: 'rgba(15, 23, 65, 0.85)',
+      color: '#fff',
+      font: { family: 'Inter', size: 10 },
+      padding: 3
+    }
+  };
+}
+
 function makeDefaults() {
   return {
     responsive: true,
@@ -92,7 +124,7 @@ const chartManager = (() => {
     const {
       labels, data, dataSecondary = null,
       yFormat = 'currency', yMin = null, yMax = null,
-      subtitle = null, leMarker = null, fadeAfterIdx = null
+      subtitle = null, leMarker = null, nraAge = null, fadeAfterIdx = null
     } = opts;
 
     const o = makeDefaults();
@@ -110,30 +142,34 @@ const chartManager = (() => {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
+    const annotations = {};
     if (leMarker != null) {
       const leIdx = labels.indexOf(leMarker);
       if (leIdx >= 0) {
-        o.plugins.annotation = {
-          annotations: {
-            le: {
-              type: 'line',
-              xMin: leIdx, xMax: leIdx,
-              borderColor: 'rgba(217, 119, 6, 0.6)',
-              borderWidth: 1,
-              borderDash: [3, 3],
-              label: {
-                display: true,
-                content: `Life Expectancy ≈ ${leMarker}`,
-                position: 'start',
-                backgroundColor: 'rgba(217, 119, 6, 0.9)',
-                color: '#fff',
-                font: { family: 'Inter', size: 10 },
-                padding: 3
-              }
-            }
+        annotations.le = {
+          type: 'line',
+          xMin: leIdx, xMax: leIdx,
+          borderColor: 'rgba(217, 119, 6, 0.6)',
+          borderWidth: 1,
+          borderDash: [3, 3],
+          label: {
+            display: true,
+            content: `Life Expectancy ≈ ${leMarker}`,
+            position: 'start',
+            backgroundColor: 'rgba(217, 119, 6, 0.9)',
+            color: '#fff',
+            font: { family: 'Inter', size: 10 },
+            padding: 3
           }
         };
       }
+    }
+    if (nraAge != null) {
+      const nraIdx = ageToIndex(labels, nraAge);
+      if (nraIdx >= 0) annotations.nra = nraAnnotation(nraIdx, nraAge);
+    }
+    if (Object.keys(annotations).length > 0) {
+      o.plugins.annotation = { annotations };
     }
 
     const primary = {
@@ -184,7 +220,7 @@ const chartManager = (() => {
   // earnings/benefit two-color segment encoding. `valuesSecondary` (payable)
   // overlays a dashed line; in working years it duplicates the scheduled
   // earnings (same data) and in retirement diverges below.
-  function lifetimeProfileChart(canvasId, { ages, values, valuesSecondary = null, transitionIdx, leAge, subtitle = null }) {
+  function lifetimeProfileChart(canvasId, { ages, values, valuesSecondary = null, transitionIdx, leAge, nraAge = null, subtitle = null }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
@@ -209,32 +245,35 @@ const chartManager = (() => {
     }
     const claimIdx = transitionIdx;
     const leIdx    = ages.indexOf(leAge);
-    o.plugins.annotation = {
-      annotations: {
-        claim: {
-          type: 'line', xMin: claimIdx, xMax: claimIdx,
-          borderColor: 'rgba(0, 0, 0, 0.25)',
-          borderWidth: 1, borderDash: [2, 4],
-          label: {
-            display: true, content: 'Claim age 65', position: 'start',
-            backgroundColor: 'rgba(0, 0, 0, 0.65)', color: '#fff',
-            font: { family: 'Inter', size: 10 }, padding: 3
-          }
-        },
-        ...(leIdx >= 0 ? {
-          le: {
-            type: 'line', xMin: leIdx, xMax: leIdx,
-            borderColor: 'rgba(217, 119, 6, 0.6)',
-            borderWidth: 1, borderDash: [3, 3],
-            label: {
-              display: true, content: `Life Expectancy ≈ ${leAge}`, position: 'end',
-              backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
-              font: { family: 'Inter', size: 10 }, padding: 3
-            }
-          }
-        } : {})
+    const nraIdx   = ageToIndex(ages, nraAge);
+    const annotations = {
+      claim: {
+        type: 'line', xMin: claimIdx, xMax: claimIdx,
+        borderColor: 'rgba(0, 0, 0, 0.25)',
+        borderWidth: 1, borderDash: [2, 4],
+        label: {
+          display: true, content: 'Claim age 65', position: 'start',
+          backgroundColor: 'rgba(0, 0, 0, 0.65)', color: '#fff',
+          font: { family: 'Inter', size: 10 }, padding: 3
+        }
       }
     };
+    if (leIdx >= 0) {
+      annotations.le = {
+        type: 'line', xMin: leIdx, xMax: leIdx,
+        borderColor: 'rgba(217, 119, 6, 0.6)',
+        borderWidth: 1, borderDash: [3, 3],
+        label: {
+          display: true, content: `Life Expectancy ≈ ${leAge}`, position: 'end',
+          backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
+          font: { family: 'Inter', size: 10 }, padding: 3
+        }
+      };
+    }
+    if (nraIdx >= 0) {
+      annotations.nra = nraAnnotation(nraIdx, nraAge);
+    }
+    o.plugins.annotation = { annotations };
 
     const primary = {
       label: valuesSecondary ? 'Scheduled' : '',
