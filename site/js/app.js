@@ -234,6 +234,11 @@ function renderCohortCharts(state) {
     labels: pvBen.years, data: pvBen.values, yFormat: 'currency'
   });
 
+  const pvTax = dataLoader.getCohortSeries(w, s, 'pv_taxes');
+  chartManager.cohortLineChart('cohortPvTaxChart', {
+    labels: pvTax.years, data: pvTax.values, yFormat: 'currency'
+  });
+
   // Benefit/Tax Ratio gets two-color encoding around 1.0 plus a dashed
   // reference line at 1.0 (the "even on the program" threshold).
   const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
