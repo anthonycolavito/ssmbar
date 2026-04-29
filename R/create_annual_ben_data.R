@@ -39,7 +39,7 @@ source("./R/calc_tax.R")
 # ---- Configuration -----------------------------------------------------------
 worker_types  <- c("very_low", "low", "medium", "high", "max")
 spouse_types  <- c("none", "very_low", "low", "medium", "high", "max")
-birth_years   <- c(1940L, 1945L, 1950L, 1955L, 1960L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2000L, 2005L, 2010L)
+birth_years   <- c(1930L, 1935L, 1940L, 1945L, 1950L, 1955L, 1960L, 1965L, 1970L, 1975L, 1980L, 1985L, 1990L, 1995L, 2000L, 2005L, 2010L)
 claim_age     <- 65L
 career_length <- 44L
 base_year     <- 2026                 # reference year for real dollars
@@ -128,6 +128,5 @@ ben_by_age <- all_ben %>%
          year, age, earnings, nominal_ben, real_ben, death_age)
 
 # ---- Save ----------------------------------------------
-dir.create("./output", showWarnings = FALSE)
 saveRDS(ben_by_age,  "./output/benefits_by_worker_age.rds")
 write_csv(ben_by_age, "./output/benefits_by_worker_age.csv")
