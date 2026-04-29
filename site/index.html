@@ -166,18 +166,12 @@
   <footer class="methodology" id="methodology">
     <p>
       <strong>About this dashboard.</strong>
-      Benefits are computed at claim age 65 under current law, using SSA's 2025 Trustees
-      Report intermediate assumptions. Real values are expressed in 2026 dollars using the
-      GDP price index. Period unisex life expectancy at age 65 is the simple average of
-      male and female period LE-at-65 from the Trustees Report, not a weighted population
-      average. Earnings profiles follow SSA scaled-earner conventions (very-low, low,
-      medium, high, max). A worker with custom dollar earnings — e.g., $50,000 — is not
-      directly modeled, but their benefit can be approximated by interpolating between
-      adjacent scaled types. Spousal benefits are modeled at the household level: the
-      worker's own retired-worker benefit, the worker's spousal benefit on the partner's
-      record, and the partner's spousal benefit on the worker's record. Both spouses are
-      assumed to share the worker's birth year and claim age. Replacement rates are
-      first-year benefit ratios, not lifetime averages.
+      Benefits are computed under current law per an age 65 claim age using SSA's 2025
+      Trustees Report intermediate assumptions. Real values are expressed in 2026 dollars
+      using the Trustees' GDP price index. Cohort unisex life expectancy at age 65 is the
+      simple average of male and female cohort life expectancy at 65 from the Trustees
+      Report. Earnings profiles follow SSA scaled-earner conventions (very low, low,
+      medium, high, max). Couples are assumed to share birth years and claim ages.
     </p>
     <p class="methodology-meta">
       Data: SSA Trustees Report 2025 · Built <span id="metaGenerated">—</span> ·
