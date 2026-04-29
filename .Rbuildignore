@@ -1,0 +1,9 @@
+^site$
+^build$
+^docs$
+^\.github$
+^\.Rbuildignore$
+^\.gitignore$
+^ssmbar\.Rproj$
+^.*\.Rproj$
+^\.Rproj\.user$
