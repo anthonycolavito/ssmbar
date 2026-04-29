@@ -109,7 +109,7 @@ const chartManager = (() => {
               borderDash: [3, 3],
               label: {
                 display: true,
-                content: `LE ≈ ${leMarker}`,
+                content: `Life Expectancy ≈ ${leMarker}`,
                 position: 'start',
                 backgroundColor: 'rgba(217, 119, 6, 0.9)',
                 color: '#fff',
@@ -190,7 +190,7 @@ const chartManager = (() => {
             borderColor: 'rgba(217, 119, 6, 0.6)',
             borderWidth: 1, borderDash: [3, 3],
             label: {
-              display: true, content: `LE ≈ ${leAge}`, position: 'end',
+              display: true, content: `Life Expectancy ≈ ${leAge}`, position: 'end',
               backgroundColor: 'rgba(217, 119, 6, 0.9)', color: '#fff',
               font: { family: 'Inter', size: 10 }, padding: 3
             }
@@ -219,13 +219,18 @@ const chartManager = (() => {
     });
   }
 
-  // Net Tax Rate by Age — two-color segments + annotated age-30 spike.
-  function netTaxRateChart(canvasId, { ages, values, subtitle = null }) {
+  // Net Tax Rate by Age — two-color segments. Y-axis is bounded so the
+  // model-artifact spike at age 30 (which can dive to ~-400%) doesn't
+  // compress the rest of the chart into a flat line.
+  function netTaxRateChart(canvasId, { ages, values, subtitle = null,
+                                       yMin = -0.50, yMax = 0.20 }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
 
     const o = makeDefaults();
+    o.scales.y.min = yMin;
+    o.scales.y.max = yMax;
     o.scales.y.ticks.callback = (v) => Fmt.percent(v);
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,

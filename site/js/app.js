@@ -132,7 +132,7 @@ function renderSummaryCards(cfg) {
   const host = document.getElementById('summaryCards');
   host.innerHTML = cards.map(c => `
     <div class="summary-card">
-      <div class="summary-label">${c.label}${c.info ? `<span class="summary-info" title="${escapeAttr(c.info)}" tabindex="0"><i class="bi bi-question-circle"></i></span>` : ''}</div>
+      <div class="summary-label">${c.label}${c.info ? `<span class="summary-info" data-tip="${escapeAttr(c.info)}" tabindex="0" aria-label="${escapeAttr(c.info)}"><i class="bi bi-question-circle"></i></span>` : ''}</div>
       <div class="summary-value">${c.value}</div>
     </div>
   `).join('');
@@ -169,8 +169,8 @@ function renderAnnualBenefitsChart(cfg, real) {
   const leAge = cfg.summary.death_age;
   const fadeIdx = (leAge != null) ? cfg.annual.ages.indexOf(leAge) : null;
   const subtitle = real
-    ? `Real 2026 dollars (GDP price index)${leAge ? `. Dashed segment beyond age ${leAge} = post-life-expectancy projection.` : '.'}`
-    : 'Nominal dollars (year of receipt).';
+    ? 'Real 2026 dollars (GDP price index)'
+    : 'Nominal dollars (year of receipt)';
   document.getElementById('annualBenefitsSubtitle').textContent = subtitle;
 
   chartManager.lineChart('annualBenefitsChart', {
