@@ -1324,6 +1324,23 @@ a:hover { color: var(--brand-blue); }
   padding: 1.1rem 1.25rem 1.4rem;
 }
 
+/* --- Worker comparison tab ---------------------------------------------- */
+.worker-compare-subtitle {
+  margin: 0 0 1rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+.worker-compare-section-title {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+  letter-spacing: 0.01em;
+}
+.worker-compare-grid--lines .chart-canvas-wrap {
+  height: 300px;
+}
+
 /* --- Data table section -------------------------------------------------- */
 .table-section {
   background: var(--bg-card);

@@ -23,6 +23,23 @@ const CHART_COLORS = {
   axis:               '#6b7280'
 };
 
+// Worker-type palette for the within-cohort comparison tab. Ordered so the
+// progression from lowest to highest earner reads as a single hue ramp.
+const WORKER_COLORS = {
+  very_low: '#0d9488',  // teal
+  low:      '#0ea5e9',  // sky
+  medium:   '#2563EB',  // brand blue
+  high:     '#7c3aed',  // violet
+  max:      '#be123c'   // rose
+};
+const WORKER_LABELS = {
+  very_low: 'Very low',
+  low:      'Low',
+  medium:   'Medium',
+  high:     'High',
+  max:      'Maximum'
+};
+
 const SECONDARY_DASH = [6, 4];
 
 // Convert an age (possibly fractional, e.g., 66.8333 for "66y10m") to its
@@ -617,5 +634,214 @@ const chartManager = (() => {
     destroyExisting(canvasId);
   }
 
-  return { lineChart, lifetimeProfileChart, netTaxRateChart, marginalIrrChart, barChart, cohortLineChart, destroyAll, destroyChart };
+  // Grouped bar chart for the worker-comparison tab. Mirrors cohortLineChart
+  // semantics (primary scheduled + optional dashed-style payable in a lighter
+  // shade) but renders as side-by-side bars within each x-axis category.
+  function cohortBarChart(canvasId, opts) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    destroyExisting(canvasId);
+
+    const {
+      labels, data, dataSecondary = null,
+      yFormat = 'currency',
+      yMin = null, yMax = null,
+      twoColorThreshold = null,
+      referenceY = null,
+      referenceLabel = null,
+      highlightIdx = null,
+      subtitle = null
+    } = opts;
+
+    const dual = dataSecondary != null;
+
+    const o = makeDefaults();
+    o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
+    o.scales.y.beginAtZero = (yFormat === 'currency');
+    if (yMin != null) o.scales.y.min = yMin;
+    if (yMax != null) o.scales.y.max = yMax;
+    o.plugins.tooltip.callbacks = {
+      label: (item) => {
+        const prefix = dual ? `${item.dataset.label}: ` : '';
+        return `${prefix}${formatYTick(item.parsed.y, yFormat)}`;
+      }
+    };
+    if (subtitle) {
+      o.plugins.subtitle.display = true;
+      o.plugins.subtitle.text = subtitle;
+    }
+    if (referenceY != null) {
+      o.plugins.annotation = {
+        annotations: {
+          ref: {
+            type: 'line',
+            yMin: referenceY, yMax: referenceY,
+            borderColor: 'rgba(0, 0, 0, 0.28)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            label: referenceLabel ? {
+              display: true,
+              content: referenceLabel,
+              position: 'end',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              color: CHART_COLORS.axis,
+              borderColor: 'rgba(0, 0, 0, 0.15)',
+              borderWidth: 1,
+              font: { family: 'Inter', size: 10 },
+              padding: 3,
+              yAdjust: -10
+            } : { display: false }
+          }
+        }
+      };
+    }
+
+    const fillFor = (v, primary) => {
+      if (twoColorThreshold != null && v != null) {
+        if (primary) return v >= twoColorThreshold ? CHART_COLORS.line : CHART_COLORS.taxAccent;
+        return v >= twoColorThreshold ? CHART_COLORS.lineSecondary : CHART_COLORS.taxAccentSecondary;
+      }
+      return primary ? CHART_COLORS.line : CHART_COLORS.lineSecondary;
+    };
+    const borderFor = (i, primary) => {
+      if (highlightIdx != null && i === highlightIdx) {
+        return primary ? '#0f1741' : 'rgba(15, 23, 65, 0.6)';
+      }
+      return 'transparent';
+    };
+
+    const datasets = [{
+      label: dual ? 'Scheduled' : '',
+      data,
+      backgroundColor: data.map(v => fillFor(v, true)),
+      borderColor: data.map((_, i) => borderFor(i, true)),
+      borderWidth: highlightIdx != null ? 2 : 0,
+      borderRadius: 3
+    }];
+    if (dual) {
+      datasets.push({
+        label: 'Payable',
+        data: dataSecondary,
+        backgroundColor: dataSecondary.map(v => fillFor(v, false)),
+        borderColor: dataSecondary.map((_, i) => borderFor(i, false)),
+        borderWidth: highlightIdx != null ? 2 : 0,
+        borderRadius: 3
+      });
+    }
+
+    charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: o
+    });
+  }
+
+  // Multi-series line chart used for the worker-comparison tab's age-axis
+  // overlays (lifetime profile, net tax rate by age, marginal IRR by age).
+  // Each entry in `series` is { key, label, data, highlight } and gets a
+  // colour from WORKER_COLORS keyed by its `key`.
+  function multiSeriesLineChart(canvasId, opts) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    destroyExisting(canvasId);
+
+    const {
+      labels, series,
+      yFormat = 'currency',
+      yMin = null, yMax = null,
+      referenceY = null,
+      referenceLabel = null,
+      transitionIdx = null,
+      subtitle = null
+    } = opts;
+
+    const o = makeDefaults();
+    o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
+    if (yFormat === 'currency') o.scales.y.beginAtZero = true;
+    if (yMin != null) o.scales.y.min = yMin;
+    if (yMax != null) o.scales.y.max = yMax;
+    o.plugins.legend.display = true;
+    o.plugins.legend.position = 'bottom';
+    o.plugins.tooltip.callbacks = {
+      title: (items) => `Age ${items[0].label}`,
+      label: (item)  => {
+        if (item.parsed.y == null) return null;
+        return `${item.dataset.label}: ${formatYTick(item.parsed.y, yFormat)}`;
+      }
+    };
+    if (subtitle) {
+      o.plugins.subtitle.display = true;
+      o.plugins.subtitle.text = subtitle;
+    }
+
+    const annotations = {};
+    if (referenceY != null) {
+      annotations.ref = {
+        type: 'line',
+        yMin: referenceY, yMax: referenceY,
+        borderColor: 'rgba(0, 0, 0, 0.25)',
+        borderWidth: 1,
+        borderDash: [2, 4],
+        label: referenceLabel ? {
+          display: true,
+          content: referenceLabel,
+          position: 'end',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          color: CHART_COLORS.axis,
+          font: { family: 'Inter', size: 10 },
+          padding: 3
+        } : { display: false }
+      };
+    }
+    if (transitionIdx != null) {
+      annotations.transition = {
+        type: 'line',
+        xMin: transitionIdx - 0.5, xMax: transitionIdx - 0.5,
+        borderColor: 'rgba(15, 23, 65, 0.35)',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        label: {
+          display: true,
+          content: 'Claim age 65',
+          position: 'start',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          color: CHART_COLORS.axis,
+          font: { family: 'Inter', size: 10 },
+          padding: 3,
+          yAdjust: 8
+        }
+      };
+    }
+    if (Object.keys(annotations).length > 0) {
+      o.plugins.annotation = { annotations };
+    }
+
+    const datasets = series.map(s => {
+      const color = WORKER_COLORS[s.key] || CHART_COLORS.line;
+      return {
+        label: s.label,
+        data:  s.data,
+        borderColor: color,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: s.highlight ? 3 : 1.75,
+        spanGaps: true
+      };
+    });
+
+    charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: o
+    });
+  }
+
+  return {
+    lineChart, lifetimeProfileChart, netTaxRateChart, marginalIrrChart, barChart,
+    cohortLineChart, cohortBarChart, multiSeriesLineChart,
+    destroyAll, destroyChart
+  };
 })();

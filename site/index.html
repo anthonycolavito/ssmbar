@@ -30,6 +30,9 @@
       <li class="nav-item">
         <button class="nav-link" id="tab-cohort" data-tab="cohort" type="button">Cohort Comparison</button>
       </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-worker" data-tab="worker" type="button">Worker Comparison</button>
+      </li>
     </ul>
     <span class="reform-chip" role="status" aria-live="polite">
       <span class="reform-chip-dot"></span>
@@ -212,6 +215,87 @@
         <h2 class="chart-title">Marginal IRR (Final Year of Work)</h2>
         <div class="chart-subtitle">Real return on the worker's age-64 contribution.</div>
         <div class="chart-canvas-wrap"><canvas id="cohortMirrFinalChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Worker comparison tab (within-cohort sweep across worker types) -->
+  <section id="panel-worker" class="tab-panel" hidden>
+    <div class="cohort-tab-toolbar">
+      <div class="scenario-legend" role="note">
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><rect x="0" y="0" width="12" height="6" fill="#2563EB"/></svg>
+          <span><strong>Scheduled</strong> — what current law promises</span>
+        </span>
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><rect x="0" y="0" width="12" height="6" fill="rgba(37,99,235,0.55)"/></svg>
+          <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
+        </span>
+      </div>
+      <button id="downloadWorkerCsvBtn" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download"></i> Download CSV
+      </button>
+    </div>
+    <p class="worker-compare-subtitle" id="workerCompareSubtitle">
+      All five primary worker types, holding birth cohort and spouse fixed.
+    </p>
+    <div class="cohort-grid">
+      <div class="chart-section">
+        <h2 class="chart-title">Initial Monthly Benefit (Real $)</h2>
+        <div class="chart-canvas-wrap"><canvas id="workerMonthlyChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Benefit / Tax Ratio</h2>
+        <div class="chart-subtitle">Blue ≥ 1.0 (lifetime net beneficiary). Amber &lt; 1.0 (net taxpayer). Dashed reference at 1.0.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerRatioChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">PV Lifetime Benefits</h2>
+        <div class="chart-canvas-wrap"><canvas id="workerPvBenChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">PV Lifetime Taxes</h2>
+        <div class="chart-canvas-wrap"><canvas id="workerPvTaxChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Replacement Rate (Career)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ worker's average real lifetime earnings.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerRrCareerChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Replacement Rate (AWI)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerRrAwiChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Internal Rate of Return</h2>
+        <div class="chart-subtitle">Real annualized return on lifetime OASDI contributions.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerIrrChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Marginal IRR (Final Year of Work)</h2>
+        <div class="chart-subtitle">Real return on the worker's age-64 contribution.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerMirrFinalChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Age-axis overlays: 5 worker-type lines per chart -->
+    <h3 class="worker-compare-section-title">By age — primary worker only, scheduled scenario</h3>
+    <div class="cohort-grid worker-compare-grid--lines">
+      <div class="chart-section">
+        <h2 class="chart-title">Lifetime Income Profile</h2>
+        <div class="chart-subtitle">Real 2026 dollars. Earnings (ages 21–64) then own benefit (age 65+).</div>
+        <div class="chart-canvas-wrap"><canvas id="workerLifetimeProfileChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Net Tax Rate by Age</h2>
+        <div class="chart-subtitle">Payroll tax rate net of incremental value of benefits, by age.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerNetTaxRateChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Marginal IRR by Age</h2>
+        <div class="chart-subtitle">Real annualized return on each year's OASDI contribution.</div>
+        <div class="chart-canvas-wrap"><canvas id="workerMarginalIrrChart"></canvas></div>
       </div>
     </div>
   </section>

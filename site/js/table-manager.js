@@ -226,6 +226,49 @@ const tableManager = (() => {
     triggerDownload(lines.join('\n'), `ssmbar_cohort_${w}_${s}.csv`);
   }
 
+  // Worker-comparison CSV: one row per worker type for the currently-selected
+  // (spouse, birth year). Same metric panel as the cohort CSV.
+  function downloadWorkerCompareCsv(state) {
+    const s = state.spouseType, y = state.birthYear;
+    const types = dataLoader.dimensions().worker_types.map(t => t.key);
+    const monthly  = dataLoader.getWorkerCompareSeries(s, y, 'monthly_real_at_65');
+    const rrCareer = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_career');
+    const rrAwi    = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_awi');
+    const pvBen    = dataLoader.getWorkerCompareSeries(s, y, 'pv_benefits');
+    const pvTax    = dataLoader.getWorkerCompareSeries(s, y, 'pv_taxes');
+    const ratio    = dataLoader.getWorkerCompareSeries(s, y, 'ben_tax_ratio');
+    const irr      = dataLoader.getWorkerCompareSeries(s, y, 'irr');
+    const mirr     = dataLoader.getWorkerCompareSeries(s, y, 'marginal_irr_age64');
+
+    const header = [
+      'worker_type', 'spouse_type', 'birth_year',
+      'monthly_real_at_65_scheduled', 'monthly_real_at_65_payable',
+      'ben_tax_ratio_scheduled',      'ben_tax_ratio_payable',
+      'pv_benefits_scheduled',        'pv_benefits_payable',
+      'pv_taxes',
+      'rep_rate_career_scheduled',    'rep_rate_career_payable',
+      'rep_rate_awi_scheduled',       'rep_rate_awi_payable',
+      'irr_scheduled',                'irr_payable',
+      'marginal_irr_age64_scheduled', 'marginal_irr_age64_payable'
+    ];
+    const lines = [header.join(',')];
+    types.forEach((w, i) => {
+      lines.push([
+        w, s, y,
+        monthly.scheduled[i] ?? '',  monthly.payable[i] ?? '',
+        ratio.scheduled[i] ?? '',    ratio.payable[i] ?? '',
+        pvBen.scheduled[i] ?? '',    pvBen.payable[i] ?? '',
+        pvTax.scheduled[i] ?? '',
+        rrCareer.scheduled[i] ?? '', rrCareer.payable[i] ?? '',
+        rrAwi.scheduled[i] ?? '',    rrAwi.payable[i] ?? '',
+        irr.scheduled[i] ?? '',      irr.payable[i] ?? '',
+        mirr.scheduled[i] ?? '',     mirr.payable[i] ?? ''
+      ].join(','));
+    });
+
+    triggerDownload(lines.join('\n'), `ssmbar_workers_${s}_${y}.csv`);
+  }
+
   function triggerDownload(csv, filename) {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -238,5 +281,5 @@ const tableManager = (() => {
     URL.revokeObjectURL(url);
   }
 
-  return { render, downloadCohortCsv };
+  return { render, downloadCohortCsv, downloadWorkerCompareCsv };
 })();

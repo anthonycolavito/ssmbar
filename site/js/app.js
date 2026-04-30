@@ -52,6 +52,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (cohortCsvBtn) {
     cohortCsvBtn.addEventListener('click', () => tableManager.downloadCohortCsv(uiControls.getState()));
   }
+  const workerCsvBtn = document.getElementById('downloadWorkerCsvBtn');
+  if (workerCsvBtn) {
+    workerCsvBtn.addEventListener('click', () => tableManager.downloadWorkerCompareCsv(uiControls.getState()));
+  }
 });
 
 function render(state) {
@@ -67,11 +71,15 @@ function render(state) {
   if (!document.getElementById('panel-cohort').hidden) {
     renderCohortCharts(state);
   }
+  if (!document.getElementById('panel-worker').hidden) {
+    renderWorkerCompareCharts(state);
+  }
 }
 
 function handleTabChange(tab) {
   const state = uiControls.getState();
   if (tab === 'cohort') renderCohortCharts(state);
+  if (tab === 'worker') renderWorkerCompareCharts(state);
 }
 
 // -----------------------------------------------------------------------------
@@ -363,6 +371,133 @@ function renderCohortCharts(state) {
   chartManager.cohortLineChart('cohortMirrFinalChart', {
     labels: mirrFinal.years, data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
     yFormat: 'percent'
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Worker comparison charts (within-cohort sweep across worker types)
+// -----------------------------------------------------------------------------
+
+const WORKER_TYPE_LABEL = {
+  very_low: 'Very low',
+  low:      'Low',
+  medium:   'Medium',
+  high:     'High',
+  max:      'Maximum'
+};
+
+function renderWorkerCompareCharts(state) {
+  const s = state.spouseType;
+  const y = state.birthYear;
+  const highlightIdx = (() => {
+    const types = dataLoader.dimensions().worker_types.map(t => t.key);
+    return types.indexOf(state.workerType);
+  })();
+
+  const subtitle = document.getElementById('workerCompareSubtitle');
+  if (subtitle) {
+    const spousePhrase = s === 'none' ? 'as a single individual' : SPOUSE_PHRASE[s];
+    subtitle.textContent = `Born ${y}, ${spousePhrase}. Compare across worker types — your selected type is outlined.`;
+  }
+
+  const labelize = series => series.types.map(t => WORKER_TYPE_LABEL[t] || t);
+
+  const monthly = dataLoader.getWorkerCompareSeries(s, y, 'monthly_real_at_65');
+  chartManager.cohortBarChart('workerMonthlyChart', {
+    labels: labelize(monthly), data: monthly.scheduled, dataSecondary: monthly.payable,
+    yFormat: 'currency', highlightIdx
+  });
+
+  const ratio = dataLoader.getWorkerCompareSeries(s, y, 'ben_tax_ratio');
+  chartManager.cohortBarChart('workerRatioChart', {
+    labels: labelize(ratio), data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)',
+    highlightIdx
+  });
+
+  const pvBen = dataLoader.getWorkerCompareSeries(s, y, 'pv_benefits');
+  chartManager.cohortBarChart('workerPvBenChart', {
+    labels: labelize(pvBen), data: pvBen.scheduled, dataSecondary: pvBen.payable,
+    yFormat: 'currency', highlightIdx
+  });
+
+  // PV taxes is scenario-invariant — single series.
+  const pvTax = dataLoader.getWorkerCompareSeries(s, y, 'pv_taxes');
+  chartManager.cohortBarChart('workerPvTaxChart', {
+    labels: labelize(pvTax), data: pvTax.scheduled,
+    yFormat: 'currency', highlightIdx
+  });
+
+  const rrCareer = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_career');
+  const rrAwi    = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortBarChart('workerRrCareerChart', {
+    labels: labelize(rrCareer), data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax, highlightIdx
+  });
+  chartManager.cohortBarChart('workerRrAwiChart', {
+    labels: labelize(rrAwi), data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax, highlightIdx
+  });
+
+  const irr = dataLoader.getWorkerCompareSeries(s, y, 'irr');
+  chartManager.cohortBarChart('workerIrrChart', {
+    labels: labelize(irr), data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', highlightIdx
+  });
+
+  const mirrFinal = dataLoader.getWorkerCompareSeries(s, y, 'marginal_irr_age64');
+  chartManager.cohortBarChart('workerMirrFinalChart', {
+    labels: labelize(mirrFinal), data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
+    yFormat: 'percent', highlightIdx
+  });
+
+  // Age-axis overlays — five lines per chart, scheduled scenario only.
+  const types = monthly.types;
+  const buildSeries = (perType, getter = (v) => v) => types.map(t => ({
+    key: t,
+    label: WORKER_TYPE_LABEL[t] || t,
+    data: perType[t] ? perType[t].map(getter) : null,
+    highlight: t === state.workerType
+  })).filter(s => s.data != null);
+
+  const lifetimeReal = state.real;
+  const lp = dataLoader.getWorkerCompareLifetimeProfiles(s, y, 'scheduled', lifetimeReal);
+  chartManager.multiSeriesLineChart('workerLifetimeProfileChart', {
+    labels: lp.ages,
+    series: types.map(t => ({
+      key: t,
+      label: WORKER_TYPE_LABEL[t] || t,
+      data: lp.perType[t],
+      highlight: t === state.workerType
+    })),
+    yFormat: 'currency',
+    transitionIdx: lp.transitionIdx >= 0 ? lp.transitionIdx : null
+  });
+
+  const ntr = dataLoader.getWorkerCompareNmtrSeries(s, y, 'values', 'scheduled');
+  chartManager.multiSeriesLineChart('workerNetTaxRateChart', {
+    labels: ntr.ages,
+    series: buildSeries(ntr.perType),
+    yFormat: 'percent',
+    referenceY: 0
+  });
+
+  const mirr = dataLoader.getWorkerCompareNmtrSeries(s, y, 'marginal_irr', 'scheduled');
+  chartManager.multiSeriesLineChart('workerMarginalIrrChart', {
+    labels: mirr.ages,
+    series: buildSeries(mirr.perType, v => (v == null ? -1 : v)),
+    yFormat: 'percent',
+    yMin: -1,
+    referenceY: 0
   });
 }
 
