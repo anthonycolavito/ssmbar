@@ -1324,12 +1324,28 @@ a:hover { color: var(--brand-blue); }
   padding: 1.1rem 1.25rem 1.4rem;
 }
 
-/* --- Worker comparison tab ---------------------------------------------- */
-.worker-compare-subtitle {
+/* --- Tab context header (Cohort + Worker tabs) -------------------------- */
+.tab-context-header {
   margin: 0 0 1rem;
-  color: var(--text-secondary);
-  font-size: 0.92rem;
 }
+.tab-context-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.tab-context-line {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--brand-navy);
+}
+.tab-context-line strong {
+  font-weight: 600;
+}
+
+/* --- Worker comparison tab ---------------------------------------------- */
 .worker-compare-section-title {
   margin: 1.75rem 0 0.75rem;
   font-size: 1rem;

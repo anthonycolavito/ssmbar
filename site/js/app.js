@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function render(state) {
   const cfg = dataLoader.getConfig(state.workerType, state.spouseType, state.birthYear);
   renderHero(cfg, state);
-  renderSummaryCards(cfg);
+  renderSummaryCards(cfg, 'summaryCards');
   renderLifetimeProfile(cfg, state);
   renderAnnualBenefitsChart(cfg, state.real);
   renderNetTaxRateChart(cfg);
@@ -69,17 +69,43 @@ function render(state) {
   tableManager.render(cfg);
 
   if (!document.getElementById('panel-cohort').hidden) {
+    renderSummaryCards(cfg, 'summaryCardsCohort');
+    setContextLine('cohortContextLine', state);
     renderCohortCharts(state);
   }
   if (!document.getElementById('panel-worker').hidden) {
+    setContextLine('workerContextLine', state, { suppressWorker: true });
     renderWorkerCompareCharts(state);
   }
 }
 
 function handleTabChange(tab) {
   const state = uiControls.getState();
-  if (tab === 'cohort') renderCohortCharts(state);
-  if (tab === 'worker') renderWorkerCompareCharts(state);
+  const cfg = dataLoader.getConfig(state.workerType, state.spouseType, state.birthYear);
+  if (tab === 'cohort') {
+    renderSummaryCards(cfg, 'summaryCardsCohort');
+    setContextLine('cohortContextLine', state);
+    renderCohortCharts(state);
+  }
+  if (tab === 'worker') {
+    setContextLine('workerContextLine', state, { suppressWorker: true });
+    renderWorkerCompareCharts(state);
+  }
+}
+
+// One-line context for the Cohort/Worker tabs. Cohort echoes the full
+// (worker, spouse, cohort) trio; Worker omits worker since the tab itself
+// sweeps that dimension.
+function setContextLine(elementId, state, { suppressWorker = false } = {}) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const lede = suppressWorker
+    ? `Born <strong>${state.birthYear}</strong>`
+    : `<strong>${WORKER_LABEL_LOWER[state.workerType] || state.workerType}</strong> earner born <strong>${state.birthYear}</strong>`;
+  const tail = state.spouseType === 'none'
+    ? 'filing as a single individual'
+    : (SPOUSE_PHRASE[state.spouseType] || '');
+  el.innerHTML = `${lede}, ${tail}`;
 }
 
 // -----------------------------------------------------------------------------
@@ -110,7 +136,9 @@ function renderHero(cfg, state) {
 // Summary cards
 // -----------------------------------------------------------------------------
 
-function renderSummaryCards(cfg) {
+function renderSummaryCards(cfg, hostId = 'summaryCards') {
+  const host = document.getElementById(hostId);
+  if (!host) return;
   const s = cfg.summary;
   const cards = [
     {
@@ -156,7 +184,6 @@ function renderSummaryCards(cfg) {
     }
   ];
 
-  const host = document.getElementById('summaryCards');
   host.innerHTML = cards.map(c => {
     const infoIcon = c.info
       ? `<span class="summary-info" data-tip="${escapeAttr(c.info)}" tabindex="0" aria-label="${escapeAttr(c.info)}"><i class="bi bi-question-circle"></i></span>`
@@ -389,23 +416,13 @@ const WORKER_TYPE_LABEL = {
 function renderWorkerCompareCharts(state) {
   const s = state.spouseType;
   const y = state.birthYear;
-  const highlightIdx = (() => {
-    const types = dataLoader.dimensions().worker_types.map(t => t.key);
-    return types.indexOf(state.workerType);
-  })();
-
-  const subtitle = document.getElementById('workerCompareSubtitle');
-  if (subtitle) {
-    const spousePhrase = s === 'none' ? 'as a single individual' : SPOUSE_PHRASE[s];
-    subtitle.textContent = `Born ${y}, ${spousePhrase}. Compare across worker types — your selected type is outlined.`;
-  }
 
   const labelize = series => series.types.map(t => WORKER_TYPE_LABEL[t] || t);
 
   const monthly = dataLoader.getWorkerCompareSeries(s, y, 'monthly_real_at_65');
   chartManager.cohortBarChart('workerMonthlyChart', {
     labels: labelize(monthly), data: monthly.scheduled, dataSecondary: monthly.payable,
-    yFormat: 'currency', highlightIdx
+    yFormat: 'currency'
   });
 
   const ratio = dataLoader.getWorkerCompareSeries(s, y, 'ben_tax_ratio');
@@ -414,21 +431,20 @@ function renderWorkerCompareCharts(state) {
     yFormat: 'number',
     twoColorThreshold: 1.0,
     referenceY: 1.0,
-    referenceLabel: 'Break-even (1.0)',
-    highlightIdx
+    referenceLabel: 'Break-even (1.0)'
   });
 
   const pvBen = dataLoader.getWorkerCompareSeries(s, y, 'pv_benefits');
   chartManager.cohortBarChart('workerPvBenChart', {
     labels: labelize(pvBen), data: pvBen.scheduled, dataSecondary: pvBen.payable,
-    yFormat: 'currency', highlightIdx
+    yFormat: 'currency'
   });
 
   // PV taxes is scenario-invariant — single series.
   const pvTax = dataLoader.getWorkerCompareSeries(s, y, 'pv_taxes');
   chartManager.cohortBarChart('workerPvTaxChart', {
     labels: labelize(pvTax), data: pvTax.scheduled,
-    yFormat: 'currency', highlightIdx
+    yFormat: 'currency'
   });
 
   const rrCareer = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_career');
@@ -441,23 +457,23 @@ function renderWorkerCompareCharts(state) {
 
   chartManager.cohortBarChart('workerRrCareerChart', {
     labels: labelize(rrCareer), data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
-    yFormat: 'percent', yMin: 0, yMax: rrMax, highlightIdx
+    yFormat: 'percent', yMin: 0, yMax: rrMax
   });
   chartManager.cohortBarChart('workerRrAwiChart', {
     labels: labelize(rrAwi), data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
-    yFormat: 'percent', yMin: 0, yMax: rrMax, highlightIdx
+    yFormat: 'percent', yMin: 0, yMax: rrMax
   });
 
   const irr = dataLoader.getWorkerCompareSeries(s, y, 'irr');
   chartManager.cohortBarChart('workerIrrChart', {
     labels: labelize(irr), data: irr.scheduled, dataSecondary: irr.payable,
-    yFormat: 'percent', highlightIdx
+    yFormat: 'percent'
   });
 
   const mirrFinal = dataLoader.getWorkerCompareSeries(s, y, 'marginal_irr_age64');
   chartManager.cohortBarChart('workerMirrFinalChart', {
     labels: labelize(mirrFinal), data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
-    yFormat: 'percent', highlightIdx
+    yFormat: 'percent'
   });
 
   // Age-axis overlays — five lines per chart, scheduled scenario only.
@@ -465,8 +481,7 @@ function renderWorkerCompareCharts(state) {
   const buildSeries = (perType, getter = (v) => v) => types.map(t => ({
     key: t,
     label: WORKER_TYPE_LABEL[t] || t,
-    data: perType[t] ? perType[t].map(getter) : null,
-    highlight: t === state.workerType
+    data: perType[t] ? perType[t].map(getter) : null
   })).filter(s => s.data != null);
 
   const lifetimeReal = state.real;
@@ -476,8 +491,7 @@ function renderWorkerCompareCharts(state) {
     series: types.map(t => ({
       key: t,
       label: WORKER_TYPE_LABEL[t] || t,
-      data: lp.perType[t],
-      highlight: t === state.workerType
+      data: lp.perType[t]
     })),
     yFormat: 'currency',
     transitionIdx: lp.transitionIdx >= 0 ? lp.transitionIdx : null

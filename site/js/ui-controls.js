@@ -115,6 +115,26 @@ const uiControls = (() => {
     });
   }
 
+  // Hero is the big "A medium earner born in..." readout. Only relevant on
+  // the Individual tab; the Cohort tab gets a context line + summary cards
+  // and the Worker tab gets a context line with a stripped-down config row.
+  function applyTabChrome(tab) {
+    const hero = document.getElementById('hero');
+    if (hero) hero.hidden = (tab !== 'individual');
+
+    // Worker tab: only the cohort selector is meaningful (spouse, dollars,
+    // and worker-type are pinned to their last-set values). Hide the rest.
+    const showAll = (tab !== 'worker');
+    const ids = [
+      'config-control--worker',
+      'config-control--spouse',
+      'config-control--dollars'
+    ];
+    ids.forEach(cls => {
+      document.querySelectorAll(`.${cls}`).forEach(el => { el.hidden = !showAll; });
+    });
+  }
+
   function buildTabs(onTab) {
     document.querySelectorAll('.nav-tabs .nav-link').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -124,6 +144,7 @@ const uiControls = (() => {
           const isTarget = p.id === `panel-${tab}`;
           p.hidden = !isTarget;
         });
+        applyTabChrome(tab);
         onTab(tab);
       });
     });

@@ -163,6 +163,11 @@
 
   <!-- Cohort tab -->
   <section id="panel-cohort" class="tab-panel" hidden>
+    <header class="tab-context-header">
+      <p class="tab-context-eyebrow">For the selected worker</p>
+      <p class="tab-context-line" id="cohortContextLine">—</p>
+    </header>
+    <div class="summary-grid" id="summaryCardsCohort"></div>
     <div class="cohort-tab-toolbar">
       <div class="scenario-legend" role="note">
         <span class="scenario-legend-item">
@@ -236,9 +241,10 @@
         <i class="bi bi-download"></i> Download CSV
       </button>
     </div>
-    <p class="worker-compare-subtitle" id="workerCompareSubtitle">
-      All five primary worker types, holding birth cohort and spouse fixed.
-    </p>
+    <header class="tab-context-header">
+      <p class="tab-context-eyebrow">All five primary worker types</p>
+      <p class="tab-context-line" id="workerContextLine">—</p>
+    </header>
     <div class="cohort-grid">
       <div class="chart-section">
         <h2 class="chart-title">Initial Monthly Benefit (Real $)</h2>
