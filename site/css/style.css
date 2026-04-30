@@ -992,7 +992,7 @@ a:hover { color: var(--brand-blue); }
   gap: 0.45rem;
 }
 .summary-card .summary-value-row--secondary .summary-value--secondary {
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: rgba(15, 23, 65, 0.62);
   margin-top: 0;
@@ -1021,11 +1021,18 @@ a:hover { color: var(--brand-blue); }
   font-weight: 300;
 }
 
-/* --- Cohort tab toolbar (download button) ----------------------------- */
+/* --- Cohort tab toolbar (legend + download button) -------------------- */
 .cohort-tab-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   margin-bottom: 0.75rem;
+}
+.cohort-tab-toolbar .scenario-legend {
+  margin: 0;
+  flex: 1 1 auto;
 }
 
 /* --- Tabs ---------------------------------------------------------------- */
@@ -1127,15 +1134,15 @@ a:hover { color: var(--brand-blue); }
 /* --- Summary cards ------------------------------------------------------- */
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
 }
 .summary-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  padding: 0.85rem 1rem;
+  padding: 0.7rem 0.85rem;
   box-shadow: var(--shadow-card);
 }
 .summary-card .summary-label {
@@ -1146,10 +1153,10 @@ a:hover { color: var(--brand-blue); }
   font-weight: 600;
 }
 .summary-card .summary-value {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--brand-navy);
-  margin-top: 0.25rem;
+  margin-top: 0.2rem;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";

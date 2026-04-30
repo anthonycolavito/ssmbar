@@ -314,22 +314,19 @@ const chartManager = (() => {
     });
   }
 
-  // Marginal IRR by working age. Two lines (scheduled / payable) with a
-  // boxed annotation covering the leading uninsured ages — that's the
-  // "clever" treatment for the first 10 years where return is undefined
-  // (post-hoc-zeroed at age 21, then zero through pre-insurance years).
+  // Marginal IRR by working age. Pre-insurance years are plotted at −100%
+  // (the literal return on a contribution that buys nothing) — the line
+  // itself communicates the regime, no separate annotation needed.
   function marginalIrrChart(canvasId, { ages, valuesScheduled, valuesPayable, subtitle = null }) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
     destroyExisting(canvasId);
 
-    // First age where either scenario produces a real value.
-    let firstWithData = ages.length;
-    for (let i = 0; i < ages.length; i++) {
-      if (valuesScheduled[i] != null || valuesPayable[i] != null) { firstWithData = i; break; }
-    }
+    const sched = valuesScheduled.map(v => (v == null ? -1 : v));
+    const pay   = valuesPayable.map(v => (v == null ? -1 : v));
 
     const o = makeDefaults();
+    o.scales.y.min = -1;
     o.scales.y.ticks.callback = (v) => Fmt.percent(v);
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
@@ -343,38 +340,19 @@ const chartManager = (() => {
       o.plugins.subtitle.text = subtitle;
     }
 
-    const annotations = {
-      zero: {
-        type: 'line', yMin: 0, yMax: 0,
-        borderColor: 'rgba(0, 0, 0, 0.25)',
-        borderWidth: 1, borderDash: [2, 4]
+    o.plugins.annotation = {
+      annotations: {
+        zero: {
+          type: 'line', yMin: 0, yMax: 0,
+          borderColor: 'rgba(0, 0, 0, 0.25)',
+          borderWidth: 1, borderDash: [2, 4]
+        }
       }
     };
-    if (firstWithData > 0) {
-      annotations.uninsured = {
-        type: 'box',
-        xMin: -0.5,
-        xMax: firstWithData - 0.5,
-        backgroundColor: 'rgba(217, 119, 6, 0.08)',
-        borderColor:    'rgba(217, 119, 6, 0.30)',
-        borderWidth: 1,
-        borderDash: [4, 4],
-        label: {
-          display: true,
-          content: ['Uninsured', 'return = −100%'],
-          position: 'center',
-          backgroundColor: 'rgba(217, 119, 6, 0.85)',
-          color: '#fff',
-          font: { family: 'Inter', size: 10 },
-          padding: 4
-        }
-      };
-    }
-    o.plugins.annotation = { annotations };
 
     const shared = {
       fill: false, tension: 0.15, pointRadius: 0, pointHoverRadius: 4,
-      borderWidth: 2, spanGaps: false
+      borderWidth: 2, spanGaps: true
     };
 
     charts[canvasId] = new Chart(ctx, {
@@ -382,8 +360,8 @@ const chartManager = (() => {
       data: {
         labels: ages,
         datasets: [
-          { label: 'Scheduled', data: valuesScheduled, borderColor: CHART_COLORS.line,           ...shared },
-          { label: 'Payable',   data: valuesPayable,   borderColor: CHART_COLORS.lineSecondary,
+          { label: 'Scheduled', data: sched, borderColor: CHART_COLORS.line,           ...shared },
+          { label: 'Payable',   data: pay,   borderColor: CHART_COLORS.lineSecondary,
             borderDash: SECONDARY_DASH, ...shared }
         ]
       },

@@ -120,7 +120,7 @@ function renderSummaryCards(cfg) {
     {
       label: 'PV Lifetime Taxes',
       value: Fmt.currency(s.pv_taxes),
-      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses. Identical under scheduled and payable scenarios.'
+      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
     },
     {
       label: 'Benefit / Tax Ratio',
@@ -197,7 +197,7 @@ function renderLifetimeProfile(cfg, state) {
         ? 'Single-worker household — earnings (ages 21–64) and Social Security benefits (age 65 to life expectancy).'
         : 'Household totals — combined earnings of both spouses (ages 21–64) and combined Social Security benefits (age 65 to life expectancy).';
     } else {
-      scope = "Primary worker only — own earnings (ages 21–64) and own Social Security benefit including any supplemental spousal benefit (age 65 to life expectancy).";
+      scope = "Primary worker only — own earnings (ages 21–64) and own Social Security benefit (age 65 to life expectancy).";
     }
     const fallback = profile.earnings_available
       ? ''
@@ -258,8 +258,8 @@ function renderNetTaxRateChart(cfg) {
 
   if (subtitle) {
     subtitle.textContent = pbPending
-      ? 'Payroll tax rate net of accrued value of benefits by age. Scheduled scenario only — payable scenario coming soon.'
-      : 'Payroll tax rate net of accrued value of benefits by age. Solid = scheduled, dashed = payable.';
+      ? 'Payroll tax rate net of incremental value of benefits by age. Scheduled scenario only — payable scenario coming soon.'
+      : 'Payroll tax rate net of incremental value of benefits by age. Solid = scheduled, dashed = payable.';
   }
 
   if (!hasData) {

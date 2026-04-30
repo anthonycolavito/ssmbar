@@ -25,7 +25,9 @@ const tableManager = (() => {
       earnings_nominal: n.earnings_nominal[i],
       earnings_real:    n.earnings_real[i],
       net_tax_sched:    n.scheduled.values[i],
-      net_tax_pay:      includePbNmtr ? n.payable.values[i] : null
+      net_tax_pay:      includePbNmtr ? n.payable.values[i] : null,
+      mirr_sched:       n.scheduled.marginal_irr ? n.scheduled.marginal_irr[i] : null,
+      mirr_pay:         (includePbNmtr && n.payable.marginal_irr) ? n.payable.marginal_irr[i] : null
     })) : [];
 
     const retirementRows = a.ages.map((age, i) => ({
@@ -54,12 +56,15 @@ const tableManager = (() => {
           <th rowspan="2">Year</th>
           <th class="text-end" colspan="2">Working-age Earnings</th>
           <th class="text-end" colspan="${includePbNmtr ? 2 : 1}">Net Tax Rate</th>
+          <th class="text-end" colspan="${includePbNmtr ? 2 : 1}">Marginal IRR</th>
           <th class="text-end" colspan="2">Nominal Benefit</th>
           <th class="text-end" colspan="2">Real Benefit</th>
         </tr>
         <tr>
           <th class="text-end th-sub">Nominal</th>
           <th class="text-end th-sub">Real</th>
+          <th class="text-end th-sub">Sched</th>
+          ${includePbNmtr ? '<th class="text-end th-sub">Pay</th>' : ''}
           <th class="text-end th-sub">Sched</th>
           ${includePbNmtr ? '<th class="text-end th-sub">Pay</th>' : ''}
           <th class="text-end th-sub">Sched</th>
@@ -75,6 +80,9 @@ const tableManager = (() => {
         const ntrPayCell = includePbNmtr
           ? `<td class="text-end td-secondary">${Fmt.percent(r.net_tax_pay)}</td>`
           : '';
+        const mirrPayCell = includePbNmtr
+          ? `<td class="text-end td-secondary">${Fmt.percent(r.mirr_pay, { decimals: 2 })}</td>`
+          : '';
         return `
           <tr>
             <td>${r.age}</td>
@@ -83,6 +91,8 @@ const tableManager = (() => {
             <td class="text-end">${Fmt.currency(r.earnings_real)}</td>
             <td class="text-end">${Fmt.percent(r.net_tax_sched)}</td>
             ${ntrPayCell}
+            <td class="text-end">${Fmt.percent(r.mirr_sched, { decimals: 2 })}</td>
+            ${mirrPayCell}
             <td class="text-end td-blank">—</td>
             <td class="text-end td-blank">—</td>
             <td class="text-end td-blank">—</td>
@@ -96,6 +106,8 @@ const tableManager = (() => {
           <td>${r.year}</td>
           ${blank}
           ${blank}
+          ${blank}
+          ${includeWorking ? blankNtrCell : ''}
           ${blank}
           ${includeWorking ? blankNtrCell : ''}
           <td class="text-end">${Fmt.currency(r.nominal_sched)}</td>
@@ -144,8 +156,9 @@ const tableManager = (() => {
       'phase', 'age', 'year',
       'earnings_nominal', 'earnings_real',
       'net_tax_rate_scheduled', 'net_tax_rate_payable',
-      'nominal_ben_scheduled', 'nominal_ben_payable',
-      'real_ben_scheduled',    'real_ben_payable'
+      'marginal_irr_scheduled', 'marginal_irr_payable',
+      'nominal_ben_scheduled',  'nominal_ben_payable',
+      'real_ben_scheduled',     'real_ben_payable'
     ];
     const lines = [header.join(',')];
     for (const r of allRows) {
@@ -154,12 +167,13 @@ const tableManager = (() => {
           'working', r.age, r.year ?? '',
           r.earnings_nominal ?? '', r.earnings_real ?? '',
           r.net_tax_sched ?? '', r.net_tax_pay ?? '',
+          r.mirr_sched ?? '',    r.mirr_pay ?? '',
           '', '', '', ''
         ].join(','));
       } else {
         lines.push([
           'retired', r.age, r.year ?? '',
-          '', '', '', '',
+          '', '', '', '', '', '',
           r.nominal_sched ?? '', r.nominal_pay ?? '',
           r.real_sched ?? '',    r.real_pay ?? ''
         ].join(','));

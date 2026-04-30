@@ -74,22 +74,22 @@
     <p class="hero-subline" id="heroSubline"></p>
   </section>
 
-  <!-- Scenario legend (shown across both tabs) -->
-  <div class="scenario-legend" role="note">
-    <span class="scenario-legend-item">
-      <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="#2563EB" stroke-width="2.4"/></svg>
-      <span><strong>Scheduled</strong> — what current law promises</span>
-    </span>
-    <span class="scenario-legend-item">
-      <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="rgba(37,99,235,0.55)" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
-      <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
-    </span>
-  </div>
-
   <!-- Individual tab -->
   <section id="panel-individual" class="tab-panel active">
     <!-- Summary cards -->
     <div class="summary-grid" id="summaryCards"></div>
+
+    <!-- Scenario legend — sits below the cards, near the charts -->
+    <div class="scenario-legend" role="note">
+      <span class="scenario-legend-item">
+        <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="#2563EB" stroke-width="2.4"/></svg>
+        <span><strong>Scheduled</strong> — what current law promises</span>
+      </span>
+      <span class="scenario-legend-item">
+        <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="rgba(37,99,235,0.55)" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
+        <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
+      </span>
+    </div>
 
     <!-- Lifetime profile chart (primary) -->
     <div class="chart-section">
@@ -116,7 +116,7 @@
 
       <div class="chart-section" id="netTaxRateSection">
         <h2 class="chart-title">Net Tax Rate by Age</h2>
-        <div class="chart-subtitle" id="netTaxRateSubtitle">Payroll tax rate net of accrued value of benefits by age</div>
+        <div class="chart-subtitle" id="netTaxRateSubtitle">Payroll tax rate net of incremental value of benefits by age</div>
         <div class="chart-canvas-wrap">
           <canvas id="netTaxRateChart"></canvas>
           <div class="chart-empty-state" id="netTaxRateEmpty" hidden>
@@ -131,7 +131,7 @@
     <div class="chart-section" id="marginalIrrSection">
       <h2 class="chart-title">Marginal Internal Rate of Return by Age</h2>
       <div class="chart-subtitle" id="marginalIrrSubtitle">
-        Real annualized return on each year's OASDI contribution. Solid = scheduled, dashed = payable. Years before the worker becomes insured are shaded — those contributions earn no marginal benefit.
+        Real annualized return on each year's OASDI contribution. Solid = scheduled, dashed = payable. Years before the worker becomes insured plot at −100% — those contributions earn no marginal benefit.
       </div>
       <div class="chart-canvas-wrap">
         <canvas id="marginalIrrChart"></canvas>
@@ -161,6 +161,16 @@
   <!-- Cohort tab -->
   <section id="panel-cohort" class="tab-panel" hidden>
     <div class="cohort-tab-toolbar">
+      <div class="scenario-legend" role="note">
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="#2563EB" stroke-width="2.4"/></svg>
+          <span><strong>Scheduled</strong> — what current law promises</span>
+        </span>
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="rgba(37,99,235,0.55)" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
+          <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
+        </span>
+      </div>
       <button id="downloadCohortCsvBtn" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-download"></i> Download CSV
       </button>
