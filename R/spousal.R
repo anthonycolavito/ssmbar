@@ -34,9 +34,9 @@ spousal_benefit <- function(worker, debugg = FALSE) {
   worker <- worker %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
-      s_rf1_ind = s_rf1[match(birth_yr + 62, age)], #First spousal reduction factor
-      s_rf2_ind = s_rf2[match(birth_yr + 62, age)], #Second spousal reduction factor
-      nra_ind = nra[match(birth_yr + 62, age)], #NRA for age 62 cohort
+      s_rf1_ind = s_rf1[match(birth_yr + 62, year)], #First spousal reduction factor
+      s_rf2_ind = s_rf2[match(birth_yr + 62, year)], #Second spousal reduction factor
+      nra_ind = nra[match(birth_yr + 62, year)], #NRA for age 62 cohort
       age_at_spouse_claim = age[match(s_claim_age, s_age)], #Age when spouse first claims benefits
       spousal_ben_claim_age = pmax(claim_age, age_at_spouse_claim), #Age when worker claims spousal benefits -- cannot be before spouse claims benefits
       
