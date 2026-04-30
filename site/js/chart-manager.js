@@ -760,8 +760,8 @@ const chartManager = (() => {
     if (yFormat === 'currency') o.scales.y.beginAtZero = true;
     if (yMin != null) o.scales.y.min = yMin;
     if (yMax != null) o.scales.y.max = yMax;
-    o.plugins.legend.display = true;
-    o.plugins.legend.position = 'bottom';
+    // Per-chart legend stays off — the parent tab supplies a single palette
+    // legend so the same five entries don't repeat under every line chart.
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
       label: (item)  => {

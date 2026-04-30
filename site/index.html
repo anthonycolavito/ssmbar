@@ -226,6 +226,10 @@
 
   <!-- Worker comparison tab (within-cohort sweep across worker types) -->
   <section id="panel-worker" class="tab-panel" hidden>
+    <header class="tab-context-header">
+      <p class="tab-context-eyebrow">All five primary worker types</p>
+      <p class="tab-context-line" id="workerContextLine">—</p>
+    </header>
     <div class="cohort-tab-toolbar">
       <div class="scenario-legend" role="note">
         <span class="scenario-legend-item">
@@ -241,10 +245,6 @@
         <i class="bi bi-download"></i> Download CSV
       </button>
     </div>
-    <header class="tab-context-header">
-      <p class="tab-context-eyebrow">All five primary worker types</p>
-      <p class="tab-context-line" id="workerContextLine">—</p>
-    </header>
     <div class="cohort-grid">
       <div class="chart-section">
         <h2 class="chart-title">Initial Monthly Benefit (Real $)</h2>
@@ -286,7 +286,19 @@
     </div>
 
     <!-- Age-axis overlays: 5 worker-type lines per chart -->
-    <h3 class="worker-compare-section-title">By age — primary worker only, scheduled scenario</h3>
+    <div class="worker-line-section-header">
+      <div class="worker-line-section-title-block">
+        <h3 class="worker-line-section-title">By age</h3>
+        <p class="worker-line-section-sub">Primary worker only · scheduled scenario</p>
+      </div>
+      <div class="worker-palette-legend" role="note" aria-label="Worker type colors">
+        <span class="worker-palette-item"><span class="worker-palette-swatch" style="background:#0d9488"></span>Very low</span>
+        <span class="worker-palette-item"><span class="worker-palette-swatch" style="background:#0ea5e9"></span>Low</span>
+        <span class="worker-palette-item"><span class="worker-palette-swatch" style="background:#2563EB"></span>Medium</span>
+        <span class="worker-palette-item"><span class="worker-palette-swatch" style="background:#7c3aed"></span>High</span>
+        <span class="worker-palette-item"><span class="worker-palette-swatch" style="background:#be123c"></span>Maximum</span>
+      </div>
+    </div>
     <div class="cohort-grid worker-compare-grid--lines">
       <div class="chart-section">
         <h2 class="chart-title">Lifetime Income Profile</h2>

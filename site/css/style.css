@@ -1346,12 +1346,51 @@ a:hover { color: var(--brand-blue); }
 }
 
 /* --- Worker comparison tab ---------------------------------------------- */
-.worker-compare-section-title {
-  margin: 1.75rem 0 0.75rem;
+.worker-line-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 2rem 0 0.85rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.worker-line-section-title-block { display: flex; flex-direction: column; }
+.worker-line-section-title {
+  margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--brand-navy);
   letter-spacing: 0.01em;
+  color: var(--brand-navy);
+}
+.worker-line-section-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.worker-palette-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.1rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.worker-palette-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.worker-palette-swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.worker-compare-grid--lines {
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
 }
 .worker-compare-grid--lines .chart-canvas-wrap {
   height: 300px;
