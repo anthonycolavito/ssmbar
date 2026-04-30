@@ -79,6 +79,14 @@ cola <- function (worker, debugg = FALSE) {
       elig_age_val <- .x$elig_age[1]
       ages <- .x$age
       
+      #Guard for ineligible workers -- COLA'd PIA stays at 0. 
+      if (is.na(elig_age_val)) {
+        .x$cola_pia <- 0
+        .x$cola_cum_factor <- cumprod(.x$cola_factor)
+        
+        return(.x)
+      }
+      
       # Find index of eligibility age for COLA replay
       elig_idx <- which(ages == elig_age_val)[1]
       
