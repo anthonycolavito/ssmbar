@@ -44,7 +44,7 @@ special_min_pia <- function(worker, debugg=FALSE) {
     group_by(id) %>% arrange(id, age) %>%
     mutate(
       #Get minimum number of YOC needed for SMP at eligibility age
-      min_yoc_elig = min_yoc_for_special_min[which(age == first(elig_age))],
+      min_yoc_elig = min_yoc_for_special_min[match(elig_age, age)],
       
       # Special minimum PIA per 42 USC 415(a)(1)(C)(i):
       # PIA = special_min_rate x (years_of_coverage - 10)

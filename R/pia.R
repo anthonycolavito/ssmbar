@@ -16,11 +16,11 @@ basic_pia <- function(worker, debugg = FALSE) {
   worker <- worker %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
       # Use worker's elig_age for bend points (disability age for disabled workers, 62 for retired workers)
-      bp1_elig = bp1[which(age == first(elig_age))], # First PIA bend point at worker's eligibility age
-      bp2_elig = bp2[which(age == first(elig_age))], # Second PIA bend point at worker's eligibility age
-      fact1_elig = fact1[which(age == first(elig_age))], # First replacement factor (90%)
-      fact2_elig = fact2[which(age == first(elig_age))], # Second replacement factor (32%)
-      fact3_elig = fact3[which(age == first(elig_age))], # Third replacement factor (15%)
+      bp1_elig = bp1[match(elig_age, age)], # First PIA bend point at worker's eligibility age
+      bp2_elig = bp2[match(elig_age, age)], # Second PIA bend point at worker's eligibility age
+      fact1_elig = fact1[match(elig_age, age)], # First replacement factor (90%)
+      fact2_elig = fact2[match(elig_age, age)], # Second replacement factor (32%)
+      fact3_elig = fact3[match(elig_age, age)], # Third replacement factor (15%)
       
       # Basic PIA per 42 USC 415(a)(1)(A): 90/32/15 bend point formula
       # Per 42 USC 415(a)(1)(A): round to next lower $0.10

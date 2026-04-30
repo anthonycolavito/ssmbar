@@ -66,7 +66,7 @@ index_earnings <- function(worker, debugg = FALSE) {
   worker <- worker %>% group_by(id) %>% arrange(id, age) %>%
     mutate(
       index_age = elig_age - first(index_age_offset), # Age for wage indexing (e.g., 62 - 2 = 60)
-      awi_index_age = awi[which(age == index_age)], # Retrieve AWI at indexing age
+      awi_index_age = awi[match(index_age, age)], # Retrieve AWI at indexing age
       index_factor = pmax(awi_index_age / awi, 1), # Calculate indexing factor. Earnings past indexing age are taken at face value.
       capped_earn = pmin(earnings, taxmax), # Cap earnings amounts at the taxable maximum at each age
       indexed_earn = capped_earn * index_factor # Indexed capped earnings amounts

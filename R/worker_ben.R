@@ -44,10 +44,10 @@ worker_benefit <- function(worker, debugg = FALSE) {
   worker <- worker %>%
     group_by(id) %>% arrange(id, age) %>%
     mutate(
-      rf1_ind = rf1[which(age == first(elig_age))], #First reduction factor
-      rf2_ind = rf2[which(age == first(elig_age))], #Second reduction factor
-      drc_ind = drc[which(age == first(elig_age))], #Third reduction factor
-      nra_ind = nra[which(age == first(elig_age))], #NRA for age 62 cohort
+      rf1_ind = rf1[match(elig_age, age)], #First reduction factor
+      rf2_ind = rf2[match(elig_age, age)], #Second reduction factor
+      drc_ind = drc[match(elig_age, age)], #Third reduction factor
+      nra_ind = nra[match(elig_age, age)], #NRA for age 62 cohort
 
       # Disabled workers get no actuarial adjustment - their benefit = 100% of PIA
       # Retired workers get actuarial adjustment based on claiming age relative to NRA
