@@ -1319,9 +1319,12 @@ a:hover { color: var(--brand-blue); }
 }
 .cohort-grid .chart-canvas-wrap {
   height: 260px;
+  margin-top: auto;  /* anchor canvas to cell bottom so plot areas line up */
 }
 .cohort-grid .chart-section {
   padding: 1.1rem 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
 }
 
 /* --- Tab context header (Cohort + Worker tabs) -------------------------- */

@@ -74,6 +74,14 @@ function nraAnnotation(nraIdx, nraAge) {
   };
 }
 
+// Pin the y-axis to a fixed width so adjacent grid charts (with different
+// tick formats — currency / percent / number) share the same plot-area
+// origin. Without this, "$1.5M" and "5%" produce different left paddings
+// and the bars/lines fall on different x-positions across cells.
+function forceFixedAxisWidth(scale) {
+  scale.width = 56;
+}
+
 function makeDefaults() {
   return {
     responsive: true,
@@ -480,6 +488,7 @@ const chartManager = (() => {
     const o = makeDefaults();
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     o.scales.y.beginAtZero = (yFormat === 'currency');
+    o.scales.y.afterFit = forceFixedAxisWidth;
     if (yMin != null) o.scales.y.min = yMin;
     if (yMax != null) o.scales.y.max = yMax;
     o.plugins.tooltip.callbacks = {
@@ -658,6 +667,7 @@ const chartManager = (() => {
     const o = makeDefaults();
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     o.scales.y.beginAtZero = (yFormat === 'currency');
+    o.scales.y.afterFit = forceFixedAxisWidth;
     if (yMin != null) o.scales.y.min = yMin;
     if (yMax != null) o.scales.y.max = yMax;
     o.plugins.tooltip.callbacks = {
@@ -758,6 +768,7 @@ const chartManager = (() => {
     const o = makeDefaults();
     o.scales.y.ticks.callback = (v) => formatYTick(v, yFormat);
     if (yFormat === 'currency') o.scales.y.beginAtZero = true;
+    o.scales.y.afterFit = forceFixedAxisWidth;
     if (yMin != null) o.scales.y.min = yMin;
     if (yMax != null) o.scales.y.max = yMax;
     // Per-chart legend stays off — the parent tab supplies a single palette
