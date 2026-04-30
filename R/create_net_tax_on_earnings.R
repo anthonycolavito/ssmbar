@@ -96,54 +96,52 @@ make_real_factor <- function(birth_yr, par) {
   par %>% transmute(year, real_factor = (df_y65 / df) * (gdp_pi_2026 / gdp_pi_y65))
 }
 
-# ---- Helper: PV of household benefits with primary truncated at t -----------
-pv_household_ben <- function(t, primary_baseline, partner_baseline,
-                             partner_info, par, real_factor_lookup, death_age,
-                             partner_solo_ben) {
+# ---- Helper: PV of household benefits with primary truncated at t -----------                                                   
+pv_household_ben <- function(t, primary_baseline, partner_baseline,                                                               
+                             partner_info, par, real_factor_lookup, death_age,                                                    
+                             partner_solo_ben) {                                                                                  
   
-  mod_primary <- primary_baseline %>%
-    mutate(earnings = if_else(age <= t, earnings, 0))
+  mod_primary <- primary_baseline %>%                                                                                             
+    mutate(earnings = if_else(age <= t, earnings, 0))     
   
-  # Pre-check: if primary's truncated earnings never reach 40 QCs, the worker
-  # is never insured, elig_age is NA, and the calc_ben pipeline errors in
-  # index_earnings(). In that case primary contributes no benefits, and the
-  # partner's spousal_ben on primary's record is also 0 (no PIA), so household
-  # benefits collapse to the partner's solo retired-worker benefit.
-  pre <- mod_primary %>% join_all_assumptions(par) %>% eligibility()
-  primary_eligible <- !is.na(pre$elig_age[1])
+  # With the upstream guards in aime/pia/cola/worker_ben, calc_ben handles
+  # an uninsured truncated worker cleanly: own wrk_ben = 0, spousal_ben on                                                        
+  # partner's record runs through normally. The old !primary_eligible                                                             
+  # short-circuit was dropping that spousal benefit and producing a year-of                                                       
+  # -insurance "windfall" delta. Now only the truly-no-partner case                                                               
+  # short-circuits to 0.                                                                                                          
+  pre <- mod_primary %>% join_all_assumptions(par) %>% eligibility()                                                              
+  primary_eligible <- !is.na(pre$elig_age[1])                                                                                     
   
-  if (!primary_eligible) {
-    if (is.null(partner_baseline)) return(0)
-    ben <- partner_solo_ben %>%
-      transmute(year, age, household_ben = annual_ben)
-  } else if (is.null(partner_baseline)) {
+  if (is.null(partner_baseline)) {                        
+    if (!primary_eligible) return(0)                                                                                              
     ben <- calc_ben(par, mod_primary, output = "skinny") %>%
-      transmute(year, age, household_ben = annual_ben)
+      transmute(year, age, household_ben = annual_ben)                                                                            
   } else {
-    mod_primary <- mod_primary %>% mutate(spouse_id = partner_baseline$id[1])
+    mod_primary <- mod_primary %>% mutate(spouse_id = partner_baseline$id[1])                                                     
     
     primary_ben <- calc_ben(par, mod_primary, partner_info, output = "skinny") %>%
-      transmute(year, age, ben_p = annual_ben)
+      transmute(year, age, ben_p = annual_ben)                                                                                    
     
     # Partner's spousal benefit depends on primary's (modified) PIA, so the
-    # spouse-info pipeline has to be rerun on the modified primary.
-    mod_primary_info <- generate_spousal_info(par, mod_primary)
+    # spouse-info pipeline has to be rerun on the modified primary.                                                               
+    mod_primary_info <- generate_spousal_info(par, mod_primary)                                                                   
     mod_partner      <- partner_baseline %>%
-      mutate(spouse_id = mod_primary$id[1])
+      mutate(spouse_id = mod_primary$id[1])                                                                                       
     partner_ben      <- calc_ben(par, mod_partner, mod_primary_info, output = "skinny") %>%
       transmute(year, age, ben_s = annual_ben)
     
     ben <- primary_ben %>%
-      full_join(partner_ben, by = c("year", "age")) %>%
+      full_join(partner_ben, by = c("year", "age")) %>%                                                                           
       mutate(household_ben = coalesce(ben_p, 0) + coalesce(ben_s, 0))
-  }
+  }                                                                                                                               
   
-  ben %>%
-    filter(age <= death_age) %>%
+  ben %>%                                                                                                                         
+    filter(age <= death_age) %>%                          
     left_join(real_factor_lookup, by = "year") %>%
-    summarise(pv = sum(household_ben * real_factor, na.rm = TRUE)) %>%
+    summarise(pv = sum(household_ben * real_factor, na.rm = TRUE)) %>%                                                            
     pull(pv)
-}
+}                                                 
 
 # ---- Helper: net tax for one config ----------------------------------------
 gen_net_tax <- function(worker_type, spouse_type, birth_yr, claim_age,

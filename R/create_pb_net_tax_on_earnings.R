@@ -102,47 +102,44 @@ make_real_factor <- function(birth_yr, par) {
 }
 
 # ---- Helper: PV of household benefits, both scenarios from one calc_ben ----
-pv_household_ben <- function(t, primary_baseline, partner_baseline,
+pv_household_ben <- function(t, primary_baseline, partner_baseline,                                                               
                              partner_info, par, real_factor_lookup, death_age,
-                             partner_solo_ben) {
+                             partner_solo_ben) {                                                                                  
   
-  mod_primary <- primary_baseline %>%
-    mutate(earnings = if_else(age <= t, earnings, 0))
+  mod_primary <- primary_baseline %>%                                                                                             
+    mutate(earnings = if_else(age <= t, earnings, 0))     
   
-  pre <- mod_primary %>% join_all_assumptions(par) %>% eligibility()
+  pre <- mod_primary %>% join_all_assumptions(par) %>% eligibility()                                                              
   primary_eligible <- !is.na(pre$elig_age[1])
   
-  if (!primary_eligible) {
-    if (is.null(partner_baseline)) return(tibble(pv_sched = 0, pv_pb = 0))
-    ben <- partner_solo_ben %>%
-      transmute(year, age, household_ben = annual_ben)
-  } else if (is.null(partner_baseline)) {
-    ben <- calc_ben(par, mod_primary, output = "skinny") %>%
-      transmute(year, age, household_ben = annual_ben)
+  if (is.null(partner_baseline)) {                                                                                                
+    if (!primary_eligible) return(tibble(pv_sched = 0, pv_pb = 0))
+    ben <- calc_ben(par, mod_primary, output = "skinny") %>%                                                                      
+      transmute(year, age, household_ben = annual_ben)                                                                            
   } else {
-    mod_primary <- mod_primary %>% mutate(spouse_id = partner_baseline$id[1])
+    mod_primary <- mod_primary %>% mutate(spouse_id = partner_baseline$id[1])                                                     
     
     primary_ben <- calc_ben(par, mod_primary, partner_info, output = "skinny") %>%
-      transmute(year, age, ben_p = annual_ben)
+      transmute(year, age, ben_p = annual_ben)                                                                                    
     
     mod_primary_info <- generate_spousal_info(par, mod_primary)
-    mod_partner      <- partner_baseline %>%
-      mutate(spouse_id = mod_primary$id[1])
-    partner_ben      <- calc_ben(par, mod_partner, mod_primary_info, output = "skinny") %>%
+    mod_partner      <- partner_baseline %>%                                                                                      
+      mutate(spouse_id = mod_primary$id[1])               
+    partner_ben      <- calc_ben(par, mod_partner, mod_primary_info, output = "skinny") %>%                                       
       transmute(year, age, ben_s = annual_ben)
     
-    ben <- primary_ben %>%
-      full_join(partner_ben, by = c("year", "age")) %>%
+    ben <- primary_ben %>%                                
+      full_join(partner_ben, by = c("year", "age")) %>%                                                                           
       mutate(household_ben = coalesce(ben_p, 0) + coalesce(ben_s, 0))
-  }
+  }                                                                                                                               
   
-  ben %>%
-    filter(age <= death_age) %>%
+  ben %>%                                                                                                                         
+    filter(age <= death_age) %>%                          
     left_join(real_factor_lookup, by = "year") %>%
-    summarise(
+    summarise(                                                                                                                    
       pv_sched = sum(household_ben           * real_factor, na.rm = TRUE),
-      pv_pb    = sum(household_ben * payable * real_factor, na.rm = TRUE)
-    )
+      pv_pb    = sum(household_ben * payable * real_factor, na.rm = TRUE)                                                         
+    )                                                                                                                             
 }
 
 # ---- Helper: net tax for one config (both scenarios) -----------------------
