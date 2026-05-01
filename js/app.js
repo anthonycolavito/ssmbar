@@ -1,0 +1,664 @@
+// =============================================================================
+// App — Entry point. Wires data, controls, hero, charts, summary cards, table.
+//
+// Every metric is shown under both the scheduled and payable scenarios. The
+// JSON config has parallel scheduled / payable sub-objects in `annual` and
+// `summary`; PV taxes is invariant and lives at the top of `summary`.
+// =============================================================================
+
+const SPOUSE_PHRASE = {
+  none:     'filing as a single individual',
+  very_low: 'married to a very-low-earning spouse',
+  low:      'married to a low-earning spouse',
+  medium:   'married to a medium-earning spouse',
+  high:     'married to a high-earning spouse',
+  max:      'married to a maximum-earning spouse'
+};
+
+const WORKER_LABEL_LOWER = {
+  very_low: 'very-low',
+  low:      'low',
+  medium:   'medium',
+  high:     'high',
+  max:      'maximum'
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await dataLoader.init();
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    showLoadError(err);
+    return;
+  }
+
+  const m = dataLoader.meta();
+  if (m && m.generated) {
+    const date = new Date(m.generated);
+    const display = isNaN(date) ? m.generated
+      : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const el = document.getElementById('metaGenerated');
+    if (el) el.textContent = display;
+  }
+
+  uiControls.init({
+    dimensions: dataLoader.dimensions(),
+    onTab: handleTabChange
+  });
+  uiControls.onChange(state => render(state));
+  render(uiControls.getState());
+
+  const cohortCsvBtn = document.getElementById('downloadCohortCsvBtn');
+  if (cohortCsvBtn) {
+    cohortCsvBtn.addEventListener('click', () => tableManager.downloadCohortCsv(uiControls.getState()));
+  }
+  const workerCsvBtn = document.getElementById('downloadWorkerCsvBtn');
+  if (workerCsvBtn) {
+    workerCsvBtn.addEventListener('click', () => tableManager.downloadWorkerCompareCsv(uiControls.getState()));
+  }
+  const constantCsvBtn = document.getElementById('downloadConstantCsvBtn');
+  if (constantCsvBtn) {
+    constantCsvBtn.addEventListener('click', () => tableManager.downloadConstantEarnerCsv());
+  }
+});
+
+function render(state) {
+  const cfg = dataLoader.getConfig(state.workerType, state.spouseType, state.birthYear);
+  renderHero(cfg, state);
+  renderSummaryCards(cfg, 'summaryCards');
+  renderLifetimeProfile(cfg, state);
+  renderAnnualBenefitsChart(cfg, state.real);
+  renderNetTaxRateChart(cfg);
+  renderMarginalIrrChart(cfg);
+  tableManager.render(cfg);
+
+  if (!document.getElementById('panel-cohort').hidden) {
+    renderSummaryCards(cfg, 'summaryCardsCohort');
+    setContextLine('cohortContextLine', state);
+    renderCohortCharts(state);
+  }
+  if (!document.getElementById('panel-worker').hidden) {
+    setContextLine('workerContextLine', state, { suppressWorker: true });
+    renderWorkerCompareCharts(state);
+  }
+  if (!document.getElementById('panel-constant').hidden) {
+    renderConstantEarnerCharts();
+  }
+}
+
+function handleTabChange(tab) {
+  const state = uiControls.getState();
+  const cfg = dataLoader.getConfig(state.workerType, state.spouseType, state.birthYear);
+  if (tab === 'cohort') {
+    renderSummaryCards(cfg, 'summaryCardsCohort');
+    setContextLine('cohortContextLine', state);
+    renderCohortCharts(state);
+  }
+  if (tab === 'worker') {
+    setContextLine('workerContextLine', state, { suppressWorker: true });
+    renderWorkerCompareCharts(state);
+  }
+  if (tab === 'constant') {
+    renderConstantEarnerCharts();
+  }
+}
+
+// One-line context for the Cohort/Worker tabs. Cohort echoes the full
+// (worker, spouse, cohort) trio; Worker omits worker since the tab itself
+// sweeps that dimension.
+function setContextLine(elementId, state, { suppressWorker = false } = {}) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const lede = suppressWorker
+    ? `Born <strong>${state.birthYear}</strong>`
+    : `<strong>${WORKER_LABEL_LOWER[state.workerType] || state.workerType}</strong> earner born <strong>${state.birthYear}</strong>`;
+  const tail = state.spouseType === 'none'
+    ? 'filing as a single individual'
+    : (SPOUSE_PHRASE[state.spouseType] || '');
+  el.innerHTML = `${lede}, ${tail}`;
+}
+
+// -----------------------------------------------------------------------------
+// Hero
+// -----------------------------------------------------------------------------
+
+function renderHero(cfg, state) {
+  const workerWord = WORKER_LABEL_LOWER[state.workerType] || state.workerType;
+  const spousePhrase = SPOUSE_PHRASE[state.spouseType] || '';
+  const ledePieces = [`A <strong>${workerWord}</strong> earner born in <strong>${state.birthYear}</strong>`];
+  if (state.spouseType !== 'none') ledePieces.push(spousePhrase);
+  const lede = `${ledePieces.join(', ')}, can expect at age 65:`;
+
+  document.getElementById('heroLede').innerHTML = lede;
+  document.getElementById('heroValue').textContent        = Fmt.currency(cfg.summary.scheduled.monthly_real_at_65);
+  document.getElementById('heroValuePayable').textContent = Fmt.currency(cfg.summary.payable.monthly_real_at_65);
+
+  const yrs = (cfg.summary.death_age != null) ? cfg.summary.death_age - 65 : null;
+  const rrSched = Fmt.percent(cfg.summary.scheduled.rep_rate_career);
+  const rrPay   = Fmt.percent(cfg.summary.payable.rep_rate_career);
+  const subParts = ['in 2026 dollars'];
+  subParts.push(`Replaces about <strong>${rrSched}</strong> of average career earnings (<strong>${rrPay}</strong> payable)`);
+  if (yrs != null) subParts.push(`Expected to be received for ~<strong>${yrs}</strong> years from age 65`);
+  document.getElementById('heroSubline').innerHTML = subParts.join(' · ');
+}
+
+// -----------------------------------------------------------------------------
+// Summary cards
+// -----------------------------------------------------------------------------
+
+function renderSummaryCards(cfg, hostId = 'summaryCards') {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  const s = cfg.summary;
+  const cards = [
+    {
+      label: 'Initial Monthly Benefit',
+      scheduled: Fmt.currency(s.scheduled.monthly_real_at_65),
+      payable:   Fmt.currency(s.payable.monthly_real_at_65),
+      info:  'Initial benefit at age 65, 2026 dollars.'
+    },
+    {
+      label: 'PV Lifetime Benefits',
+      scheduled: Fmt.currency(s.scheduled.pv_benefits),
+      payable:   Fmt.currency(s.payable.pv_benefits),
+      info:  'Lifetime value of benefits discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
+    },
+    {
+      label: 'PV Lifetime Taxes',
+      value: Fmt.currency(s.pv_taxes),
+      info:  'Lifetime value of taxes discounted to age 65, 2026 dollars. Per member for couples — household total split equally between spouses.'
+    },
+    {
+      label: 'Benefit / Tax Ratio',
+      scheduled: (s.scheduled.ben_tax_ratio == null) ? '--' : s.scheduled.ben_tax_ratio.toFixed(2),
+      payable:   (s.payable.ben_tax_ratio   == null) ? '--' : s.payable.ben_tax_ratio.toFixed(2),
+      info:  'PV Lifetime Benefits divided by PV Lifetime Taxes.'
+    },
+    {
+      label: 'Internal Rate of Return',
+      scheduled: Fmt.percent(s.scheduled.irr, { decimals: 2 }),
+      payable:   Fmt.percent(s.payable.irr,   { decimals: 2 }),
+      info:  'Real annualized return on lifetime OASDI contributions — the discount rate that equates the present value of taxes paid to the present value of benefits received.'
+    },
+    {
+      label: 'Replacement Rate (Career)',
+      scheduled: Fmt.percent(s.scheduled.rep_rate_career),
+      payable:   Fmt.percent(s.payable.rep_rate_career),
+      info:  "Initial real benefit divided by worker's average real annual career earnings."
+    },
+    {
+      label: 'Replacement Rate (Average Wage)',
+      scheduled: Fmt.percent(s.scheduled.rep_rate_awi),
+      payable:   Fmt.percent(s.payable.rep_rate_awi),
+      info:  'Initial benefit divided by the national average wage.'
+    }
+  ];
+
+  host.innerHTML = cards.map(c => {
+    const infoIcon = c.info
+      ? `<span class="summary-info" data-tip="${escapeAttr(c.info)}" tabindex="0" aria-label="${escapeAttr(c.info)}"><i class="bi bi-question-circle"></i></span>`
+      : '';
+    const valueBlock = (c.value != null)
+      ? `<div class="summary-value">${c.value}</div>`
+      : `
+        <div class="summary-value-dual">
+          <div class="summary-value-row">
+            <span class="summary-value">${c.scheduled}</span>
+            <span class="summary-scenario-label">scheduled</span>
+          </div>
+          <div class="summary-value-row summary-value-row--secondary">
+            <span class="summary-value summary-value--secondary">${c.payable}</span>
+            <span class="summary-scenario-label">payable</span>
+          </div>
+        </div>`;
+    return `
+      <div class="summary-card">
+        <div class="summary-label">${c.label}${infoIcon}</div>
+        ${valueBlock}
+      </div>`;
+  }).join('');
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+// -----------------------------------------------------------------------------
+// Charts — Individual tab
+// -----------------------------------------------------------------------------
+
+function renderLifetimeProfile(cfg, state) {
+  const view = state.lifetimeView || 'primary';
+  const profile = dataLoader.getLifetimeProfile(
+    state.workerType, state.spouseType, state.birthYear, state.real, view
+  );
+
+  const subtitleEl = document.getElementById('lifetimeProfileSubtitle');
+  if (subtitleEl) {
+    const dollars = state.real ? 'Real 2026 dollars (GDP price index)' : 'Nominal dollars (year of receipt)';
+    let scope;
+    if (view === 'household') {
+      scope = state.spouseType === 'none'
+        ? 'Single-worker household — earnings (ages 21–64) and Social Security benefits (age 65 to life expectancy).'
+        : 'Household totals — combined earnings of both spouses (ages 21–64) and combined Social Security benefits (age 65 to life expectancy).';
+    } else {
+      scope = "Primary worker only — own earnings (ages 21–64) and own Social Security benefit (age 65 to life expectancy).";
+    }
+    const fallback = profile.earnings_available
+      ? ''
+      : ' Working-year earnings data not yet available for this cohort — only retirement years shown.';
+    subtitleEl.textContent = `${dollars}. ${scope}${fallback} Solid line = scheduled benefits; dashed line = payable.`;
+  }
+
+  chartManager.lifetimeProfileChart('lifetimeProfileChart', {
+    ages:            profile.ages,
+    values:          profile.scheduled,
+    valuesSecondary: profile.payable,
+    transitionIdx:   profile.transitionIdx,
+    leAge:           profile.leAge,
+    nraAge:          cfg.summary.nra
+  });
+}
+
+function renderAnnualBenefitsChart(cfg, real) {
+  const sched = real ? cfg.annual.scheduled.real : cfg.annual.scheduled.nominal;
+  const pay   = real ? cfg.annual.payable.real   : cfg.annual.payable.nominal;
+  const leAge = cfg.summary.death_age;
+  const fadeIdx = (leAge != null) ? cfg.annual.ages.indexOf(leAge) : null;
+  const subtitle = real
+    ? 'Real 2026 dollars (GDP price index). Solid = scheduled, dashed = payable.'
+    : 'Nominal dollars (year of receipt). Solid = scheduled, dashed = payable.';
+  document.getElementById('annualBenefitsSubtitle').textContent = subtitle;
+
+  chartManager.lineChart('annualBenefitsChart', {
+    labels:        cfg.annual.ages,
+    data:          sched,
+    dataSecondary: pay,
+    yFormat:       'currency',
+    yMin:          0,
+    leMarker:      leAge,
+    nraAge:        cfg.summary.nra,
+    fadeAfterIdx:  (fadeIdx != null && fadeIdx >= 0) ? fadeIdx : null
+  });
+}
+
+function renderNetTaxRateChart(cfg) {
+  const canvas    = document.getElementById('netTaxRateChart');
+  const empty     = document.getElementById('netTaxRateEmpty');
+  const subtitle  = document.getElementById('netTaxRateSubtitle');
+  const pending   = dataLoader.nmtrValuesPending();
+  const pbPending = dataLoader.pbNmtrPending();
+  const hasData   = dataLoader.hasNmtr(cfg) && !pending;
+
+  if (canvas) canvas.hidden = !hasData;
+  if (empty) {
+    empty.hidden = hasData;
+    const msg = empty.querySelector('span');
+    if (msg) {
+      msg.textContent = pending
+        ? 'Net tax rate data is being recomputed — currently unavailable.'
+        : 'Net tax data is not yet available for this cohort.';
+    }
+  }
+
+  if (subtitle) {
+    subtitle.textContent = pbPending
+      ? 'Payroll tax rate net of incremental value of benefits by age. Scheduled scenario only — payable scenario coming soon.'
+      : 'Payroll tax rate net of incremental value of benefits by age. Solid = scheduled, dashed = payable.';
+  }
+
+  if (!hasData) {
+    chartManager.destroyChart('netTaxRateChart');
+    return;
+  }
+
+  chartManager.netTaxRateChart('netTaxRateChart', {
+    ages:            cfg.nmtr.ages,
+    values:          cfg.nmtr.scheduled.values,
+    valuesSecondary: pbPending ? null : cfg.nmtr.payable.values
+  });
+}
+
+function renderMarginalIrrChart(cfg) {
+  const canvas  = document.getElementById('marginalIrrChart');
+  const empty   = document.getElementById('marginalIrrEmpty');
+  const hasData = dataLoader.hasNmtr(cfg) && !dataLoader.nmtrValuesPending();
+
+  if (canvas) canvas.hidden = !hasData;
+  if (empty)  empty.hidden  =  hasData;
+  if (!hasData) {
+    chartManager.destroyChart('marginalIrrChart');
+    return;
+  }
+
+  chartManager.marginalIrrChart('marginalIrrChart', {
+    ages:            cfg.nmtr.ages,
+    valuesScheduled: cfg.nmtr.scheduled.marginal_irr,
+    valuesPayable:   cfg.nmtr.payable.marginal_irr
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Cohort charts
+// -----------------------------------------------------------------------------
+
+function renderCohortCharts(state) {
+  const w = state.workerType, s = state.spouseType;
+
+  const monthly = dataLoader.getCohortSeries(w, s, 'monthly_real_at_65');
+  chartManager.cohortLineChart('cohortMonthlyChart', {
+    labels: monthly.years, data: monthly.scheduled, dataSecondary: monthly.payable,
+    yFormat: 'currency'
+  });
+
+  // Benefit/Tax Ratio: solid scheduled + dashed payable, both lines colored
+  // around the 1.0 threshold (blue for net beneficiary, amber for net
+  // taxpayer; the secondary line uses lighter shades to match its dashed
+  // weight). Dashed reference at 1.0.
+  const ratio = dataLoader.getCohortSeries(w, s, 'ben_tax_ratio');
+  chartManager.cohortLineChart('cohortRatioChart', {
+    labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
+  });
+
+  const pvBen = dataLoader.getCohortSeries(w, s, 'pv_benefits');
+  chartManager.cohortLineChart('cohortPvBenChart', {
+    labels: pvBen.years, data: pvBen.scheduled, dataSecondary: pvBen.payable,
+    yFormat: 'currency'
+  });
+
+  // PV Taxes is identical under scheduled and payable — single line.
+  const pvTax = dataLoader.getCohortSeries(w, s, 'pv_taxes');
+  chartManager.cohortLineChart('cohortPvTaxChart', {
+    labels: pvTax.years, data: pvTax.scheduled,
+    yFormat: 'currency'
+  });
+
+  // The two replacement-rate charts share a common y-axis (0 to the larger of
+  // the two metrics' max across cohorts and scenarios) so they're directly
+  // comparable.
+  const rrCareer = dataLoader.getCohortSeries(w, s, 'rep_rate_career');
+  const rrAwi    = dataLoader.getCohortSeries(w, s, 'rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortLineChart('cohortRrCareerChart', {
+    labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+  chartManager.cohortLineChart('cohortRrAwiChart', {
+    labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+
+  // Bottom row: the two IRR charts.
+  const irr = dataLoader.getCohortSeries(w, s, 'irr');
+  chartManager.cohortLineChart('cohortIrrChart', {
+    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', yMin: 0
+  });
+
+  const mirrFinal = dataLoader.getCohortSeries(w, s, 'marginal_irr_age64');
+  chartManager.cohortLineChart('cohortMirrFinalChart', {
+    labels: mirrFinal.years, data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
+    yFormat: 'percent'
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Worker comparison charts (within-cohort sweep across worker types)
+// -----------------------------------------------------------------------------
+
+const WORKER_TYPE_LABEL = {
+  very_low: 'Very low',
+  low:      'Low',
+  medium:   'Medium',
+  high:     'High',
+  max:      'Maximum'
+};
+
+function renderWorkerCompareCharts(state) {
+  const s = state.spouseType;
+  const y = state.birthYear;
+
+  const labelize = series => series.types.map(t => WORKER_TYPE_LABEL[t] || t);
+
+  const monthly = dataLoader.getWorkerCompareSeries(s, y, 'monthly_real_at_65');
+  chartManager.cohortBarChart('workerMonthlyChart', {
+    labels: labelize(monthly), data: monthly.scheduled, dataSecondary: monthly.payable,
+    yFormat: 'currency'
+  });
+
+  const ratio = dataLoader.getWorkerCompareSeries(s, y, 'ben_tax_ratio');
+  chartManager.cohortBarChart('workerRatioChart', {
+    labels: labelize(ratio), data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
+  });
+
+  const pvBen = dataLoader.getWorkerCompareSeries(s, y, 'pv_benefits');
+  chartManager.cohortBarChart('workerPvBenChart', {
+    labels: labelize(pvBen), data: pvBen.scheduled, dataSecondary: pvBen.payable,
+    yFormat: 'currency'
+  });
+
+  // PV taxes is scenario-invariant — single series.
+  const pvTax = dataLoader.getWorkerCompareSeries(s, y, 'pv_taxes');
+  chartManager.cohortBarChart('workerPvTaxChart', {
+    labels: labelize(pvTax), data: pvTax.scheduled,
+    yFormat: 'currency'
+  });
+
+  const rrCareer = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_career');
+  const rrAwi    = dataLoader.getWorkerCompareSeries(s, y, 'rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortBarChart('workerRrCareerChart', {
+    labels: labelize(rrCareer), data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+  chartManager.cohortBarChart('workerRrAwiChart', {
+    labels: labelize(rrAwi), data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+
+  const irr = dataLoader.getWorkerCompareSeries(s, y, 'irr');
+  chartManager.cohortBarChart('workerIrrChart', {
+    labels: labelize(irr), data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent'
+  });
+
+  const mirrFinal = dataLoader.getWorkerCompareSeries(s, y, 'marginal_irr_age64');
+  chartManager.cohortBarChart('workerMirrFinalChart', {
+    labels: labelize(mirrFinal), data: mirrFinal.scheduled, dataSecondary: mirrFinal.payable,
+    yFormat: 'percent'
+  });
+
+  // Age-axis overlays — five lines per chart, scheduled scenario only.
+  const types = monthly.types;
+  const buildSeries = (perType, getter = (v) => v) => types.map(t => ({
+    key: t,
+    label: WORKER_TYPE_LABEL[t] || t,
+    data: perType[t] ? perType[t].map(getter) : null
+  })).filter(s => s.data != null);
+
+  const lifetimeReal = state.real;
+  const lp = dataLoader.getWorkerCompareLifetimeProfiles(s, y, 'scheduled', lifetimeReal);
+  chartManager.multiSeriesLineChart('workerLifetimeProfileChart', {
+    labels: lp.ages,
+    series: types.map(t => ({
+      key: t,
+      label: WORKER_TYPE_LABEL[t] || t,
+      data: lp.perType[t]
+    })),
+    yFormat: 'currency',
+    transitionIdx: lp.transitionIdx >= 0 ? lp.transitionIdx : null
+  });
+
+  const ntr = dataLoader.getWorkerCompareNmtrSeries(s, y, 'values', 'scheduled');
+  chartManager.multiSeriesLineChart('workerNetTaxRateChart', {
+    labels: ntr.ages,
+    series: buildSeries(ntr.perType),
+    yFormat: 'percent',
+    referenceY: 0
+  });
+
+  const mirr = dataLoader.getWorkerCompareNmtrSeries(s, y, 'marginal_irr', 'scheduled');
+  chartManager.multiSeriesLineChart('workerMarginalIrrChart', {
+    labels: mirr.ages,
+    series: buildSeries(mirr.perType, v => (v == null ? -1 : v)),
+    yFormat: 'percent',
+    yMin: -1,
+    referenceY: 0
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Constant-earner cohort charts (synthetic $50K avg-real worker, single)
+// -----------------------------------------------------------------------------
+
+function renderConstantEarnerCharts() {
+  // Trustees Report 2025 formal projections end at year 2099. A cohort
+  // born in 2035 turns 65 in 2100, so cohorts from 2035 onward retire
+  // in extrapolation territory. Mark that boundary on every chart.
+  const TRUSTEES_CUTOFF      = 2035;
+  const TRUSTEES_CUTOFF_LBL  = 'Trustees projection ends →';
+
+  const monthly = dataLoader.getConstantEarnerSeries('monthly_real_at_65');
+  chartManager.cohortLineChart('constantMonthlyChart', {
+    labels: monthly.years, data: monthly.scheduled, dataSecondary: monthly.payable,
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  const ratio = dataLoader.getConstantEarnerSeries('ben_tax_ratio');
+  chartManager.cohortLineChart('constantRatioChart', {
+    labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  const pvBen = dataLoader.getConstantEarnerSeries('pv_benefits');
+  chartManager.cohortLineChart('constantPvBenChart', {
+    labels: pvBen.years, data: pvBen.scheduled, dataSecondary: pvBen.payable,
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  // PV taxes is scenario-invariant — single line.
+  const pvTax = dataLoader.getConstantEarnerSeries('pv_taxes');
+  chartManager.cohortLineChart('constantPvTaxChart', {
+    labels: pvTax.years, data: pvTax.scheduled,
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  const rrCareer = dataLoader.getConstantEarnerSeries('rep_rate_career');
+  const rrAwi    = dataLoader.getConstantEarnerSeries('rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortLineChart('constantRrCareerChart', {
+    labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+  chartManager.cohortLineChart('constantRrAwiChart', {
+    labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  const irr = dataLoader.getConstantEarnerSeries('irr');
+  chartManager.cohortLineChart('constantIrrChart', {
+    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', yMin: 0,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  const mirr = dataLoader.getConstantEarnerSeries('marginal_irr_age64');
+  chartManager.cohortLineChart('constantMirrFinalChart', {
+    labels: mirr.years, data: mirr.scheduled, dataSecondary: mirr.payable,
+    yFormat: 'percent',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
+  });
+
+  renderConstantIncomeShareChart();
+  renderConstantLifetimeChart();
+}
+
+// Auxiliary chart 1: $50K (in 2026 dollars) as a share of AWI and tax max
+// in each calendar year.
+function renderConstantIncomeShareChart() {
+  const s = dataLoader.getConstantEarnerIncomeShare();
+  chartManager.cohortLineChart('constantIncomeShareChart', {
+    labels: s.years,
+    data:          s.fifty_k_over_awi,
+    dataSecondary: s.fifty_k_over_taxmax,
+    yFormat: 'number',
+    referenceY: 1.0,
+    referenceLabel: '$50K = AWI / taxmax'
+  });
+}
+
+// Auxiliary chart 2: lifetime real-income profile. One earnings line
+// (ages 21-64, identical across cohorts by construction) plus several
+// benefit lines (age 65+, one per cohort) showing how retirement income
+// rises across cohorts.
+function renderConstantLifetimeChart() {
+  const lp = dataLoader.getConstantEarnerLifetime();
+  // Sequential cool-to-warm palette so cohort progression reads at a glance.
+  const COHORT_COLORS = [
+    '#08519c', '#3182bd', '#6baed6',
+    '#fdae6b', '#e6550d', '#a50f15', '#67000d'
+  ];
+
+  const earningsSeries = {
+    key:   'earnings',
+    label: 'Earnings ($50K real, ages 21-64)',
+    data:  lp.earnings_real,
+    color: '#0d9488',
+    highlight: true
+  };
+  const cohortSeries = lp.cohort_years.map((c, i) => ({
+    key:   `cohort_${c}`,
+    label: `Born ${c}`,
+    data:  lp.scheduled_by_cohort[i],
+    color: COHORT_COLORS[i % COHORT_COLORS.length]
+  }));
+
+  chartManager.multiSeriesLineChart('constantLifetimeChart', {
+    labels:        lp.ages,
+    series:        [earningsSeries, ...cohortSeries],
+    yFormat:       'currency',
+    transitionIdx: lp.ages.indexOf(65),
+    showLegend:    true
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Errors
+// -----------------------------------------------------------------------------
+
+function showLoadError(err) {
+  const host = document.querySelector('.app-container');
+  host.innerHTML = `<div class="alert alert-danger m-4">Failed to load dashboard data: ${err.message}</div>`;
+}
