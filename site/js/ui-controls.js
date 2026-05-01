@@ -123,15 +123,23 @@ const uiControls = (() => {
     if (hero) hero.hidden = (tab !== 'individual');
 
     // Worker tab: only the cohort selector is meaningful (spouse, dollars,
-    // and worker-type are pinned to their last-set values). Hide the rest.
-    const showAll = (tab !== 'worker');
+    // and worker-type are pinned to their last-set values).
+    // Constant-earner tab: every dimension is fixed at the synthetic $50K
+    // worker, so hide every control including the cohort selector.
     const ids = [
       'config-control--worker',
       'config-control--spouse',
+      'config-control--cohort',
       'config-control--dollars'
     ];
+    const visible = {
+      'config-control--worker':  tab === 'individual' || tab === 'cohort',
+      'config-control--spouse':  tab === 'individual' || tab === 'cohort',
+      'config-control--cohort':  tab !== 'constant',
+      'config-control--dollars': tab === 'individual' || tab === 'cohort'
+    };
     ids.forEach(cls => {
-      document.querySelectorAll(`.${cls}`).forEach(el => { el.hidden = !showAll; });
+      document.querySelectorAll(`.${cls}`).forEach(el => { el.hidden = !visible[cls]; });
     });
   }
 

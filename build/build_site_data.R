@@ -75,6 +75,10 @@ nmtr_pb      <- read_csv_strict("output/pb_net_tax_on_earnings.csv")
 irr          <- read_csv_strict("output/irr_by_config.csv")
 mirr         <- read_csv_strict("output/marginal_irr_by_age.csv")
 
+# Constant-earner ($50,000 custom average) metrics, single individual,
+# one row per birth cohort. Built by build/create_constant_earner_metrics.R.
+constant_earner <- read_csv_strict("output/constant_earner_metrics.csv")
+
 # Period unisex life expectancy at age 65 by claim year, derived from tr2025.
 load("data/tr2025.rda")
 BASE_YEAR <- 2026L
@@ -307,6 +311,40 @@ for (w in WORKER_TYPES) {
   }
 }
 
+# ---- Constant-earner block: arrays parallel to BIRTH_YEARS -----------------
+ce_pull <- function(col) {
+  ord <- match(BIRTH_YEARS, constant_earner$birth_yr)
+  unname(round(constant_earner[[col]][ord], 6))
+}
+ce_pull_money <- function(col) {
+  ord <- match(BIRTH_YEARS, constant_earner$birth_yr)
+  unname(round(constant_earner[[col]][ord], 2))
+}
+
+constant_earner_block <- list(
+  custom_avg_earnings = 50000,
+  birth_years         = BIRTH_YEARS,
+  pv_taxes            = ce_pull_money("pv_taxes"),
+  scheduled = list(
+    monthly_real_at_65 = ce_pull_money("monthly_real_at_65_scheduled"),
+    pv_benefits        = ce_pull_money("pv_benefits_scheduled"),
+    ben_tax_ratio      = ce_pull("ben_tax_ratio_scheduled"),
+    rep_rate_career    = ce_pull("rep_rate_career_scheduled"),
+    rep_rate_awi       = ce_pull("rep_rate_awi_scheduled"),
+    irr                = ce_pull("irr_scheduled"),
+    marginal_irr_age64 = ce_pull("marginal_irr_age64_scheduled")
+  ),
+  payable = list(
+    monthly_real_at_65 = ce_pull_money("monthly_real_at_65_payable"),
+    pv_benefits        = ce_pull_money("pv_benefits_payable"),
+    ben_tax_ratio      = ce_pull("ben_tax_ratio_payable"),
+    rep_rate_career    = ce_pull("rep_rate_career_payable"),
+    rep_rate_awi       = ce_pull("rep_rate_awi_payable"),
+    irr                = ce_pull("irr_payable"),
+    marginal_irr_age64 = ce_pull("marginal_irr_age64_payable")
+  )
+)
+
 # ---- Write -------------------------------------------------------------------
 out <- list(
   meta = list(
@@ -322,7 +360,8 @@ out <- list(
     spouse_types = lapply(SPOUSE_TYPES, function(k) list(key = k, label = unname(SPOUSE_LABELS[[k]]))),
     birth_years  = BIRTH_YEARS
   ),
-  configs = configs
+  configs         = configs,
+  constant_earner = constant_earner_block
 )
 
 dir.create("site/data", recursive = TRUE, showWarnings = FALSE)

@@ -269,6 +269,50 @@ const tableManager = (() => {
     triggerDownload(lines.join('\n'), `ssmbar_workers_${s}_${y}.csv`);
   }
 
+  // Constant-earner CSV: one row per birth year for the synthetic $50K
+  // custom-average earner (single individual). Same eight metrics as the
+  // cohort tab.
+  function downloadConstantEarnerCsv() {
+    const meta     = dataLoader.getConstantEarnerMeta();
+    const years    = meta.birth_years;
+    const monthly  = dataLoader.getConstantEarnerSeries('monthly_real_at_65');
+    const rrCareer = dataLoader.getConstantEarnerSeries('rep_rate_career');
+    const rrAwi    = dataLoader.getConstantEarnerSeries('rep_rate_awi');
+    const pvBen    = dataLoader.getConstantEarnerSeries('pv_benefits');
+    const pvTax    = dataLoader.getConstantEarnerSeries('pv_taxes');
+    const ratio    = dataLoader.getConstantEarnerSeries('ben_tax_ratio');
+    const irr      = dataLoader.getConstantEarnerSeries('irr');
+    const mirr     = dataLoader.getConstantEarnerSeries('marginal_irr_age64');
+
+    const header = [
+      'birth_year', 'custom_avg_earnings',
+      'monthly_real_at_65_scheduled', 'monthly_real_at_65_payable',
+      'ben_tax_ratio_scheduled',      'ben_tax_ratio_payable',
+      'pv_benefits_scheduled',        'pv_benefits_payable',
+      'pv_taxes',
+      'rep_rate_career_scheduled',    'rep_rate_career_payable',
+      'rep_rate_awi_scheduled',       'rep_rate_awi_payable',
+      'irr_scheduled',                'irr_payable',
+      'marginal_irr_age64_scheduled', 'marginal_irr_age64_payable'
+    ];
+    const lines = [header.join(',')];
+    years.forEach((y, i) => {
+      lines.push([
+        y, meta.custom_avg_earnings,
+        monthly.scheduled[i] ?? '',  monthly.payable[i] ?? '',
+        ratio.scheduled[i] ?? '',    ratio.payable[i] ?? '',
+        pvBen.scheduled[i] ?? '',    pvBen.payable[i] ?? '',
+        pvTax.scheduled[i] ?? '',
+        rrCareer.scheduled[i] ?? '', rrCareer.payable[i] ?? '',
+        rrAwi.scheduled[i] ?? '',    rrAwi.payable[i] ?? '',
+        irr.scheduled[i] ?? '',      irr.payable[i] ?? '',
+        mirr.scheduled[i] ?? '',     mirr.payable[i] ?? ''
+      ].join(','));
+    });
+
+    triggerDownload(lines.join('\n'), 'ssmbar_constant_earner_50k.csv');
+  }
+
   function triggerDownload(csv, filename) {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -281,5 +325,5 @@ const tableManager = (() => {
     URL.revokeObjectURL(url);
   }
 
-  return { render, downloadCohortCsv, downloadWorkerCompareCsv };
+  return { render, downloadCohortCsv, downloadWorkerCompareCsv, downloadConstantEarnerCsv };
 })();

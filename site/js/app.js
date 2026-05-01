@@ -56,6 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (workerCsvBtn) {
     workerCsvBtn.addEventListener('click', () => tableManager.downloadWorkerCompareCsv(uiControls.getState()));
   }
+  const constantCsvBtn = document.getElementById('downloadConstantCsvBtn');
+  if (constantCsvBtn) {
+    constantCsvBtn.addEventListener('click', () => tableManager.downloadConstantEarnerCsv());
+  }
 });
 
 function render(state) {
@@ -77,6 +81,9 @@ function render(state) {
     setContextLine('workerContextLine', state, { suppressWorker: true });
     renderWorkerCompareCharts(state);
   }
+  if (!document.getElementById('panel-constant').hidden) {
+    renderConstantEarnerCharts();
+  }
 }
 
 function handleTabChange(tab) {
@@ -90,6 +97,9 @@ function handleTabChange(tab) {
   if (tab === 'worker') {
     setContextLine('workerContextLine', state, { suppressWorker: true });
     renderWorkerCompareCharts(state);
+  }
+  if (tab === 'constant') {
+    renderConstantEarnerCharts();
   }
 }
 
@@ -512,6 +522,69 @@ function renderWorkerCompareCharts(state) {
     yFormat: 'percent',
     yMin: -1,
     referenceY: 0
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Constant-earner cohort charts (synthetic $50K avg-real worker, single)
+// -----------------------------------------------------------------------------
+
+function renderConstantEarnerCharts() {
+  const monthly = dataLoader.getConstantEarnerSeries('monthly_real_at_65');
+  chartManager.cohortLineChart('constantMonthlyChart', {
+    labels: monthly.years, data: monthly.scheduled, dataSecondary: monthly.payable,
+    yFormat: 'currency'
+  });
+
+  const ratio = dataLoader.getConstantEarnerSeries('ben_tax_ratio');
+  chartManager.cohortLineChart('constantRatioChart', {
+    labels: ratio.years, data: ratio.scheduled, dataSecondary: ratio.payable,
+    yFormat: 'number',
+    twoColorThreshold: 1.0,
+    referenceY: 1.0,
+    referenceLabel: 'Break-even (1.0)'
+  });
+
+  const pvBen = dataLoader.getConstantEarnerSeries('pv_benefits');
+  chartManager.cohortLineChart('constantPvBenChart', {
+    labels: pvBen.years, data: pvBen.scheduled, dataSecondary: pvBen.payable,
+    yFormat: 'currency'
+  });
+
+  // PV taxes is scenario-invariant — single line.
+  const pvTax = dataLoader.getConstantEarnerSeries('pv_taxes');
+  chartManager.cohortLineChart('constantPvTaxChart', {
+    labels: pvTax.years, data: pvTax.scheduled,
+    yFormat: 'currency'
+  });
+
+  const rrCareer = dataLoader.getConstantEarnerSeries('rep_rate_career');
+  const rrAwi    = dataLoader.getConstantEarnerSeries('rep_rate_awi');
+  const rrAll = [
+    ...rrCareer.scheduled, ...rrCareer.payable,
+    ...rrAwi.scheduled,    ...rrAwi.payable
+  ].filter(v => v != null);
+  const rrMax = rrAll.length ? Math.max(...rrAll) * 1.05 : 1;
+
+  chartManager.cohortLineChart('constantRrCareerChart', {
+    labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+  chartManager.cohortLineChart('constantRrAwiChart', {
+    labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
+    yFormat: 'percent', yMin: 0, yMax: rrMax
+  });
+
+  const irr = dataLoader.getConstantEarnerSeries('irr');
+  chartManager.cohortLineChart('constantIrrChart', {
+    labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
+    yFormat: 'percent', yMin: 0
+  });
+
+  const mirr = dataLoader.getConstantEarnerSeries('marginal_irr_age64');
+  chartManager.cohortLineChart('constantMirrFinalChart', {
+    labels: mirr.years, data: mirr.scheduled, dataSecondary: mirr.payable,
+    yFormat: 'percent'
   });
 }
 

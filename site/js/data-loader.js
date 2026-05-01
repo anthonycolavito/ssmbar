@@ -113,6 +113,26 @@ const dataLoader = (() => {
     return { types, ages: ages || [], perType };
   }
 
+  // Constant-earner cohort series. The bundler stores parallel arrays
+  // (indexed by birth_years) under payload.constant_earner. PV taxes is
+  // scenario-invariant; the two arrays are identical for that field.
+  function getConstantEarnerSeries(summaryField) {
+    const ce    = payload.constant_earner;
+    const years = ce.birth_years;
+    if (summaryField === 'pv_taxes') {
+      return { years, scheduled: ce.pv_taxes, payable: ce.pv_taxes };
+    }
+    return {
+      years,
+      scheduled: ce.scheduled[summaryField] || [],
+      payable:   ce.payable[summaryField]   || []
+    };
+  }
+
+  function getConstantEarnerMeta() {
+    return payload.constant_earner;
+  }
+
   // Per-cohort cohort-tab series. Each metric gets parallel scheduled/payable
   // arrays of equal length. PV taxes is scenario-invariant; for that field the
   // two arrays are identical and the caller can render a single line.
@@ -188,6 +208,7 @@ const dataLoader = (() => {
   return {
     init, ready, meta, dimensions, getConfig, getCohortSeries, getLifetimeProfile,
     getWorkerCompareSeries, getWorkerCompareLifetimeProfiles, getWorkerCompareNmtrSeries,
+    getConstantEarnerSeries, getConstantEarnerMeta,
     hasNmtr, nmtrMissingBirthYears, nmtrValuesPending, pbNmtrPending
   };
 })();

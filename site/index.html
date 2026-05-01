@@ -33,6 +33,9 @@
       <li class="nav-item">
         <button class="nav-link" id="tab-worker" data-tab="worker" type="button">Worker Comparison</button>
       </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-constant" data-tab="constant" type="button">Constant Earnings Comparisons</button>
+      </li>
     </ul>
     <span class="reform-chip" role="status" aria-live="polite">
       <span class="reform-chip-dot"></span>
@@ -314,6 +317,70 @@
         <h2 class="chart-title">Marginal IRR by Age</h2>
         <div class="chart-subtitle">Real annualized return on each year's OASDI contribution.</div>
         <div class="chart-canvas-wrap"><canvas id="workerMarginalIrrChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Constant earnings comparisons tab (single $50K custom earner across cohorts) -->
+  <section id="panel-constant" class="tab-panel" hidden>
+    <header class="tab-context-header">
+      <p class="tab-context-eyebrow">$50,000 custom earner</p>
+      <p class="tab-context-line" id="constantContextLine">
+        Top-35 real earnings held constant at <strong>$50,000</strong> (in 2026 dollars) across every birth cohort. Single individual, no spouse.
+      </p>
+    </header>
+    <div class="cohort-tab-toolbar">
+      <div class="scenario-legend" role="note">
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="#2563EB" stroke-width="2.4"/></svg>
+          <span><strong>Scheduled</strong> — what current law promises</span>
+        </span>
+        <span class="scenario-legend-item">
+          <svg width="28" height="6" aria-hidden="true"><line x1="0" y1="3" x2="28" y2="3" stroke="rgba(37,99,235,0.55)" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
+          <span><strong>Payable</strong> — what the trust fund can actually pay after projected depletion</span>
+        </span>
+      </div>
+      <button id="downloadConstantCsvBtn" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-download"></i> Download CSV
+      </button>
+    </div>
+    <div class="cohort-grid">
+      <div class="chart-section">
+        <h2 class="chart-title">Monthly Benefit at 65 (Real $)</h2>
+        <div class="chart-canvas-wrap"><canvas id="constantMonthlyChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Benefit / Tax Ratio</h2>
+        <div class="chart-subtitle">Blue ≥ 1.0 (lifetime net beneficiary). Amber &lt; 1.0 (net taxpayer). Dashed reference at 1.0.</div>
+        <div class="chart-canvas-wrap"><canvas id="constantRatioChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">PV Lifetime Benefits</h2>
+        <div class="chart-canvas-wrap"><canvas id="constantPvBenChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">PV Lifetime Taxes</h2>
+        <div class="chart-canvas-wrap"><canvas id="constantPvTaxChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Replacement Rate (Career)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ worker's average real lifetime earnings.</div>
+        <div class="chart-canvas-wrap"><canvas id="constantRrCareerChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Replacement Rate (AWI)</h2>
+        <div class="chart-subtitle">First-year benefit ÷ economy-wide average wage in claim year.</div>
+        <div class="chart-canvas-wrap"><canvas id="constantRrAwiChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Internal Rate of Return</h2>
+        <div class="chart-subtitle">Real annualized return on lifetime OASDI contributions.</div>
+        <div class="chart-canvas-wrap"><canvas id="constantIrrChart"></canvas></div>
+      </div>
+      <div class="chart-section">
+        <h2 class="chart-title">Marginal IRR (Final Year of Work)</h2>
+        <div class="chart-subtitle">Real return on the worker's age-64 contribution.</div>
+        <div class="chart-canvas-wrap"><canvas id="constantMirrFinalChart"></canvas></div>
       </div>
     </div>
   </section>
