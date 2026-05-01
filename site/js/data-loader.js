@@ -133,6 +133,14 @@ const dataLoader = (() => {
     return payload.constant_earner;
   }
 
+  function getConstantEarnerLifetime() {
+    return payload.constant_earner.lifetime;
+  }
+
+  function getConstantEarnerIncomeShare() {
+    return payload.constant_earner.income_share;
+  }
+
   // Per-cohort cohort-tab series. Each metric gets parallel scheduled/payable
   // arrays of equal length. PV taxes is scenario-invariant; for that field the
   // two arrays are identical and the caller can render a single line.
@@ -209,6 +217,7 @@ const dataLoader = (() => {
     init, ready, meta, dimensions, getConfig, getCohortSeries, getLifetimeProfile,
     getWorkerCompareSeries, getWorkerCompareLifetimeProfiles, getWorkerCompareNmtrSeries,
     getConstantEarnerSeries, getConstantEarnerMeta,
+    getConstantEarnerLifetime, getConstantEarnerIncomeShare,
     hasNmtr, nmtrMissingBirthYears, nmtrValuesPending, pbNmtrPending
   };
 })();

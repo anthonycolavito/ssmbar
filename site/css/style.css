@@ -1399,6 +1399,31 @@ a:hover { color: var(--brand-blue); }
   height: 300px;
 }
 
+/* --- Constant Earnings tab: auxiliary section --------------------------- */
+.constant-aux-section {
+  margin: 2rem 0 0.85rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.constant-aux-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+.constant-aux-section-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 800px;
+}
+.constant-aux-grid {
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+}
+.constant-aux-grid .chart-canvas-wrap {
+  height: 300px;
+}
+
 /* --- Data table section -------------------------------------------------- */
 .table-section {
   background: var(--bg-card);

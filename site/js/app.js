@@ -600,6 +600,58 @@ function renderConstantEarnerCharts() {
     yFormat: 'percent',
     referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
+
+  renderConstantIncomeShareChart();
+  renderConstantLifetimeChart();
+}
+
+// Auxiliary chart 1: $50K (in 2026 dollars) as a share of AWI and tax max
+// in each calendar year.
+function renderConstantIncomeShareChart() {
+  const s = dataLoader.getConstantEarnerIncomeShare();
+  chartManager.cohortLineChart('constantIncomeShareChart', {
+    labels: s.years,
+    data:          s.fifty_k_over_awi,
+    dataSecondary: s.fifty_k_over_taxmax,
+    yFormat: 'number',
+    referenceY: 1.0,
+    referenceLabel: '$50K = AWI / taxmax'
+  });
+}
+
+// Auxiliary chart 2: lifetime real-income profile. One earnings line
+// (ages 21-64, identical across cohorts by construction) plus several
+// benefit lines (age 65+, one per cohort) showing how retirement income
+// rises across cohorts.
+function renderConstantLifetimeChart() {
+  const lp = dataLoader.getConstantEarnerLifetime();
+  // Sequential cool-to-warm palette so cohort progression reads at a glance.
+  const COHORT_COLORS = [
+    '#08519c', '#3182bd', '#6baed6',
+    '#fdae6b', '#e6550d', '#a50f15', '#67000d'
+  ];
+
+  const earningsSeries = {
+    key:   'earnings',
+    label: 'Earnings ($50K real, ages 21-64)',
+    data:  lp.earnings_real,
+    color: '#0d9488',
+    highlight: true
+  };
+  const cohortSeries = lp.cohort_years.map((c, i) => ({
+    key:   `cohort_${c}`,
+    label: `Born ${c}`,
+    data:  lp.scheduled_by_cohort[i],
+    color: COHORT_COLORS[i % COHORT_COLORS.length]
+  }));
+
+  chartManager.multiSeriesLineChart('constantLifetimeChart', {
+    labels:        lp.ages,
+    series:        [earningsSeries, ...cohortSeries],
+    yFormat:       'currency',
+    transitionIdx: lp.ages.indexOf(65),
+    showLegend:    true
+  });
 }
 
 // -----------------------------------------------------------------------------

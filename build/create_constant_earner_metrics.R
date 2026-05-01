@@ -252,15 +252,53 @@ compute_metrics <- function(birth_yr) {
   )
 }
 
+# ---- Lifetime profile: long-format earnings/benefits per cohort ------------
+# Real earnings 21-64 are identical across cohorts by construction (the
+# scalar normalising top-35 average to $50K cancels the level differences
+# in real_AWI). We still emit them per cohort so the bundler can pick any
+# representative profile and so a downstream consumer can verify the
+# invariance directly.
+compute_lifetime_long <- function(birth_yr) {
+  birth_yr   <- as.integer(birth_yr)
+  y65        <- birth_yr + 65L
+  death_age  <- le_at_65$death_age[le_at_65$year_at_65 == y65]
+
+  worker <- build_worker(birth_yr)
+  ben    <- calc_ben(tr2025, worker, output = "skinny")
+
+  earn_long <- worker %>%
+    filter(age %in% work_ages) %>%
+    left_join(real_factor_lookup, by = "year") %>%
+    transmute(birth_yr, age, year,
+              real_earnings    = earnings * real_factor,
+              real_ben_sched   = NA_real_,
+              real_ben_payable = NA_real_)
+
+  ben_long <- ben %>%
+    filter(age >= 65L, age <= death_age) %>%
+    left_join(payable_lookup,     by = "year") %>%
+    left_join(real_factor_lookup, by = "year") %>%
+    transmute(birth_yr, age, year,
+              real_earnings    = NA_real_,
+              real_ben_sched   = annual_ben           * real_factor,
+              real_ben_payable = annual_ben * payable * real_factor)
+
+  bind_rows(earn_long, ben_long)
+}
+
 # ---- Run --------------------------------------------------------------------
 results <- map_dfr(birth_years, function(by) {
   cat(sprintf("Cohort %d ...\n", by))
   compute_metrics(by)
 })
 
-# ---- Save -------------------------------------------------------------------
-saveRDS(results,  "./output/constant_earner_metrics.rds")
-write_csv(results, "./output/constant_earner_metrics.csv")
+lifetime <- map_dfr(birth_years, compute_lifetime_long)
 
-cat(sprintf("\nWrote %d rows to output/constant_earner_metrics.csv\n", nrow(results)))
-print(results, n = nrow(results))
+# ---- Save -------------------------------------------------------------------
+saveRDS(results,   "./output/constant_earner_metrics.rds")
+write_csv(results,  "./output/constant_earner_metrics.csv")
+saveRDS(lifetime,  "./output/constant_earner_lifetime.rds")
+write_csv(lifetime, "./output/constant_earner_lifetime.csv")
+
+cat(sprintf("\nWrote %d metric rows and %d lifetime rows.\n",
+            nrow(results), nrow(lifetime)))

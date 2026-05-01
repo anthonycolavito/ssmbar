@@ -77,7 +77,10 @@ mirr         <- read_csv_strict("output/marginal_irr_by_age.csv")
 
 # Constant-earner ($50,000 custom average) metrics, single individual,
 # one row per birth cohort. Built by build/create_constant_earner_metrics.R.
-constant_earner <- read_csv_strict("output/constant_earner_metrics.csv")
+constant_earner          <- read_csv_strict("output/constant_earner_metrics.csv")
+constant_earner_lifetime <- read_csv_strict("output/constant_earner_lifetime.csv")
+# Extended assumptions file used only for the income-share series past 2150.
+load("data/tr2025_extended.rda")
 
 # Period unisex life expectancy at age 65 by claim year, derived from tr2025.
 load("data/tr2025.rda")
@@ -312,13 +315,72 @@ for (w in WORKER_TYPES) {
 }
 
 # ---- Constant-earner block: arrays parallel to its own birth_year column --
-# This block uses the constant-earner CSV's full birth-year range, which
-# extends well past the standard cohort tab's 1930-2010 (currently to 2200
-# via the extended assumptions file). PV taxes is scenario-invariant.
+# This block uses the constant-earner CSV's full birth-year range, then
+# filters to cohorts that successfully accumulate 40 quarters of coverage
+# (insured) — the AWI-indexed QC threshold eventually outpaces a fixed-real
+# $50K profile, so far-future cohorts emit NA across all benefit metrics.
+# Charts on the tab end at the last-insured cohort (currently 2160).
 constant_earner <- constant_earner[order(constant_earner$birth_yr), ]
+constant_earner <- constant_earner[!is.na(constant_earner$monthly_real_at_65_scheduled), ]
 CE_BIRTH_YEARS  <- constant_earner$birth_yr
 ce_pull       <- function(col) unname(round(constant_earner[[col]], 6))
 ce_pull_money <- function(col) unname(round(constant_earner[[col]], 2))
+
+# Lifetime profile arrays: one shared earnings line (real $2026, ages 21-64)
+# plus per-cohort scheduled benefit arrays for a small representative
+# selection of birth years. Cohorts in COHORT_PICKS are kept; everything
+# else is dropped to keep the JSON tidy.
+COHORT_PICKS <- c(1930L, 1965L, 2000L, 2025L, 2055L, 2090L, 2160L)
+COHORT_PICKS <- intersect(COHORT_PICKS, CE_BIRTH_YEARS)
+
+LIFETIME_AGES <- 21:89
+
+# Earnings shape is invariant across cohorts by construction (the $50K
+# scalar normalises top-35 real average, which cancels real-AWI level
+# differences). Take the 1990 cohort's profile as the representative one.
+earn_pick <- constant_earner_lifetime[
+  constant_earner_lifetime$birth_yr == 1990 &
+  !is.na(constant_earner_lifetime$real_earnings), ]
+earn_by_age <- setNames(earn_pick$real_earnings, earn_pick$age)
+earnings_real <- vapply(LIFETIME_AGES, function(a)
+  if (as.character(a) %in% names(earn_by_age))
+    unname(round(earn_by_age[as.character(a)], 2))
+  else NA_real_, numeric(1))
+
+# Per-cohort benefit profiles aligned to LIFETIME_AGES.
+make_cohort_ben <- function(cohort, scenario_col) {
+  rows <- constant_earner_lifetime[
+    constant_earner_lifetime$birth_yr == cohort &
+    !is.na(constant_earner_lifetime[[scenario_col]]), ]
+  by_age <- setNames(rows[[scenario_col]], rows$age)
+  vapply(LIFETIME_AGES, function(a)
+    if (as.character(a) %in% names(by_age))
+      unname(round(by_age[as.character(a)], 2))
+    else NA_real_, numeric(1))
+}
+
+lifetime_block <- list(
+  ages           = LIFETIME_AGES,
+  earnings_real  = earnings_real,
+  cohort_years   = COHORT_PICKS,
+  scheduled_by_cohort = lapply(COHORT_PICKS, function(c) make_cohort_ben(c, "real_ben_sched")),
+  payable_by_cohort   = lapply(COHORT_PICKS, function(c) make_cohort_ben(c, "real_ben_payable"))
+)
+
+# Income-share series: $50K (in 2026$) as a fraction of real (2026$) AWI
+# and real (2026$) taxmax in each calendar year. Uses the extended
+# assumptions file so the right tail past 2150 is real data, not a copy.
+INCOME_SHARE_YEARS <- 1951:2250
+income_share_df <- tr2025_extended[tr2025_extended$year %in% INCOME_SHARE_YEARS, ]
+income_share_df$real_awi    <- income_share_df$awi    * gdp_pi_2026 / income_share_df$gdp_pi
+income_share_df$real_taxmax <- income_share_df$taxmax * gdp_pi_2026 / income_share_df$gdp_pi
+fifty_k_real <- 50000
+
+income_share_block <- list(
+  years              = income_share_df$year,
+  fifty_k_over_awi   = round(fifty_k_real / income_share_df$real_awi, 4),
+  fifty_k_over_taxmax= round(fifty_k_real / income_share_df$real_taxmax, 4)
+)
 
 constant_earner_block <- list(
   custom_avg_earnings = 50000,
@@ -341,7 +403,9 @@ constant_earner_block <- list(
     rep_rate_awi       = ce_pull("rep_rate_awi_payable"),
     irr                = ce_pull("irr_payable"),
     marginal_irr_age64 = ce_pull("marginal_irr_age64_payable")
-  )
+  ),
+  lifetime     = lifetime_block,
+  income_share = income_share_block
 )
 
 # ---- Write -------------------------------------------------------------------

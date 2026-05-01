@@ -788,7 +788,8 @@ const chartManager = (() => {
       referenceY = null,
       referenceLabel = null,
       transitionIdx = null,
-      subtitle = null
+      subtitle = null,
+      showLegend = false
     } = opts;
 
     const o = makeDefaults();
@@ -797,8 +798,17 @@ const chartManager = (() => {
     o.scales.y.afterFit = forceFixedAxisWidth;
     if (yMin != null) o.scales.y.min = yMin;
     if (yMax != null) o.scales.y.max = yMax;
-    // Per-chart legend stays off — the parent tab supplies a single palette
-    // legend so the same five entries don't repeat under every line chart.
+    // Per-chart legend defaults off — the Worker tab supplies a shared
+    // palette legend instead. Constant Earnings tab opts in via
+    // showLegend: true so each cohort line is identifiable.
+    if (showLegend) {
+      o.plugins.legend.display = true;
+      o.plugins.legend.position = 'bottom';
+      o.plugins.legend.labels = {
+        boxWidth: 14, boxHeight: 2,
+        font: { family: 'Inter', size: 11 }
+      };
+    }
     o.plugins.tooltip.callbacks = {
       title: (items) => `Age ${items[0].label}`,
       label: (item)  => {
@@ -854,7 +864,10 @@ const chartManager = (() => {
     }
 
     const datasets = series.map(s => {
-      const color = WORKER_COLORS[s.key] || CHART_COLORS.line;
+      // Explicit s.color wins (used by the Constant Earnings tab where each
+      // line keys on a birth cohort, not a worker type). Otherwise fall
+      // back to the WORKER_COLORS lookup used by the Worker Comparison tab.
+      const color = s.color || WORKER_COLORS[s.key] || CHART_COLORS.line;
       return {
         label: s.label,
         data:  s.data,
@@ -865,6 +878,7 @@ const chartManager = (() => {
         pointRadius: 0,
         pointHoverRadius: 4,
         borderWidth: s.highlight ? 3 : 1.75,
+        borderDash: s.dash || undefined,
         spanGaps: true
       };
     });
