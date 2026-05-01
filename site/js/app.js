@@ -530,10 +530,17 @@ function renderWorkerCompareCharts(state) {
 // -----------------------------------------------------------------------------
 
 function renderConstantEarnerCharts() {
+  // Trustees Report 2025 formal projections end at year 2099. A cohort
+  // born in 2035 turns 65 in 2100, so cohorts from 2035 onward retire
+  // in extrapolation territory. Mark that boundary on every chart.
+  const TRUSTEES_CUTOFF      = 2035;
+  const TRUSTEES_CUTOFF_LBL  = 'Trustees projection ends →';
+
   const monthly = dataLoader.getConstantEarnerSeries('monthly_real_at_65');
   chartManager.cohortLineChart('constantMonthlyChart', {
     labels: monthly.years, data: monthly.scheduled, dataSecondary: monthly.payable,
-    yFormat: 'currency'
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   const ratio = dataLoader.getConstantEarnerSeries('ben_tax_ratio');
@@ -542,20 +549,23 @@ function renderConstantEarnerCharts() {
     yFormat: 'number',
     twoColorThreshold: 1.0,
     referenceY: 1.0,
-    referenceLabel: 'Break-even (1.0)'
+    referenceLabel: 'Break-even (1.0)',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   const pvBen = dataLoader.getConstantEarnerSeries('pv_benefits');
   chartManager.cohortLineChart('constantPvBenChart', {
     labels: pvBen.years, data: pvBen.scheduled, dataSecondary: pvBen.payable,
-    yFormat: 'currency'
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   // PV taxes is scenario-invariant — single line.
   const pvTax = dataLoader.getConstantEarnerSeries('pv_taxes');
   chartManager.cohortLineChart('constantPvTaxChart', {
     labels: pvTax.years, data: pvTax.scheduled,
-    yFormat: 'currency'
+    yFormat: 'currency',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   const rrCareer = dataLoader.getConstantEarnerSeries('rep_rate_career');
@@ -568,23 +578,27 @@ function renderConstantEarnerCharts() {
 
   chartManager.cohortLineChart('constantRrCareerChart', {
     labels: rrCareer.years, data: rrCareer.scheduled, dataSecondary: rrCareer.payable,
-    yFormat: 'percent', yMin: 0, yMax: rrMax
+    yFormat: 'percent', yMin: 0, yMax: rrMax,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
   chartManager.cohortLineChart('constantRrAwiChart', {
     labels: rrAwi.years, data: rrAwi.scheduled, dataSecondary: rrAwi.payable,
-    yFormat: 'percent', yMin: 0, yMax: rrMax
+    yFormat: 'percent', yMin: 0, yMax: rrMax,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   const irr = dataLoader.getConstantEarnerSeries('irr');
   chartManager.cohortLineChart('constantIrrChart', {
     labels: irr.years, data: irr.scheduled, dataSecondary: irr.payable,
-    yFormat: 'percent', yMin: 0
+    yFormat: 'percent', yMin: 0,
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 
   const mirr = dataLoader.getConstantEarnerSeries('marginal_irr_age64');
   chartManager.cohortLineChart('constantMirrFinalChart', {
     labels: mirr.years, data: mirr.scheduled, dataSecondary: mirr.payable,
-    yFormat: 'percent'
+    yFormat: 'percent',
+    referenceX: TRUSTEES_CUTOFF, referenceXLabel: TRUSTEES_CUTOFF_LBL
   });
 }
 

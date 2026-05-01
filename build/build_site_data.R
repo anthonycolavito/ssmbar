@@ -311,19 +311,18 @@ for (w in WORKER_TYPES) {
   }
 }
 
-# ---- Constant-earner block: arrays parallel to BIRTH_YEARS -----------------
-ce_pull <- function(col) {
-  ord <- match(BIRTH_YEARS, constant_earner$birth_yr)
-  unname(round(constant_earner[[col]][ord], 6))
-}
-ce_pull_money <- function(col) {
-  ord <- match(BIRTH_YEARS, constant_earner$birth_yr)
-  unname(round(constant_earner[[col]][ord], 2))
-}
+# ---- Constant-earner block: arrays parallel to its own birth_year column --
+# This block uses the constant-earner CSV's full birth-year range, which
+# extends well past the standard cohort tab's 1930-2010 (currently to 2200
+# via the extended assumptions file). PV taxes is scenario-invariant.
+constant_earner <- constant_earner[order(constant_earner$birth_yr), ]
+CE_BIRTH_YEARS  <- constant_earner$birth_yr
+ce_pull       <- function(col) unname(round(constant_earner[[col]], 6))
+ce_pull_money <- function(col) unname(round(constant_earner[[col]], 2))
 
 constant_earner_block <- list(
   custom_avg_earnings = 50000,
-  birth_years         = BIRTH_YEARS,
+  birth_years         = CE_BIRTH_YEARS,
   pv_taxes            = ce_pull_money("pv_taxes"),
   scheduled = list(
     monthly_real_at_65 = ce_pull_money("monthly_real_at_65_scheduled"),

@@ -480,6 +480,8 @@ const chartManager = (() => {
       twoColorThreshold = null,
       referenceY = null,
       referenceLabel = null,
+      referenceX = null,
+      referenceXLabel = null,
       subtitle = null
     } = opts;
 
@@ -502,30 +504,54 @@ const chartManager = (() => {
       o.plugins.subtitle.display = true;
       o.plugins.subtitle.text = subtitle;
     }
+    const annotations = {};
     if (referenceY != null) {
-      o.plugins.annotation = {
-        annotations: {
-          ref: {
-            type: 'line',
-            yMin: referenceY, yMax: referenceY,
-            borderColor: 'rgba(0, 0, 0, 0.28)',
-            borderWidth: 1,
-            borderDash: [4, 4],
-            label: referenceLabel ? {
-              display: true,
-              content: referenceLabel,
-              position: 'end',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              color: CHART_COLORS.axis,
-              borderColor: 'rgba(0, 0, 0, 0.15)',
-              borderWidth: 1,
-              font: { family: 'Inter', size: 10 },
-              padding: 3,
-              yAdjust: -10
-            } : { display: false }
-          }
-        }
+      annotations.refY = {
+        type: 'line',
+        yMin: referenceY, yMax: referenceY,
+        borderColor: 'rgba(0, 0, 0, 0.28)',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        label: referenceLabel ? {
+          display: true,
+          content: referenceLabel,
+          position: 'end',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          color: CHART_COLORS.axis,
+          borderColor: 'rgba(0, 0, 0, 0.15)',
+          borderWidth: 1,
+          font: { family: 'Inter', size: 10 },
+          padding: 3,
+          yAdjust: -10
+        } : { display: false }
       };
+    }
+    if (referenceX != null) {
+      const xIdx = labels.indexOf(referenceX);
+      if (xIdx >= 0) {
+        annotations.refX = {
+          type: 'line',
+          xMin: xIdx, xMax: xIdx,
+          borderColor: 'rgba(217, 119, 6, 0.55)',
+          borderWidth: 1,
+          borderDash: [4, 4],
+          label: referenceXLabel ? {
+            display: true,
+            content: referenceXLabel,
+            position: 'start',
+            backgroundColor: 'rgba(255, 255, 255, 0.92)',
+            color: CHART_COLORS.axis,
+            borderColor: 'rgba(217, 119, 6, 0.55)',
+            borderWidth: 1,
+            font: { family: 'Inter', size: 9.5 },
+            padding: 3,
+            yAdjust: 0
+          } : { display: false }
+        };
+      }
+    }
+    if (Object.keys(annotations).length > 0) {
+      o.plugins.annotation = { annotations };
     }
 
     // Threshold encoding flips line colour at twoColorThreshold and is applied
