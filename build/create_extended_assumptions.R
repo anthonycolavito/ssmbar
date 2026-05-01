@@ -28,6 +28,15 @@ source("./R/assumptions_prep.R")
 
 TARGET_YEAR <- 2300L
 
+# Trustees Report 2025 formal projections cover years 1951-2100. Past 2100
+# the nominal discount factor `df` should keep growing in perpetuity at the
+# trustees' terminal nominal-discount rate of 4.77% per year. The standard
+# prep_assumptions() output freezes df at its year-2100 value, which biases
+# every long-horizon PV calculation downward. We correct that here only in
+# the extended file (data/tr2025.rda is left untouched).
+TRUSTEES_LAST_YEAR <- 2100L
+NOMINAL_DF_GROWTH  <- 1.0477   # 4.77% per year — terminal nominal discount
+
 # ---- 1. Standard prep ------------------------------------------------------
 tr_raw   <- read.csv("./data-raw/2025TR_assumptions.csv")
 tr2025_extended <- prep_assumptions(tr_raw)
@@ -121,7 +130,24 @@ if (last_yr < TARGET_YEAR) {
                                           tr2025_extended$old_law_base * 0.15)
 }
 
-# ---- 4. Save (separate file — does NOT replace data/tr2025.rda) -----------
+# ---- 4. Re-extend the discount factors past the last trustees year --------
+# prep_assumptions copies df / real_df from the terminal trustees row when
+# extending to 2150, freezing them. Replace those (and the 2151-TARGET rows)
+# with proper geometric growth from year-2100. real_df is df deflated by
+# CPI-W relative to its 2100 baseline.
+df_2100        <- tr2025_extended$df       [tr2025_extended$year == TRUSTEES_LAST_YEAR]
+real_df_2100   <- tr2025_extended$real_df  [tr2025_extended$year == TRUSTEES_LAST_YEAR]
+cpi_w_2100     <- tr2025_extended$cpi_w    [tr2025_extended$year == TRUSTEES_LAST_YEAR]
+
+post_idx <- which(tr2025_extended$year > TRUSTEES_LAST_YEAR)
+yrs_past <- tr2025_extended$year[post_idx] - TRUSTEES_LAST_YEAR
+
+tr2025_extended$df[post_idx] <- df_2100 * NOMINAL_DF_GROWTH^yrs_past
+tr2025_extended$real_df[post_idx] <-
+  real_df_2100 * (tr2025_extended$df[post_idx] / df_2100) *
+                 (cpi_w_2100 / tr2025_extended$cpi_w[post_idx])
+
+# ---- 5. Save (separate file — does NOT replace data/tr2025.rda) -----------
 save(tr2025_extended,
      file = "./data/tr2025_extended.rda",
      compress = "xz")
